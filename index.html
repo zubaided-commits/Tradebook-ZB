@@ -1,14 +1,14 @@
-None selected
+None selected 
 
 Skip to content
 Using Gmail with screen readers
-1 of 8,884
+1 of 8,885
 (no subject)
 Inbox
 
 ED Z <zubaided@icloud.com>
 Attachments
-12:28 PM (1 minute ago)
+12:36 PM (1 minute ago)
 to me
 
 
@@ -27,6 +27,7 @@ Sent from my iPhone
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="TradeBook">
 <meta name="theme-color" content="#0d1117">
+<meta name="color-scheme" content="dark">
 <title>TradeBook</title>
 <style>
 :root {
@@ -55,6 +56,7 @@ Sent from my iPhone
 }
 
 - { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html { color-scheme: dark; }
   html, body { height: 100%; overflow: hidden; background: #0d1117; }
   body {
   background: var(–bg);
@@ -154,30 +156,49 @@ border-radius: 10px; padding: 12px 10px; text-align: center;
 .fg { display: flex; flex-direction: column; gap: 5px; }
 .fg label { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(–text2); }
 .fg input, .fg select {
-background: var(–bg); border: 1px solid var(–border);
-border-radius: 10px; color: var(–text);
+background: #1c2128 !important;
+-webkit-background: #1c2128 !important;
+border: 1px solid #21262d !important;
+border-radius: 10px;
+color: #f0f6fc !important;
+-webkit-text-fill-color: #f0f6fc !important;
 padding: 12px 13px; font-size: 0.95rem;
 font-family: var(–font);
 outline: none; width: 100%; transition: border-color 0.15s;
 -webkit-appearance: none; appearance: none;
+color-scheme: dark;
 }
-.fg input:focus, .fg select:focus { border-color: var(–green); }
+.fg input:focus, .fg select:focus { border-color: #3fb950 !important; }
 .fg input[readonly] { opacity: 0.5; }
-.fg select { background-image: url(“data:image/svg+xml,%3Csvg xmlns=‘http://www.w3.org/2000/svg’ width=‘12’ height=‘8’ viewBox=‘0 0 12 8’%3E%3Cpath d=‘M1 1l5 5 5-5’ stroke=’%238b949e’ stroke-width=‘1.5’ fill=‘none’ stroke-linecap=‘round’/%3E%3C/svg%3E”); background-repeat: no-repeat; background-position: right 13px center; padding-right: 32px; }
+.fg input::placeholder { color: #484f58 !important; -webkit-text-fill-color: #484f58 !important; }
+.fg select {
+background-color: #1c2128 !important;
+background-image: url(“data:image/svg+xml,%3Csvg xmlns=‘http://www.w3.org/2000/svg’ width=‘12’ height=‘8’ viewBox=‘0 0 12 8’%3E%3Cpath d=‘M1 1l5 5 5-5’ stroke=’%238b949e’ stroke-width=‘1.5’ fill=‘none’ stroke-linecap=‘round’/%3E%3C/svg%3E”);
+background-repeat: no-repeat; background-position: right 13px center; padding-right: 32px;
+}
+/* Force dark autofill on Safari */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+-webkit-box-shadow: 0 0 0px 1000px #1c2128 inset !important;
+-webkit-text-fill-color: #f0f6fc !important;
+border: 1px solid #21262d !important;
+}
 
 .seg-control {
-display: flex; background: var(–bg); border: 1px solid var(–border);
+display: flex; background: #0d1117; border: 1px solid #21262d;
 border-radius: 10px; padding: 3px; gap: 3px;
 }
 .seg-btn {
 flex: 1; padding: 9px 6px; border-radius: 8px; border: none;
 font-size: 0.78rem; font-weight: 700; cursor: pointer;
-background: transparent; color: var(–text2);
+background: transparent; color: #8b949e;
 transition: all 0.15s; font-family: var(–font);
+-webkit-appearance: none;
 }
-.seg-btn.active { background: var(–card2); color: var(–text); box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
-.seg-btn.buy.active { color: var(–green); }
-.seg-btn.sell.active { color: var(–red); }
+.seg-btn.active { background: #1c2128; color: #f0f6fc; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.seg-btn.buy.active { color: #3fb950; }
+.seg-btn.sell.active { color: #f85149; }
 
 /* ── DIVIDER ── */
 .divider { height: 1px; background: var(–border); margin: 14px 0; }
@@ -197,12 +218,13 @@ width: 100%; padding: 15px; border-radius: 12px;
 font-size: 0.88rem; font-weight: 700; letter-spacing: 0.02em;
 cursor: pointer; border: none; font-family: var(–font);
 transition: all 0.15s; margin-top: 12px;
--webkit-appearance: none;
+-webkit-appearance: none; appearance: none;
+display: block;
 }
-.btn:active { transform: scale(0.97); }
-.btn-green { background: var(–green); color: #0d1117; }
-.btn-red { background: var(–red); color: #fff; }
-.btn-ghost { background: var(–card2); color: var(–text); border: 1px solid var(–border); margin-top: 8px; }
+.btn:active { transform: scale(0.97); opacity: 0.85; }
+.btn-green { background: #3fb950 !important; color: #0d1117 !important; -webkit-text-fill-color: #0d1117 !important; }
+.btn-red   { background: #f85149 !important; color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; }
+.btn-ghost { background: #1c2128 !important; color: #f0f6fc !important; -webkit-text-fill-color: #f0f6fc !important; border: 1px solid #21262d; margin-top: 8px; }
 
 /* ── BADGE ── */
 .badge {
@@ -1335,4 +1357,4 @@ window.addEventListener('load', () => {
 </body>
 </html>
 text.txt
-Displaying text.txt.
+Displaying text.txt. 
