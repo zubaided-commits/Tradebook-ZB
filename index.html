@@ -50,12 +50,12 @@
 .app {
 display: flex; flex-direction: column;
 height: 100vh; height: 100dvh;
-padding-top: var(–safe-top);
+padding-top: max(env(safe-area-inset-top), 44px);
 background: var(–bg);
 }
 
 .topbar {
-padding: 14px 20px 10px;
+padding: 12px 20px 10px;
 background: var(–bg);
 display: flex; align-items: center; justify-content: space-between;
 border-bottom: 1px solid var(–border);
@@ -69,17 +69,17 @@ flex-shrink: 0;
 flex: 1; overflow-y: auto; overflow-x: hidden;
 -webkit-overflow-scrolling: touch;
 padding: 16px 16px 0;
-padding-bottom: calc(80px + var(–safe-bottom));
+padding-bottom: calc(90px + max(env(safe-area-inset-bottom), 16px));
 }
 
 /* ── BOTTOM NAV ── */
 .bottom-nav {
 position: fixed; bottom: 0; left: 0; right: 0;
-background: rgba(13,17,23,0.92);
+background: rgba(13,17,23,0.97);
 backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
 border-top: 1px solid var(–border);
 display: flex;
-padding-bottom: var(–safe-bottom);
+padding-bottom: max(env(safe-area-inset-bottom), 8px);
 z-index: 200;
 }
 .nav-item {
@@ -100,8 +100,9 @@ transition: all 0.15s; color: var(–text3);
 font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
 letter-spacing: 0.12em; color: var(–text2);
 margin: 20px 0 10px; display: flex; align-items: center; gap: 8px;
+overflow: hidden;
 }
-.section-hd::after { content: ‘’; flex: 1; height: 1px; background: var(–border); }
+.section-hd::after { content: ‘’; flex: 1; height: 1px; background: var(–border); display: inline-block; vertical-align: middle; }
 
 /* ── CARDS ── */
 .card {
@@ -348,7 +349,7 @@ border-left: 2px solid var(–border); padding-left: 12px; margin: 12px 0;
 ```
 <!-- ══ DASHBOARD ══ -->
 <div class="page active" id="pg-home">
-  <div id="install-banner" class="install-banner">
+  <div id="install-banner" class="install-banner" style="display:none">
     <div class="ib-icon">📲</div>
     <div style="flex:1">
       <div class="ib-title">Add to Home Screen</div>
