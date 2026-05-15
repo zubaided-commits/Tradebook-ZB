@@ -343,14 +343,14 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 </div>
 
 <script>
-// ══ SECURITY ══
-// Default credentials — hashed with simple SHA-like obfuscation stored in localStorage
+// == SECURITY ==
+// Default credentials - hashed with simple SHA-like obfuscation stored in localStorage
 let currentUser=null;
 let loginAttempts=0;
 let lockoutUntil=0;
 
 function hashPass(pass){
-  // Safari-safe hash — no btoa, pure charCode arithmetic
+  // Safari-safe hash - no btoa, pure charCode arithmetic
   const str=pass+'TB_SALT_2024_SECURE';
   let h1=5381, h2=52711;
   for(let i=0;i<str.length;i++){
@@ -397,8 +397,8 @@ function clearSession(){ localStorage.removeItem('tb_session'); }
 function togglePassVis(){
   const inp=document.getElementById('login-pass');
   const eye=document.getElementById('pass-eye');
-  if(inp.type==='password'){inp.type='text';eye.textContent='🙈';}
-  else{inp.type='password';eye.textContent='👁';}
+  if(inp.type==='password'){inp.type='text';eye.textContent=''*'';}
+  else{inp.type='password';eye.textContent=''*'';}
 }
 
 function clearLoginError(){
@@ -425,7 +425,7 @@ function doLogin(){
   if(Date.now()<lockoutUntil){
     const secs=Math.ceil((lockoutUntil-Date.now())/1000);
     document.getElementById('login-lockout').style.display='block';
-    document.getElementById('login-lockout').textContent=`⏳ Too many attempts. Try again in ${secs}s`;
+    document.getElementById('login-lockout').textContent=` Too many attempts. Try again in ${secs}s`;
     return;
   }
 
@@ -446,7 +446,7 @@ function doLogin(){
       lockoutUntil=Date.now()+30000; // 30 second lockout
       loginAttempts=0;
       document.getElementById('login-lockout').style.display='block';
-      document.getElementById('login-lockout').textContent='⏳ Too many failed attempts. Locked for 30 seconds.';
+      document.getElementById('login-lockout').textContent=' Too many failed attempts. Locked for 30 seconds.';
       // Countdown
       const interval=setInterval(()=>{
         const secs=Math.ceil((lockoutUntil-Date.now())/1000);
@@ -454,11 +454,11 @@ function doLogin(){
           clearInterval(interval);
           document.getElementById('login-lockout').style.display='none';
         }else{
-          document.getElementById('login-lockout').textContent=`⏳ Too many attempts. Try again in ${secs}s`;
+          document.getElementById('login-lockout').textContent=` Too many attempts. Try again in ${secs}s`;
         }
       },1000);
     }else{
-      showLoginError(`❌ Wrong username or password. ${5-loginAttempts} attempt(s) remaining.`);
+      showLoginError(`[X] Wrong username or password. ${5-loginAttempts} attempt(s) remaining.`);
     }
     // Shake animation
     const card=document.getElementById('login-pass');
@@ -524,7 +524,7 @@ function doChangePass(){
   const user=users[currentUser.username];
 
   if(hashPass(current)!==user.passHash){
-    msgEl.textContent='❌ Current password is wrong.';
+    msgEl.textContent='[X] Current password is wrong.';
     msgEl.style.display='block';
     msgEl.style.background='rgba(255,61,61,0.1)';
     msgEl.style.color='#ff3d3d';
@@ -532,7 +532,7 @@ function doChangePass(){
     return;
   }
   if(newPass.length<6){
-    msgEl.textContent='❌ New password must be at least 6 characters.';
+    msgEl.textContent='[X] New password must be at least 6 characters.';
     msgEl.style.display='block';
     msgEl.style.background='rgba(255,61,61,0.1)';
     msgEl.style.color='#ff3d3d';
@@ -540,7 +540,7 @@ function doChangePass(){
     return;
   }
   if(newPass!==confirm){
-    msgEl.textContent='❌ Passwords do not match.';
+    msgEl.textContent='[X] Passwords do not match.';
     msgEl.style.display='block';
     msgEl.style.background='rgba(255,61,61,0.1)';
     msgEl.style.color='#ff3d3d';
@@ -550,7 +550,7 @@ function doChangePass(){
 
   users[currentUser.username].passHash=hashPass(newPass);
   saveUsers(users);
-  msgEl.textContent='✅ Password changed successfully!';
+  msgEl.textContent='[OK] Password changed successfully!';
   msgEl.style.display='block';
   msgEl.style.background='rgba(0,200,83,0.1)';
   msgEl.style.color='#00c853';
@@ -558,7 +558,7 @@ function doChangePass(){
   setTimeout(()=>{ document.getElementById('chpass-modal').style.display='none'; },1500);
 }
 
-// ══ AUTO SESSION CHECK ══
+// == AUTO SESSION CHECK ==
 window.addEventListener('load',()=>{
   load();
 
@@ -592,7 +592,8 @@ window.addEventListener('load',()=>{
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('main-app').style.display='none';
 });
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+
+function goTo(id){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('pg-'+id).classList.add('active');
   document.getElementById('nav-'+id).classList.add('active');
@@ -618,7 +619,7 @@ function addDeposit(){
   if(!date)return msg('dep-msg','Select a date.',false);
   DB.deposits.push({id:DB.nextDid++,who,type,amt,date,time,note});
   save();renderAll();
-  msg('dep-msg',type==='deposit'?'✅ Deposit added!':'✅ Withdrawal recorded!',true);
+  msg('dep-msg',type==='deposit'?'[OK] Deposit added!':'[OK] Withdrawal recorded!',true);
   document.getElementById('dep-amt').value='';
   document.getElementById('dep-note').value='';
 }
@@ -640,25 +641,25 @@ function addTrade(){
   const{myFee,broFee}=calcFeeSplit(myVal,broVal);
   if(tradeAction==='buy'){
     const myBal=getBalance('me'),broBal=getBalance('bro');
-    if(myQty>0&&myBal<=0)return msg('trade-msg','🚫 Zubaid has no funds. Add a deposit first.',false);
-    if(myQty>0&&(myVal+myFee)>myBal)return msg('trade-msg',`🚫 Zubaid needs €${(myVal+myFee).toFixed(2)} but has €${myBal.toFixed(2)}`,false);
-    if(broQty>0&&broBal<=0)return msg('trade-msg','🚫 Bihzad has no funds. Add a deposit first.',false);
-    if(broQty>0&&(broVal+broFee)>broBal)return msg('trade-msg',`🚫 Bihzad needs €${(broVal+broFee).toFixed(2)} but has €${broBal.toFixed(2)}`,false);
+    if(myQty>0&&myBal<=0)return msg('trade-msg','[NO] Zubaid has no funds. Add a deposit first.',false);
+    if(myQty>0&&(myVal+myFee)>myBal)return msg('trade-msg',`[NO] Zubaid needs EUR${(myVal+myFee).toFixed(2)} but has EUR${myBal.toFixed(2)}`,false);
+    if(broQty>0&&broBal<=0)return msg('trade-msg','[NO] Bihzad has no funds. Add a deposit first.',false);
+    if(broQty>0&&(broVal+broFee)>broBal)return msg('trade-msg',`[NO] Bihzad needs EUR${(broVal+broFee).toFixed(2)} but has EUR${broBal.toFixed(2)}`,false);
   }
   if(tradeAction==='sell'){
     const positions=getOpenPositions();
     const pos=positions.find(p=>p.ticker===ticker);
     const myHeld=pos?+pos.myQty.toFixed(6):0,broHeld=pos?+pos.broQty.toFixed(6):0;
-    if(myQty>0&&myHeld===0)return msg('trade-msg',`🚫 Zubaid holds no ${ticker} shares.`,false);
-    if(myQty>0&&myQty>myHeld)return msg('trade-msg',`🚫 Zubaid only holds ${myHeld} of ${ticker}.`,false);
-    if(broQty>0&&broHeld===0)return msg('trade-msg',`🚫 Bihzad holds no ${ticker} shares.`,false);
-    if(broQty>0&&broQty>broHeld)return msg('trade-msg',`🚫 Bihzad only holds ${broHeld} of ${ticker}.`,false);
+    if(myQty>0&&myHeld===0)return msg('trade-msg',`[NO] Zubaid holds no ${ticker} shares.`,false);
+    if(myQty>0&&myQty>myHeld)return msg('trade-msg',`[NO] Zubaid only holds ${myHeld} of ${ticker}.`,false);
+    if(broQty>0&&broHeld===0)return msg('trade-msg',`[NO] Bihzad holds no ${ticker} shares.`,false);
+    if(broQty>0&&broQty>broHeld)return msg('trade-msg',`[NO] Bihzad only holds ${broHeld} of ${ticker}.`,false);
   }
   let myPnl=null,broPnl=null;
   if(tradeAction==='sell'){const p=computePnL(ticker,myQty,broQty,price,myFee,broFee);myPnl=p.myPnl;broPnl=p.broPnl;}
   DB.trades.push({id:DB.nextTid++,action:tradeAction,type,ticker,date,time,myQty,broQty,price,myVal,broVal,myFee,broFee,myPnl,broPnl});
   save();renderAll();
-  msg('trade-msg','✅ Trade recorded!',true);
+  msg('trade-msg','[OK] Trade recorded!',true);
   ['tr-ticker','tr-my-qty','tr-bro-qty','tr-price'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ticker-tag').style.display='none';
   calcFees();
@@ -704,8 +705,8 @@ function renderDash(){
   document.getElementById('d-bro-pnl').innerHTML=`P&L: <span class="${bp>=0?'green':'red'}" onclick="showPnlBreakdown('bro')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">${fmt(bp)} 📊</span>`;
   const totalDep=DB.deposits.filter(d=>d.type==='deposit').reduce((s,d)=>s+d.amt,0);
   const totalFees=DB.trades.reduce((s,t)=>s+t.myFee+t.broFee,0);
-  document.getElementById('d-deps').textContent='€'+totalDep.toFixed(0);
-  document.getElementById('d-fees').textContent='€'+totalFees.toFixed(2);
+  document.getElementById('d-deps').textContent='EUR'+totalDep.toFixed(0);
+  document.getElementById('d-fees').textContent='EUR'+totalFees.toFixed(2);
   document.getElementById('d-pos').textContent=getOpenPositions().length;
   const recent=[...DB.trades].reverse().slice(0,5);
   document.getElementById('d-recent').innerHTML=recent.length?recent.map(tradeCard).join(''):empty('No trades yet','📈');
@@ -719,11 +720,11 @@ function renderDeps(){
       <div class="dep-icon">${d.type==='deposit'?'💰':'↩'}</div>
       <div class="dep-info">
         <div class="dep-who">${d.who==='me'?'Zubaid':'Bihzad'} · <span class="badge ${d.type==='deposit'?'b-dep':'b-wit'}">${d.type}</span></div>
-        <div class="dep-note">${d.note||'—'}</div>
+        <div class="dep-note">${d.note||'-'}</div>
         <div class="dep-date">${d.date}${d.time?' · '+d.time:''}</div>
       </div>
       <div>
-        <div class="dep-amt ${d.type==='deposit'?'green':'red'}">${d.type==='deposit'?'+':'-'}€${d.amt.toFixed(2)}</div>
+        <div class="dep-amt ${d.type==='deposit'?'green':'red'}">${d.type==='deposit'?'+':'-'}EUR${d.amt.toFixed(2)}</div>
         <button class="del-btn" onclick="delDeposit(${d.id})">✕</button>
       </div>
     </div>`).join('');
@@ -749,8 +750,8 @@ function tradeCard(t){
       <button class="del-btn" onclick="delTrade(${t.id})">✕</button>
     </div>
     <div class="ti-row">
-      ${t.myQty>0?`<div class="ti-side"><div class="ts-lbl ts-me">Zubaid</div><strong>${t.myQty}</strong> × €${t.price}<br>Val: <strong>€${t.myVal.toFixed(2)}</strong><br>Fee: <span class="red">€${t.myFee.toFixed(2)}</span></div>`:'<div></div>'}
-      ${t.broQty>0?`<div class="ti-side"><div class="ts-lbl ts-bro">Bihzad</div><strong>${t.broQty}</strong> × €${t.price}<br>Val: <strong>€${t.broVal.toFixed(2)}</strong><br>Fee: <span class="red">€${t.broFee.toFixed(2)}</span></div>`:'<div></div>'}
+      ${t.myQty>0?`<div class="ti-side"><div class="ts-lbl ts-me">Zubaid</div><strong>${t.myQty}</strong> × EUR${t.price}<br>Val: <strong>EUR${t.myVal.toFixed(2)}</strong><br>Fee: <span class="red">EUR${t.myFee.toFixed(2)}</span></div>`:'<div></div>'}
+      ${t.broQty>0?`<div class="ti-side"><div class="ts-lbl ts-bro">Bihzad</div><strong>${t.broQty}</strong> × EUR${t.price}<br>Val: <strong>EUR${t.broVal.toFixed(2)}</strong><br>Fee: <span class="red">EUR${t.broFee.toFixed(2)}</span></div>`:'<div></div>'}
     </div>
     ${(myPnlHtml||broPnlHtml)?`<div class="pnl-row">${myPnlHtml}${broPnlHtml}</div>`:''}
   </div>`;
@@ -761,14 +762,14 @@ function renderPort(){
   const list=document.getElementById('port-list');
   if(!positions.length){list.innerHTML=empty('No open positions','📂');return;}
   list.innerHTML=positions.map(p=>{
-    const myAvg=p.myQty>0?(p.myCost/p.myQty).toFixed(4):'—';
-    const broAvg=p.broQty>0?(p.broCost/p.broQty).toFixed(4):'—';
+    const myAvg=p.myQty>0?(p.myCost/p.myQty).toFixed(4):'-';
+    const broAvg=p.broQty>0?(p.broCost/p.broQty).toFixed(4):'-';
     const joint=p.myQty>0&&p.broQty>0;
     return`<div class="pos-item">
       <div class="pos-top"><span style="font-size:1.1rem;font-weight:800;color:#2196f3">${p.ticker}</span><span class="badge b-${p.type}">${p.type}</span>${joint?'<span class="badge b-joint">JOINT</span>':''}</div>
       <div class="pos-grid">
-        ${p.myQty>0?`<div class="pos-side"><span style="color:#00c853;font-size:0.55rem;font-weight:700;text-transform:uppercase">Zubaid</span><br>Qty: <strong style="color:#fff">${p.myQty.toFixed(4)}</strong><br>Avg: €${myAvg}<br>Cost: €${p.myCost.toFixed(2)}</div>`:''}
-        ${p.broQty>0?`<div class="pos-side"><span style="color:#2196f3;font-size:0.55rem;font-weight:700;text-transform:uppercase">Bihzad</span><br>Qty: <strong style="color:#fff">${p.broQty.toFixed(4)}</strong><br>Avg: €${broAvg}<br>Cost: €${p.broCost.toFixed(2)}</div>`:''}
+        ${p.myQty>0?`<div class="pos-side"><span style="color:#00c853;font-size:0.55rem;font-weight:700;text-transform:uppercase">Zubaid</span><br>Qty: <strong style="color:#fff">${p.myQty.toFixed(4)}</strong><br>Avg: EUR${myAvg}<br>Cost: EUR${p.myCost.toFixed(2)}</div>`:''}
+        ${p.broQty>0?`<div class="pos-side"><span style="color:#2196f3;font-size:0.55rem;font-weight:700;text-transform:uppercase">Bihzad</span><br>Qty: <strong style="color:#fff">${p.broQty.toFixed(4)}</strong><br>Avg: EUR${broAvg}<br>Cost: EUR${p.broCost.toFixed(2)}</div>`:''}
       </div>
     </div>`;
   }).join('');
@@ -802,7 +803,7 @@ function showPnlBreakdown(who){
       </div>
       <div style="background:#1e1e1e;border-radius:4px;height:5px;margin-bottom:8px"><div style="width:${bw}%;height:100%;border-radius:4px;background:${bc}"></div></div>
       <div style="font-size:0.62rem;color:#666;margin-bottom:6px">${pct}% of total · ${item.trades.length} sell trade(s)</div>
-      ${item.trades.map(tr=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-top:1px solid #1e1e1e;font-size:0.68rem;font-family:'SF Mono',ui-monospace,monospace"><span style="color:#666">${tr.date}${tr.time?' '+tr.time:''} · ${tr.qty}×€${tr.price}</span><span style="color:${tr.pnl>=0?'#00c853':'#ff3d3d'};font-weight:600">${fmt(tr.pnl)}</span></div>`).join('')}
+      ${item.trades.map(tr=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-top:1px solid #1e1e1e;font-size:0.68rem;font-family:'SF Mono',ui-monospace,monospace"><span style="color:#666">${tr.date}${tr.time?' '+tr.time:''} · ${tr.qty}×EUR${tr.price}</span><span style="color:${tr.pnl>=0?'#00c853':'#ff3d3d'};font-weight:600">${fmt(tr.pnl)}</span></div>`).join('')}
     </div>`;
   });
   document.getElementById('modal-body').innerHTML=html;
@@ -877,7 +878,7 @@ function filterTickerSuggestions(){
   onTickerInput();
 }
 
-function fmt(n){return(n<0?'-':'')+'€'+Math.abs(n).toFixed(2);}
+function fmt(n){return(n<0?'-':'')+'EUR'+Math.abs(n).toFixed(2);}
 function empty(text,icon){return`<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-text">${text}</div></div>`;}
 function msg(id,text,ok){
   const el=document.getElementById(id);
@@ -886,7 +887,7 @@ function msg(id,text,ok){
   setTimeout(()=>{el.className='alert';},3500);
 }
 
-// ══ CORE DATA ══
+// == CORE DATA ==
 const BROKER_FEE=0.99,FEE_THRESHOLD=250;
 let DB={deposits:[],trades:[],nextDid:1,nextTid:1};
 let tradeAction='buy';
@@ -952,7 +953,7 @@ function checkResetInput(){
   if(val==='DELETE'){btn.disabled=false;btn.style.background='#ff3d3d';btn.style.cursor='pointer';}
   else{btn.disabled=true;btn.style.background='#333';btn.style.cursor='not-allowed';}
 }
-function confirmReset(){DB={deposits:[],trades:[],nextDid:1,nextTid:1};save();renderAll();closeResetModal();msg('dep-msg','✅ All data cleared.',true);}
+function confirmReset(){DB={deposits:[],trades:[],nextDid:1,nextTid:1};save();renderAll();closeResetModal();msg('dep-msg','[OK] All data cleared.',true);}
 
 function calcFeeSplit(myVal,broVal){
   let myFee=0,broFee=0;
@@ -977,17 +978,17 @@ function calcFees(){
   const broQty=parseNum(document.getElementById('tr-bro-qty').value);
   const price=parseNum(document.getElementById('tr-price').value);
   const myVal=myQty*price,broVal=broQty*price;
-  document.getElementById('tr-my-total').value=myVal>0?'€'+myVal.toFixed(2):'';
-  document.getElementById('tr-bro-total').value=broVal>0?'€'+broVal.toFixed(2):'';
+  document.getElementById('tr-my-total').value=myVal>0?'EUR'+myVal.toFixed(2):'';
+  document.getElementById('tr-bro-total').value=broVal>0?'EUR'+broVal.toFixed(2):'';
   if(!price||(!myQty&&!broQty)){document.getElementById('fee-box').textContent='💶 Enter price and quantities to calculate fees.';document.getElementById('balance-check').style.display='none';return;}
   const{myFee,broFee}=calcFeeSplit(myVal,broVal);
   const combined=myVal+broVal;
   let reason='';
-  if(myQty>0&&broQty>0){reason=combined>=FEE_THRESHOLD?`Joint €${combined.toFixed(2)} ≥ €250 → No fee`:`Joint €${combined.toFixed(2)} < €250 → Fee split`;}
-  else{reason=combined>=FEE_THRESHOLD?`€${combined.toFixed(2)} ≥ €250 → No fee`:`€${combined.toFixed(2)} < €250 → Fee applies`;}
+  if(myQty>0&&broQty>0){reason=combined>=FEE_THRESHOLD?`Joint EUR${combined.toFixed(2)} ≥ EUR250 → No fee`:`Joint EUR${combined.toFixed(2)} < EUR250 → Fee split`;}
+  else{reason=combined>=FEE_THRESHOLD?`EUR${combined.toFixed(2)} ≥ EUR250 → No fee`:`EUR${combined.toFixed(2)} < EUR250 → Fee applies`;}
   const parts=[];
-  if(myQty>0)parts.push(`Zubaid fee: €${myFee.toFixed(2)}`);
-  if(broQty>0)parts.push(`Bihzad fee: €${broFee.toFixed(2)}`);
+  if(myQty>0)parts.push(`Zubaid fee: EUR${myFee.toFixed(2)}`);
+  if(broQty>0)parts.push(`Bihzad fee: EUR${broFee.toFixed(2)}`);
   document.getElementById('fee-box').textContent=`💶 ${reason}\n${parts.join('  ·  ')}`;
   const balDiv=document.getElementById('balance-check');
   balDiv.style.display='grid';
@@ -995,19 +996,19 @@ function calcFees(){
   const myNeed=myVal+myFee,broNeed=broVal+broFee;
   if(tradeAction==='buy'){
     const myOk=myQty===0||myBal>=myNeed,broOk=broQty===0||broBal>=broNeed;
-    document.getElementById('bal-me').innerHTML=myQty>0?`<span style="color:#888;font-size:0.55rem">ZUBAID</span><br><span style="color:${myOk?'#00c853':'#ff3d3d'}">${myOk?'✅':'🚫'} €${myBal.toFixed(2)}</span><br><span style="color:#555">Need €${myNeed.toFixed(2)}</span>`:`<span style="color:#333;font-size:0.55rem">ZUBAID</span><br><span style="color:#333">Not trading</span>`;
-    document.getElementById('bal-bro').innerHTML=broQty>0?`<span style="color:#888;font-size:0.55rem">BIHZAD</span><br><span style="color:${broOk?'#00c853':'#ff3d3d'}">${broOk?'✅':'🚫'} €${broBal.toFixed(2)}</span><br><span style="color:#555">Need €${broNeed.toFixed(2)}</span>`:`<span style="color:#333;font-size:0.55rem">BIHZAD</span><br><span style="color:#333">Not trading</span>`;
+    document.getElementById('bal-me').innerHTML=myQty>0?`<span style="color:#888;font-size:0.55rem">ZUBAID</span><br><span style="color:${myOk?'#00c853':'#ff3d3d'}">${myOk?'[OK]':'[NO]'} EUR${myBal.toFixed(2)}</span><br><span style="color:#555">Need EUR${myNeed.toFixed(2)}</span>`:`<span style="color:#333;font-size:0.55rem">ZUBAID</span><br><span style="color:#333">Not trading</span>`;
+    document.getElementById('bal-bro').innerHTML=broQty>0?`<span style="color:#888;font-size:0.55rem">BIHZAD</span><br><span style="color:${broOk?'#00c853':'#ff3d3d'}">${broOk?'[OK]':'[NO]'} EUR${broBal.toFixed(2)}</span><br><span style="color:#555">Need EUR${broNeed.toFixed(2)}</span>`:`<span style="color:#333;font-size:0.55rem">BIHZAD</span><br><span style="color:#333">Not trading</span>`;
   }else{
     const ticker=document.getElementById('tr-ticker').value.trim().toUpperCase();
     const pos=ticker?getOpenPositions().find(p=>p.ticker===ticker):null;
     const myHeld=pos?+pos.myQty.toFixed(4):0,broHeld=pos?+pos.broQty.toFixed(4):0;
     const myOk=myQty===0||(myHeld>0&&myQty<=myHeld),broOk=broQty===0||(broHeld>0&&broQty<=broHeld);
-    document.getElementById('bal-me').innerHTML=myQty>0?`<span style="color:#888;font-size:0.55rem">ZUBAID HOLDS</span><br><span style="color:${myOk?'#00c853':'#ff3d3d'}">${myOk?'✅':'🚫'} ${myHeld}</span><br><span style="color:#555">Selling: ${myQty}</span>`:`<span style="color:#333;font-size:0.55rem">ZUBAID HOLDS</span><br><span style="color:#333">${myHeld>0?myHeld:'None'}</span>`;
-    document.getElementById('bal-bro').innerHTML=broQty>0?`<span style="color:#888;font-size:0.55rem">BIHZAD HOLDS</span><br><span style="color:${broOk?'#00c853':'#ff3d3d'}">${broOk?'✅':'🚫'} ${broHeld}</span><br><span style="color:#555">Selling: ${broQty}</span>`:`<span style="color:#333;font-size:0.55rem">BIHZAD HOLDS</span><br><span style="color:#333">${broHeld>0?broHeld:'None'}</span>`;
+    document.getElementById('bal-me').innerHTML=myQty>0?`<span style="color:#888;font-size:0.55rem">ZUBAID HOLDS</span><br><span style="color:${myOk?'#00c853':'#ff3d3d'}">${myOk?'[OK]':'[NO]'} ${myHeld}</span><br><span style="color:#555">Selling: ${myQty}</span>`:`<span style="color:#333;font-size:0.55rem">ZUBAID HOLDS</span><br><span style="color:#333">${myHeld>0?myHeld:'None'}</span>`;
+    document.getElementById('bal-bro').innerHTML=broQty>0?`<span style="color:#888;font-size:0.55rem">BIHZAD HOLDS</span><br><span style="color:${broOk?'#00c853':'#ff3d3d'}">${broOk?'[OK]':'[NO]'} ${broHeld}</span><br><span style="color:#555">Selling: ${broQty}</span>`:`<span style="color:#333;font-size:0.55rem">BIHZAD HOLDS</span><br><span style="color:#333">${broHeld>0?broHeld:'None'}</span>`;
   }
 }
 
-// ══ STATEMENTS ══
+// == STATEMENTS ==
 let stmtTrader='me', stmtView='monthly';
 
 function setStmtTrader(who){
@@ -1074,7 +1075,7 @@ function renderStatements(){
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div>
           <div style="font-size:1rem;font-weight:800;color:#fff">${periodLabel}</div>
-          <div style="font-size:0.62rem;color:#666;margin-top:2px">${buyCount} trade(s) · Fees: €${p.fees.toFixed(2)}</div>
+          <div style="font-size:0.62rem;color:#666;margin-top:2px">${buyCount} trade(s) · Fees: EUR${p.fees.toFixed(2)}</div>
         </div>
         <div style="text-align:right">
           <div style="font-family:'SF Mono',ui-monospace,monospace;font-size:1.2rem;font-weight:800;color:${pnlColor}">${fmt(p.pnl)}</div>
@@ -1092,7 +1093,7 @@ function renderStatements(){
             <span style="color:#666;margin-left:6px">${t.date}${t.time?' '+t.time:''}</span>
           </div>
           <div style="text-align:right">
-            <span style="color:#888">${qty}×€${t.price}</span>
+            <span style="color:#888">${qty}×EUR${t.price}</span>
             <span style="color:${tpnl>=0?'#00c853':'#ff3d3d'};font-weight:700;margin-left:8px">${fmt(tpnl)}</span>
           </div>
         </div>`;
@@ -1119,10 +1120,10 @@ function downloadPDF(periodKey, name, periodLabel){
       <td>${t.ticker}</td>
       <td>${t.type}</td>
       <td>${qty}</td>
-      <td>€${t.price}</td>
-      <td>€${(qty*t.price).toFixed(2)}</td>
-      <td>€${fee.toFixed(2)}</td>
-      <td style="color:${pnl>=0?'#00aa44':'#cc0000'};font-weight:bold">${pnl!==null?fmt(pnl):'—'}</td>
+      <td>EUR${t.price}</td>
+      <td>EUR${(qty*t.price).toFixed(2)}</td>
+      <td>EUR${fee.toFixed(2)}</td>
+      <td style="color:${pnl>=0?'#00aa44':'#cc0000'};font-weight:bold">${pnl!==null?fmt(pnl):'-'}</td>
     </tr>`;
   }).join('');
 
@@ -1154,7 +1155,7 @@ function downloadPDF(periodKey, name, periodLabel){
 <div class="summary">
   <div class="sum-box"><div class="sum-lbl">Realized P&L</div><div class="sum-val ${totalPnl>=0?'profit':'loss'}">${fmt(totalPnl)}</div></div>
   <div class="sum-box"><div class="sum-lbl">Total Trades</div><div class="sum-val">${sells.filter(t=>who==='me'?t.myQty>0:t.broQty>0).length}</div></div>
-  <div class="sum-box"><div class="sum-lbl">Fees Paid</div><div class="sum-val">€${totalFees.toFixed(2)}</div></div>
+  <div class="sum-box"><div class="sum-lbl">Fees Paid</div><div class="sum-val">EUR${totalFees.toFixed(2)}</div></div>
 </div>
 <table>
   <thead><tr><th>Date & Time</th><th>Ticker</th><th>Type</th><th>Qty</th><th>Price</th><th>Value</th><th>Fee</th><th>P&L</th></tr></thead>
