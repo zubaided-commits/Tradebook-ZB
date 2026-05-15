@@ -395,10 +395,10 @@ function saveSession(username){ localStorage.setItem('tb_session',JSON.stringify
 function clearSession(){ localStorage.removeItem('tb_session'); }
 
 function togglePassVis(){
-  const inp=document.getElementById('login-pass');
-  const eye=document.getElementById('pass-eye');
-  if(inp.type==='password'){inp.type='text';eye.textContent=''*'';}
-  else{inp.type='password';eye.textContent=''*'';}
+  var inp=document.getElementById('login-pass');
+  var eye=document.getElementById('pass-eye');
+  if(inp.type==='password'){inp.type='text';eye.textContent='Hide';}
+  else{inp.type='password';eye.textContent='Show';}
 }
 
 function clearLoginError(){
