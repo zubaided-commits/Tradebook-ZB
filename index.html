@@ -10,10 +10,6 @@
 <meta name="theme-color" content="#0a0a0a">
 <meta name="color-scheme" content="dark">
 <title>TradeBook</title>
-
-<!-- PDF Library -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{color-scheme:dark;background:#0a0a0a}
@@ -150,6 +146,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 </div>
 
 <!-- CHANGE PASSWORD MODAL -->
+
 <div id="chpass-modal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);align-items:center;justify-content:center">
   <div style="background:#161616;border:1px solid #2e2e2e;border-radius:20px;padding:24px 20px;margin:20px;max-width:320px;width:100%">
     <div style="font-size:1rem;font-weight:800;text-align:center;margin-bottom:16px">🔑 Change Password</div>
@@ -303,6 +300,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 </div><!-- /main-app -->
 
 <!-- RESET MODAL -->
+
 <div id="reset-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);align-items:center;justify-content:center">
   <div style="background:#161616;border:1px solid #2e2e2e;border-radius:20px;padding:26px 20px;margin:20px;max-width:320px;width:100%">
     <div style="font-size:2rem;text-align:center;margin-bottom:10px">⚠️</div>
@@ -318,6 +316,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 </div>
 
 <!-- P&L MODAL -->
+
 <div id="pnl-modal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)" onclick="closePnlModal(event)">
   <div style="position:absolute;bottom:0;left:0;right:0;background:#161616;border-radius:22px 22px 0 0;padding:20px 16px;max-height:80vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:env(safe-area-inset-bottom,16px)">
     <div style="width:36px;height:4px;background:#2e2e2e;border-radius:2px;margin:0 auto 16px"></div>
@@ -330,6 +329,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 </div>
 
 <!-- USER MENU -->
+
 <div id="user-menu" style="display:none;position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)" onclick="closeUserMenu(event)">
   <div style="position:absolute;bottom:0;left:0;right:0;background:#161616;border-radius:22px 22px 0 0;padding:20px 16px;padding-bottom:env(safe-area-inset-bottom,20px)">
     <div style="width:36px;height:4px;background:#2e2e2e;border-radius:2px;margin:0 auto 16px"></div>
@@ -343,12 +343,14 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 </div>
 
 <script>
-// ══ SECURITY ══
+// == SECURITY ==
+// Default credentials - hashed with simple SHA-like obfuscation stored in localStorage
 let currentUser=null;
 let loginAttempts=0;
 let lockoutUntil=0;
 
 function hashPass(pass){
+  // Safari-safe hash - no btoa, pure charCode arithmetic
   const str=pass+'TB_SALT_2024_SECURE';
   let h1=5381, h2=52711;
   for(let i=0;i<str.length;i++){
@@ -364,10 +366,12 @@ function getUsers(){
   try{
     const u=localStorage.getItem('tb_users');
     if(u){
+      // Migrate old hash format if needed
       const parsed=JSON.parse(u);
       if(parsed&&parsed.zubaid&&parsed.bihzad)return parsed;
     }
   }catch(e){}
+  // Fresh defaults
   return{
     zubaid:{name:'Zubaid',passHash:hashPass('zubaid123')},
     bihzad:{name:'Bihzad',passHash:hashPass('bihzad123')}
@@ -381,6 +385,7 @@ function getSession(){
     const s=localStorage.getItem('tb_session');
     if(!s)return null;
     const sess=JSON.parse(s);
+    // Session expires after 8 hours
     if(Date.now()-sess.time>8*60*60*1000){ localStorage.removeItem('tb_session'); return null; }
     return sess;
   }catch(e){return null;}
@@ -392,19 +397,35 @@ function clearSession(){ localStorage.removeItem('tb_session'); }
 function togglePassVis(){
   const inp=document.getElementById('login-pass');
   const eye=document.getElementById('pass-eye');
-  if(inp.type==='password'){inp.type='text';eye.textContent='🙈';}
-  else{inp.type='password';eye.textContent='👁';}
+  if(inp.type==='password'){inp.type='text';eye.textContent=''*'';}
+  else{inp.type='password';eye.textContent=''*'';}
 }
 
 function clearLoginError(){
   document.getElementById('login-error').style.display='none';
 }
 
+function initAppAfterLogin(){
+  try{
+    const now=new Date();
+    const today=now.toISOString().split('T')[0];
+    const time=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('dep-date').value=today;
+    document.getElementById('dep-time').value=time;
+    document.getElementById('tr-date').value=today;
+    document.getElementById('tr-time').value=time;
+  }catch(e){}
+  initTitlePress();
+  updateClock();
+  renderAll();
+}
+
 function doLogin(){
+  // Check lockout
   if(Date.now()<lockoutUntil){
     const secs=Math.ceil((lockoutUntil-Date.now())/1000);
     document.getElementById('login-lockout').style.display='block';
-    document.getElementById('login-lockout').textContent=`⏳ Too many attempts. Try again in ${secs}s`;
+    document.getElementById('login-lockout').textContent=` Too many attempts. Try again in ${secs}s`;
     return;
   }
 
@@ -422,25 +443,31 @@ function doLogin(){
   if(!user||hashPass(password)!==user.passHash){
     loginAttempts++;
     if(loginAttempts>=5){
-      lockoutUntil=Date.now()+30000;
+      lockoutUntil=Date.now()+30000; // 30 second lockout
       loginAttempts=0;
       document.getElementById('login-lockout').style.display='block';
-      document.getElementById('login-lockout').textContent='⏳ Too many failed attempts. Locked for 30 seconds.';
+      document.getElementById('login-lockout').textContent=' Too many failed attempts. Locked for 30 seconds.';
+      // Countdown
       const interval=setInterval(()=>{
         const secs=Math.ceil((lockoutUntil-Date.now())/1000);
         if(secs<=0){
           clearInterval(interval);
           document.getElementById('login-lockout').style.display='none';
         }else{
-          document.getElementById('login-lockout').textContent=`⏳ Too many attempts. Try again in ${secs}s`;
+          document.getElementById('login-lockout').textContent=` Too many attempts. Try again in ${secs}s`;
         }
       },1000);
     }else{
-      showLoginError(`❌ Wrong username or password. ${5-loginAttempts} attempt(s) remaining.`);
+      showLoginError(`[X] Wrong username or password. ${5-loginAttempts} attempt(s) remaining.`);
     }
+    // Shake animation
+    const card=document.getElementById('login-pass');
+    card.style.borderColor='#ff3d3d !important';
+    setTimeout(()=>card.style.borderColor='',1000);
     return;
   }
 
+  // Success
   loginAttempts=0;
   currentUser={username,name:user.name};
   saveSession(username);
@@ -450,7 +477,7 @@ function doLogin(){
   document.getElementById('main-app').style.display='flex';
   document.getElementById('login-pass').value='';
   document.getElementById('login-user').value='';
-  renderAll();
+  initAppAfterLogin();
 }
 
 function showLoginError(msg){
@@ -497,7 +524,7 @@ function doChangePass(){
   const user=users[currentUser.username];
 
   if(hashPass(current)!==user.passHash){
-    msgEl.textContent='❌ Current password is wrong.';
+    msgEl.textContent='[X] Current password is wrong.';
     msgEl.style.display='block';
     msgEl.style.background='rgba(255,61,61,0.1)';
     msgEl.style.color='#ff3d3d';
@@ -505,7 +532,7 @@ function doChangePass(){
     return;
   }
   if(newPass.length<6){
-    msgEl.textContent='❌ New password must be at least 6 characters.';
+    msgEl.textContent='[X] New password must be at least 6 characters.';
     msgEl.style.display='block';
     msgEl.style.background='rgba(255,61,61,0.1)';
     msgEl.style.color='#ff3d3d';
@@ -513,7 +540,7 @@ function doChangePass(){
     return;
   }
   if(newPass!==confirm){
-    msgEl.textContent='❌ Passwords do not match.';
+    msgEl.textContent='[X] Passwords do not match.';
     msgEl.style.display='block';
     msgEl.style.background='rgba(255,61,61,0.1)';
     msgEl.style.color='#ff3d3d';
@@ -523,7 +550,7 @@ function doChangePass(){
 
   users[currentUser.username].passHash=hashPass(newPass);
   saveUsers(users);
-  msgEl.textContent='✅ Password changed successfully!';
+  msgEl.textContent='[OK] Password changed successfully!';
   msgEl.style.display='block';
   msgEl.style.background='rgba(0,200,83,0.1)';
   msgEl.style.color='#00c853';
@@ -531,26 +558,11 @@ function doChangePass(){
   setTimeout(()=>{ document.getElementById('chpass-modal').style.display='none'; },1500);
 }
 
-// ══ CORE DATA ══
-const BROKER_FEE=0.99,FEE_THRESHOLD=250;
-let DB={deposits:[],trades:[],nextDid:1,nextTid:1};
-let tradeAction='buy';
-
-function parseNum(v){return parseFloat(String(v||0).replace(',','.'))||0;}
-function save(){try{localStorage.setItem('tb_v2',JSON.stringify(DB));}catch(e){}}
-function load(){try{const d=localStorage.getItem('tb_v2');if(d)DB=JSON.parse(d);}catch(e){}}
-
-// ══ AUTO SESSION CHECK ══
+// == AUTO SESSION CHECK ==
 window.addEventListener('load',()=>{
   load();
-  const now=new Date();
-  const today=now.toISOString().split('T')[0];
-  const time=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  document.getElementById('dep-date').value=today;
-  document.getElementById('dep-time').value=time;
-  document.getElementById('tr-date').value=today;
-  document.getElementById('tr-time').value=time;
 
+  // Clear old incompatible password hash if present
   try{
     const u=localStorage.getItem('tb_users');
     if(u){
@@ -561,6 +573,7 @@ window.addEventListener('load',()=>{
     }
   }catch(e){ localStorage.removeItem('tb_users'); }
 
+  // Check for existing session
   const session=getSession();
   if(session){
     const users=getUsers();
@@ -571,22 +584,20 @@ window.addEventListener('load',()=>{
       document.getElementById('menu-username').textContent=user.name;
       document.getElementById('login-screen').style.display='none';
       document.getElementById('main-app').style.display='flex';
-      renderAll();
+      initAppAfterLogin();
       return;
     }
   }
-
+  // Show login screen
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('main-app').style.display='none';
 });
 
 function goTo(id){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('pg-'+id).classList.add('active');
   document.getElementById('nav-'+id).classList.add('active');
   document.querySelector('.content').scrollTop=0;
-
   if(id==='trade'||id==='deposit'){
     const now=new Date();
     const t=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
@@ -595,15 +606,6 @@ function goTo(id){
     if(id==='deposit'){document.getElementById('dep-time').value=t;document.getElementById('dep-date').value=d;delete document.getElementById('dep-time').dataset.manual;}
   }
   renderAll();
-}
-
-function fmt(n){return(n<0?'-':'')+'€'+Math.abs(n).toFixed(2);}
-function empty(text,icon){return`<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-text">${text}</div></div>`;}
-function msg(id,text,ok){
-  const el=document.getElementById(id);
-  el.textContent=text;
-  el.className='alert show '+(ok?'alert-ok':'alert-err');
-  setTimeout(()=>{el.className='alert';},3500);
 }
 
 function addDeposit(){
@@ -617,86 +619,11 @@ function addDeposit(){
   if(!date)return msg('dep-msg','Select a date.',false);
   DB.deposits.push({id:DB.nextDid++,who,type,amt,date,time,note});
   save();renderAll();
-  msg('dep-msg',type==='deposit'?'✅ Deposit added!':'✅ Withdrawal recorded!',true);
+  msg('dep-msg',type==='deposit'?'[OK] Deposit added!':'[OK] Withdrawal recorded!',true);
   document.getElementById('dep-amt').value='';
   document.getElementById('dep-note').value='';
 }
 function delDeposit(id){if(confirm('Delete this entry?')){DB.deposits=DB.deposits.filter(d=>d.id!==id);save();renderAll();}}
-
-function calcFeeSplit(myVal,broVal){
-  let myFee=0,broFee=0;
-  const combined=myVal+broVal;
-  if(myVal>0&&broVal>0){
-    if(combined<FEE_THRESHOLD){
-      myFee=+((myVal/combined)*BROKER_FEE).toFixed(4);
-      broFee=+((broVal/combined)*BROKER_FEE).toFixed(4);
-    }
-  }
-  else if(myVal>0){myFee=myVal<FEE_THRESHOLD?BROKER_FEE:0;}
-  else if(broVal>0){broFee=broVal<FEE_THRESHOLD?BROKER_FEE:0;}
-  return{myFee:+myFee.toFixed(4),broFee:+broFee.toFixed(4)};
-}
-
-function setAction(a){
-  tradeAction=a;
-  document.getElementById('seg-buy').classList.toggle('active',a==='buy');
-  document.getElementById('seg-sell').classList.toggle('active',a==='sell');
-  document.getElementById('trade-btn').textContent=a==='buy'?'Record Buy':'Record Sell';
-  document.getElementById('trade-btn').className='btn '+(a==='buy'?'btn-green':'btn-red');
-  calcFees();
-}
-
-function getBalance(who){
-  let b=0;
-  DB.deposits.forEach(d=>{if(d.who===who)b+=d.type==='deposit'?d.amt:-d.amt;});
-  DB.trades.forEach(t=>{const[v,fee]=who==='me'?[t.myVal,t.myFee]:[t.broVal,t.broFee];b+=t.action==='buy'?-(v+fee):(v-fee);});
-  return+b.toFixed(2);
-}
-
-function getRealizedPnL(who){
-  return+DB.trades.filter(t=>t.action==='sell').reduce((s,t)=>{
-    const p=who==='me'?t.myPnl:t.broPnl;
-    return s+(p!==null?p:0);
-  },0).toFixed(2);
-}
-
-function getOpenPositions(){
-  const pos={};
-  DB.trades.forEach(t=>{
-    if(!pos[t.ticker])pos[t.ticker]={ticker:t.ticker,type:t.type,myQty:0,broQty:0,myCost:0,broCost:0};
-    const p=pos[t.ticker];
-    if(t.action==='buy'){
-      p.myQty+=t.myQty;p.broQty+=t.broQty;
-      p.myCost+=t.myVal+t.myFee;
-      p.broCost+=t.broVal+t.broFee;
-    }else{
-      p.myQty-=t.myQty;
-      p.broQty-=t.broQty;
-    }
-  });
-  return Object.values(pos).filter(p=>p.myQty>0.0001||p.broQty>0.0001);
-}
-
-function computePnL(ticker,sellMyQty,sellBroQty,sellPrice,sellMyFee,sellBroFee){
-  const buys=DB.trades.filter(t=>t.action==='buy'&&t.ticker===ticker);
-  let myBuyCost=0,broBuyCost=0,myRem=sellMyQty,broRem=sellBroQty;
-  for(const b of buys){
-    if(myRem>0&&b.myQty>0){
-      const u=Math.min(myRem,b.myQty);
-      myBuyCost+=u*b.price+(u/b.myQty)*b.myFee;
-      myRem-=u;
-    }
-    if(broRem>0&&b.broQty>0){
-      const u=Math.min(broRem,b.broQty);
-      broBuyCost+=u*b.price+(u/b.broQty)*b.broFee;
-      broRem-=u;
-    }
-  }
-  return{
-    myPnl:sellMyQty>0?+((sellMyQty*sellPrice-sellMyFee)-myBuyCost).toFixed(4):null,
-    broPnl:sellBroQty>0?+((sellBroQty*sellPrice-sellBroFee)-broBuyCost).toFixed(4):null
-  };
-}
 
 function addTrade(){
   const type=document.getElementById('tr-type').value;
@@ -706,47 +633,108 @@ function addTrade(){
   const price=parseNum(document.getElementById('tr-price').value);
   const myQty=parseNum(document.getElementById('tr-my-qty').value);
   const broQty=parseNum(document.getElementById('tr-bro-qty').value);
-
   if(!ticker)return msg('trade-msg','Enter a ticker or name.',false);
   if(!date)return msg('trade-msg','Select a date.',false);
   if(price<=0)return msg('trade-msg','Enter a valid price.',false);
   if(!myQty&&!broQty)return msg('trade-msg','Enter quantity for at least one trader.',false);
-
   const myVal=myQty*price,broVal=broQty*price;
   const{myFee,broFee}=calcFeeSplit(myVal,broVal);
-
   if(tradeAction==='buy'){
     const myBal=getBalance('me'),broBal=getBalance('bro');
-    if(myQty>0&&(myVal+myFee)>myBal)return msg('trade-msg',`🚫 Zubaid needs €${(myVal+myFee).toFixed(2)} but has €${myBal.toFixed(2)}`,false);
-    if(broQty>0&&(broVal+broFee)>broBal)return msg('trade-msg',`🚫 Bihzad needs €${(broVal+broFee).toFixed(2)} but has €${broBal.toFixed(2)}`,false);
+    if(myQty>0&&myBal<=0)return msg('trade-msg','[NO] Zubaid has no funds. Add a deposit first.',false);
+    if(myQty>0&&(myVal+myFee)>myBal)return msg('trade-msg',`[NO] Zubaid needs EUR${(myVal+myFee).toFixed(2)} but has EUR${myBal.toFixed(2)}`,false);
+    if(broQty>0&&broBal<=0)return msg('trade-msg','[NO] Bihzad has no funds. Add a deposit first.',false);
+    if(broQty>0&&(broVal+broFee)>broBal)return msg('trade-msg',`[NO] Bihzad needs EUR${(broVal+broFee).toFixed(2)} but has EUR${broBal.toFixed(2)}`,false);
   }
-
   if(tradeAction==='sell'){
     const positions=getOpenPositions();
     const pos=positions.find(p=>p.ticker===ticker);
     const myHeld=pos?+pos.myQty.toFixed(6):0,broHeld=pos?+pos.broQty.toFixed(6):0;
-    if(myQty>0&&myQty>myHeld)return msg('trade-msg',`🚫 Zubaid only holds ${myHeld} of ${ticker}.`,false);
-    if(broQty>0&&broQty>broHeld)return msg('trade-msg',`🚫 Bihzad only holds ${broHeld} of ${ticker}.`,false);
+    if(myQty>0&&myHeld===0)return msg('trade-msg',`[NO] Zubaid holds no ${ticker} shares.`,false);
+    if(myQty>0&&myQty>myHeld)return msg('trade-msg',`[NO] Zubaid only holds ${myHeld} of ${ticker}.`,false);
+    if(broQty>0&&broHeld===0)return msg('trade-msg',`[NO] Bihzad holds no ${ticker} shares.`,false);
+    if(broQty>0&&broQty>broHeld)return msg('trade-msg',`[NO] Bihzad only holds ${broHeld} of ${ticker}.`,false);
   }
-
   let myPnl=null,broPnl=null;
-  if(tradeAction==='sell'){
-    const p=computePnL(ticker,myQty,broQty,price,myFee,broFee);
-    myPnl=p.myPnl;broPnl=p.broPnl;
-  }
-
+  if(tradeAction==='sell'){const p=computePnL(ticker,myQty,broQty,price,myFee,broFee);myPnl=p.myPnl;broPnl=p.broPnl;}
   DB.trades.push({id:DB.nextTid++,action:tradeAction,type,ticker,date,time,myQty,broQty,price,myVal,broVal,myFee,broFee,myPnl,broPnl});
   save();renderAll();
-
-  msg('trade-msg','✅ Trade recorded!',true);
+  msg('trade-msg','[OK] Trade recorded!',true);
   ['tr-ticker','tr-my-qty','tr-bro-qty','tr-price'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ticker-tag').style.display='none';
   calcFees();
 }
 
+function computePnL(ticker,sellMyQty,sellBroQty,sellPrice,sellMyFee,sellBroFee){
+  const buys=DB.trades.filter(t=>t.action==='buy'&&t.ticker===ticker);
+  let myBuyCost=0,broBuyCost=0,myRem=sellMyQty,broRem=sellBroQty;
+  for(const b of buys){
+    if(myRem>0&&b.myQty>0){const u=Math.min(myRem,b.myQty);myBuyCost+=u*b.price+(u/b.myQty)*b.myFee;myRem-=u;}
+    if(broRem>0&&b.broQty>0){const u=Math.min(broRem,b.broQty);broBuyCost+=u*b.price+(u/b.broQty)*b.broFee;broRem-=u;}
+  }
+  return{myPnl:sellMyQty>0?+((sellMyQty*sellPrice-sellMyFee)-myBuyCost).toFixed(4):null,broPnl:sellBroQty>0?+((sellBroQty*sellPrice-sellBroFee)-broBuyCost).toFixed(4):null};
+}
 function delTrade(id){if(confirm('Delete this trade?')){DB.trades=DB.trades.filter(t=>t.id!==id);save();renderAll();}}
 
+function getBalance(who){
+  let b=0;
+  DB.deposits.forEach(d=>{if(d.who===who)b+=d.type==='deposit'?d.amt:-d.amt;});
+  DB.trades.forEach(t=>{const[v,fee]=who==='me'?[t.myVal,t.myFee]:[t.broVal,t.broFee];b+=t.action==='buy'?-(v+fee):(v-fee);});
+  return+b.toFixed(2);
+}
+function getRealizedPnL(who){return+DB.trades.filter(t=>t.action==='sell').reduce((s,t)=>{const p=who==='me'?t.myPnl:t.broPnl;return s+(p!==null?p:0);},0).toFixed(2);}
+function getOpenPositions(){
+  const pos={};
+  DB.trades.forEach(t=>{
+    if(!pos[t.ticker])pos[t.ticker]={ticker:t.ticker,type:t.type,myQty:0,broQty:0,myCost:0,broCost:0};
+    const p=pos[t.ticker];
+    if(t.action==='buy'){p.myQty+=t.myQty;p.broQty+=t.broQty;p.myCost+=t.myVal+t.myFee;p.broCost+=t.broVal+t.broFee;}
+    else{p.myQty-=t.myQty;p.broQty-=t.broQty;}
+  });
+  return Object.values(pos).filter(p=>p.myQty>0.0001||p.broQty>0.0001);
+}
+
 function renderAll(){renderDash();renderDeps();renderHist();renderPort();renderStatements();}
+
+function renderDash(){
+  const mb=getBalance('me'),bb=getBalance('bro');
+  const mp=getRealizedPnL('me'),bp=getRealizedPnL('bro');
+  document.getElementById('d-my-bal').textContent=fmt(mb);
+  document.getElementById('d-bro-bal').textContent=fmt(bb);
+  document.getElementById('d-my-pnl').innerHTML=`P&L: <span class="${mp>=0?'green':'red'}" onclick="showPnlBreakdown('me')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">${fmt(mp)} 📊</span>`;
+  document.getElementById('d-bro-pnl').innerHTML=`P&L: <span class="${bp>=0?'green':'red'}" onclick="showPnlBreakdown('bro')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">${fmt(bp)} 📊</span>`;
+  const totalDep=DB.deposits.filter(d=>d.type==='deposit').reduce((s,d)=>s+d.amt,0);
+  const totalFees=DB.trades.reduce((s,t)=>s+t.myFee+t.broFee,0);
+  document.getElementById('d-deps').textContent='EUR'+totalDep.toFixed(0);
+  document.getElementById('d-fees').textContent='EUR'+totalFees.toFixed(2);
+  document.getElementById('d-pos').textContent=getOpenPositions().length;
+  const recent=[...DB.trades].reverse().slice(0,5);
+  document.getElementById('d-recent').innerHTML=recent.length?recent.map(tradeCard).join(''):empty('No trades yet','📈');
+}
+
+function renderDeps(){
+  const list=document.getElementById('dep-list');
+  if(!DB.deposits.length){list.innerHTML=empty('No entries yet','💳');return;}
+  list.innerHTML=[...DB.deposits].reverse().map(d=>`
+    <div class="dep-item">
+      <div class="dep-icon">${d.type==='deposit'?'💰':'↩'}</div>
+      <div class="dep-info">
+        <div class="dep-who">${d.who==='me'?'Zubaid':'Bihzad'} · <span class="badge ${d.type==='deposit'?'b-dep':'b-wit'}">${d.type}</span></div>
+        <div class="dep-note">${d.note||'-'}</div>
+        <div class="dep-date">${d.date}${d.time?' · '+d.time:''}</div>
+      </div>
+      <div>
+        <div class="dep-amt ${d.type==='deposit'?'green':'red'}">${d.type==='deposit'?'+':'-'}EUR${d.amt.toFixed(2)}</div>
+        <button class="del-btn" onclick="delDeposit(${d.id})">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderHist(){
+  const list=document.getElementById('hist-list');
+  if(!DB.trades.length){list.innerHTML=empty('No trades yet','📋');return;}
+  list.innerHTML=[...DB.trades].reverse().map(tradeCard).join('');
+}
 
 function tradeCard(t){
   const joint=t.myQty>0&&t.broQty>0;
@@ -762,56 +750,11 @@ function tradeCard(t){
       <button class="del-btn" onclick="delTrade(${t.id})">✕</button>
     </div>
     <div class="ti-row">
-      ${t.myQty>0?`<div class="ti-side"><div class="ts-lbl ts-me">Zubaid</div><strong>${t.myQty}</strong> × €${t.price}<br>Val: <strong>€${t.myVal.toFixed(2)}</strong><br>Fee: <span class="red">€${t.myFee.toFixed(2)}</span></div>`:'<div></div>'}
-      ${t.broQty>0?`<div class="ti-side"><div class="ts-lbl ts-bro">Bihzad</div><strong>${t.broQty}</strong> × €${t.price}<br>Val: <strong>€${t.broVal.toFixed(2)}</strong><br>Fee: <span class="red">€${t.broFee.toFixed(2)}</span></div>`:'<div></div>'}
+      ${t.myQty>0?`<div class="ti-side"><div class="ts-lbl ts-me">Zubaid</div><strong>${t.myQty}</strong> × EUR${t.price}<br>Val: <strong>EUR${t.myVal.toFixed(2)}</strong><br>Fee: <span class="red">EUR${t.myFee.toFixed(2)}</span></div>`:'<div></div>'}
+      ${t.broQty>0?`<div class="ti-side"><div class="ts-lbl ts-bro">Bihzad</div><strong>${t.broQty}</strong> × EUR${t.price}<br>Val: <strong>EUR${t.broVal.toFixed(2)}</strong><br>Fee: <span class="red">EUR${t.broFee.toFixed(2)}</span></div>`:'<div></div>'}
     </div>
     ${(myPnlHtml||broPnlHtml)?`<div class="pnl-row">${myPnlHtml}${broPnlHtml}</div>`:''}
   </div>`;
-}
-
-function renderDash(){
-  const mb=getBalance('me'),bb=getBalance('bro');
-  const mp=getRealizedPnL('me'),bp=getRealizedPnL('bro');
-
-  document.getElementById('d-my-bal').textContent=fmt(mb);
-  document.getElementById('d-bro-bal').textContent=fmt(bb);
-
-  document.getElementById('d-my-pnl').innerHTML=`P&L: <span class="${mp>=0?'green':'red'}" onclick="showPnlBreakdown('me')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">${fmt(mp)} 📊</span>`;
-  document.getElementById('d-bro-pnl').innerHTML=`P&L: <span class="${bp>=0?'green':'red'}" onclick="showPnlBreakdown('bro')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">${fmt(bp)} 📊</span>`;
-
-  const totalDep=DB.deposits.filter(d=>d.type==='deposit').reduce((s,d)=>s+d.amt,0);
-  const totalFees=DB.trades.reduce((s,t)=>s+t.myFee+t.broFee,0);
-
-  document.getElementById('d-deps').textContent='€'+totalDep.toFixed(0);
-  document.getElementById('d-fees').textContent='€'+totalFees.toFixed(2);
-  document.getElementById('d-pos').textContent=getOpenPositions().length;
-
-  const recent=[...DB.trades].reverse().slice(0,5);
-  document.getElementById('d-recent').innerHTML=recent.length?recent.map(tradeCard).join(''):empty('No trades yet','📈');
-}
-
-function renderDeps(){
-  const list=document.getElementById('dep-list');
-  if(!DB.deposits.length){list.innerHTML=empty('No entries yet','💳');return;}
-  list.innerHTML=[...DB.deposits].reverse().map(d=>`
-    <div class="dep-item">
-      <div class="dep-icon">${d.type==='deposit'?'💰':'↩'}</div>
-      <div class="dep-info">
-        <div class="dep-who">${d.who==='me'?'Zubaid':'Bihzad'} · <span class="badge ${d.type==='deposit'?'b-dep':'b-wit'}">${d.type}</span></div>
-        <div class="dep-note">${d.note||'—'}</div>
-        <div class="dep-date">${d.date}${d.time?' · '+d.time:''}</div>
-      </div>
-      <div>
-        <div class="dep-amt ${d.type==='deposit'?'green':'red'}">${d.type==='deposit'?'+':'-'}€${d.amt.toFixed(2)}</div>
-        <button class="del-btn" onclick="delDeposit(${d.id})">✕</button>
-      </div>
-    </div>`).join('');
-}
-
-function renderHist(){
-  const list=document.getElementById('hist-list');
-  if(!DB.trades.length){list.innerHTML=empty('No trades yet','📋');return;}
-  list.innerHTML=[...DB.trades].reverse().map(tradeCard).join('');
 }
 
 function renderPort(){
@@ -819,26 +762,24 @@ function renderPort(){
   const list=document.getElementById('port-list');
   if(!positions.length){list.innerHTML=empty('No open positions','📂');return;}
   list.innerHTML=positions.map(p=>{
-    const myAvg=p.myQty>0?(p.myCost/p.myQty).toFixed(4):'—';
-    const broAvg=p.broQty>0?(p.broCost/p.broQty).toFixed(4):'—';
+    const myAvg=p.myQty>0?(p.myCost/p.myQty).toFixed(4):'-';
+    const broAvg=p.broQty>0?(p.broCost/p.broQty).toFixed(4):'-';
     const joint=p.myQty>0&&p.broQty>0;
     return`<div class="pos-item">
       <div class="pos-top"><span style="font-size:1.1rem;font-weight:800;color:#2196f3">${p.ticker}</span><span class="badge b-${p.type}">${p.type}</span>${joint?'<span class="badge b-joint">JOINT</span>':''}</div>
       <div class="pos-grid">
-        ${p.myQty>0?`<div class="pos-side"><span style="color:#00c853;font-size:0.55rem;font-weight:700;text-transform:uppercase">Zubaid</span><br>Qty: <strong style="color:#fff">${p.myQty.toFixed(4)}</strong><br>Avg: €${myAvg}<br>Cost: €${p.myCost.toFixed(2)}</div>`:''}
-        ${p.broQty>0?`<div class="pos-side"><span style="color:#2196f3;font-size:0.55rem;font-weight:700;text-transform:uppercase">Bihzad</span><br>Qty: <strong style="color:#fff">${p.broQty.toFixed(4)}</strong><br>Avg: €${broAvg}<br>Cost: €${p.broCost.toFixed(2)}</div>`:''}
+        ${p.myQty>0?`<div class="pos-side"><span style="color:#00c853;font-size:0.55rem;font-weight:700;text-transform:uppercase">Zubaid</span><br>Qty: <strong style="color:#fff">${p.myQty.toFixed(4)}</strong><br>Avg: EUR${myAvg}<br>Cost: EUR${p.myCost.toFixed(2)}</div>`:''}
+        ${p.broQty>0?`<div class="pos-side"><span style="color:#2196f3;font-size:0.55rem;font-weight:700;text-transform:uppercase">Bihzad</span><br>Qty: <strong style="color:#fff">${p.broQty.toFixed(4)}</strong><br>Avg: EUR${broAvg}<br>Cost: EUR${p.broCost.toFixed(2)}</div>`:''}
       </div>
     </div>`;
   }).join('');
 }
 
 function closePnlModal(e){if(e.target===document.getElementById('pnl-modal'))document.getElementById('pnl-modal').style.display='none';}
-
 function showPnlBreakdown(who){
   const name=who==='me'?'Zubaid':'Bihzad';
   const sells=DB.trades.filter(t=>t.action==='sell');
   const byTicker={};
-
   sells.forEach(t=>{
     const pnl=who==='me'?t.myPnl:t.broPnl;
     if(pnl===null)return;
@@ -846,25 +787,15 @@ function showPnlBreakdown(who){
     byTicker[t.ticker].totalPnl+=pnl;
     byTicker[t.ticker].trades.push({date:t.date,time:t.time,qty:who==='me'?t.myQty:t.broQty,price:t.price,pnl});
   });
-
   const items=Object.values(byTicker).sort((a,b)=>b.totalPnl-a.totalPnl);
   const totalPnl=items.reduce((s,i)=>s+i.totalPnl,0);
-
   document.getElementById('modal-title').innerHTML=`${name}'s P&L Breakdown`;
-
-  if(!items.length){
-    document.getElementById('modal-body').innerHTML=empty('No closed trades yet','📊');
-    document.getElementById('pnl-modal').style.display='flex';
-    return;
-  }
-
+  if(!items.length){document.getElementById('modal-body').innerHTML=empty('No closed trades yet','📊');document.getElementById('pnl-modal').style.display='flex';return;}
   let html=`<div style="background:#111;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.7rem;color:#888;text-transform:uppercase;letter-spacing:0.08em">Total Realized P&L</span><span style="font-family:'SF Mono',ui-monospace,monospace;font-size:1.1rem;font-weight:700;color:${totalPnl>=0?'#00c853':'#ff3d3d'}">${fmt(totalPnl)}</span></div>`;
-
   items.forEach(item=>{
     const pct=totalPnl!==0?Math.abs(item.totalPnl/totalPnl*100).toFixed(1):'0.0';
     const bw=totalPnl!==0?Math.min(100,Math.abs(item.totalPnl/totalPnl*100)):0;
     const bc=item.totalPnl>=0?'#00c853':'#ff3d3d';
-
     html+=`<div style="background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:13px 14px;margin-bottom:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:8px"><span style="font-size:1rem;font-weight:800;color:#2196f3">${item.ticker}</span><span class="badge b-${item.type}">${item.type}</span></div>
@@ -872,15 +803,13 @@ function showPnlBreakdown(who){
       </div>
       <div style="background:#1e1e1e;border-radius:4px;height:5px;margin-bottom:8px"><div style="width:${bw}%;height:100%;border-radius:4px;background:${bc}"></div></div>
       <div style="font-size:0.62rem;color:#666;margin-bottom:6px">${pct}% of total · ${item.trades.length} sell trade(s)</div>
-      ${item.trades.map(tr=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-top:1px solid #1e1e1e;font-size:0.68rem;font-family:'SF Mono',ui-monospace,monospace"><span style="color:#666">${tr.date}${tr.time?' '+tr.time:''} · ${tr.qty}×€${tr.price}</span><span style="color:${tr.pnl>=0?'#00c853':'#ff3d3d'};font-weight:600">${fmt(tr.pnl)}</span></div>`).join('')}
+      ${item.trades.map(tr=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-top:1px solid #1e1e1e;font-size:0.68rem;font-family:'SF Mono',ui-monospace,monospace"><span style="color:#666">${tr.date}${tr.time?' '+tr.time:''} · ${tr.qty}×EUR${tr.price}</span><span style="color:${tr.pnl>=0?'#00c853':'#ff3d3d'};font-weight:600">${fmt(tr.pnl)}</span></div>`).join('')}
     </div>`;
   });
-
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('pnl-modal').style.display='flex';
 }
 
-// ASSETS
 const ASSETS={
   stock:[
     {ticker:'AAPL',name:'Apple Inc.'},{ticker:'MSFT',name:'Microsoft Corp.'},{ticker:'GOOGL',name:'Alphabet (Google)'},
@@ -944,88 +873,72 @@ function filterTickerSuggestions(){
   const type=document.getElementById('tr-type').value;
   if(ticker){
     const wrongType=(type==='stock'&&ASSETS.commodity.find(a=>a.ticker===ticker))||(type==='commodity'&&ASSETS.stock.find(a=>a.ticker===ticker));
-    if(wrongType){
-      document.getElementById('tr-ticker').value='';
-      document.getElementById('ticker-tag').style.display='none';
-      msg('trade-msg',`⚠️ ${ticker} is not a ${type}. Cleared.`,false);
-    }
+    if(wrongType){document.getElementById('tr-ticker').value='';document.getElementById('ticker-tag').style.display='none';msg('trade-msg',`⚠️ ${ticker} is not a ${type}. Cleared.`,false);}
   }
   onTickerInput();
 }
 
-function calcFees(){
-  const myQty=parseNum(document.getElementById('tr-my-qty').value);
-  const broQty=parseNum(document.getElementById('tr-bro-qty').value);
-  const price=parseNum(document.getElementById('tr-price').value);
-  const myVal=myQty*price,broVal=broQty*price;
+function fmt(n){return(n<0?'-':'')+'EUR'+Math.abs(n).toFixed(2);}
+function empty(text,icon){return`<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-text">${text}</div></div>`;}
+function msg(id,text,ok){
+  const el=document.getElementById(id);
+  el.textContent=text;
+  el.className='alert show '+(ok?'alert-ok':'alert-err');
+  setTimeout(()=>{el.className='alert';},3500);
+}
 
-  document.getElementById('tr-my-total').value=myVal>0?'€'+myVal.toFixed(2):'';
-  document.getElementById('tr-bro-total').value=broVal>0?'€'+broVal.toFixed(2):'';
+// == CORE DATA ==
+const BROKER_FEE=0.99,FEE_THRESHOLD=250;
+let DB={deposits:[],trades:[],nextDid:1,nextTid:1};
+let tradeAction='buy';
+function parseNum(v){return parseFloat(String(v||0).replace(',','.'))||0;}
+function save(){try{localStorage.setItem('tb_v2',JSON.stringify(DB));}catch(e){}}
+function load(){try{const d=localStorage.getItem('tb_v2');if(d)DB=JSON.parse(d);}catch(e){}}
 
-  if(!price||(!myQty&&!broQty)){
-    document.getElementById('fee-box').textContent='💶 Enter price and quantities to calculate fees.';
-    document.getElementById('balance-check').style.display='none';
-    return;
+function goTo(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('pg-'+id).classList.add('active');
+  document.getElementById('nav-'+id).classList.add('active');
+  document.querySelector('.content').scrollTop=0;
+  if(id==='trade'||id==='deposit'){
+    const now=new Date();
+    const t=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const d=now.toISOString().split('T')[0];
+    if(id==='trade'){document.getElementById('tr-time').value=t;document.getElementById('tr-date').value=d;delete document.getElementById('tr-time').dataset.manual;}
+    if(id==='deposit'){document.getElementById('dep-time').value=t;document.getElementById('dep-date').value=d;delete document.getElementById('dep-time').dataset.manual;}
   }
-
-  const{myFee,broFee}=calcFeeSplit(myVal,broVal);
-  const combined=myVal+broVal;
-  let reason='';
-
-  if(myQty>0&&broQty>0){
-    reason=combined>=FEE_THRESHOLD?`Joint €${combined.toFixed(2)} ≥ €250 → No fee`:`Joint €${combined.toFixed(2)} < €250 → Fee split`;
-  }else{
-    reason=combined>=FEE_THRESHOLD?`€${combined.toFixed(2)} ≥ €250 → No fee`:`€${combined.toFixed(2)} < €250 → Fee applies`;
-  }
-
-  const parts=[];
-  if(myQty>0)parts.push(`Zubaid fee: €${myFee.toFixed(2)}`);
-  if(broQty>0)parts.push(`Bihzad fee: €${broFee.toFixed(2)}`);
-  document.getElementById('fee-box').textContent=`💶 ${reason}\n${parts.join('  ·  ')}`;
-
-  const balDiv=document.getElementById('balance-check');
-  balDiv.style.display='grid';
-
-  const myBal=getBalance('me'),broBal=getBalance('bro');
-  const myNeed=myVal+myFee,broNeed=broVal+broFee;
-
-  if(tradeAction==='buy'){
-    const myOk=myQty===0||myBal>=myNeed,broOk=broQty===0||broBal>=broNeed;
-    document.getElementById('bal-me').innerHTML=myQty>0?`<span style="color:#888;font-size:0.55rem">ZUBAID</span><br><span style="color:${myOk?'#00c853':'#ff3d3d'}">${myOk?'✅':'🚫'} €${myBal.toFixed(2)}</span><br><span style="color:#555">Need €${myNeed.toFixed(2)}</span>`:`<span style="color:#333;font-size:0.55rem">ZUBAID</span><br><span style="color:#333">Not trading</span>`;
-    document.getElementById('bal-bro').innerHTML=broQty>0?`<span style="color:#888;font-size:0.55rem">BIHZAD</span><br><span style="color:${broOk?'#00c853':'#ff3d3d'}">${broOk?'✅':'🚫'} €${broBal.toFixed(2)}</span><br><span style="color:#555">Need €${broNeed.toFixed(2)}</span>`:`<span style="color:#333;font-size:0.55rem">BIHZAD</span><br><span style="color:#333">Not trading</span>`;
-  }else{
-    const ticker=document.getElementById('tr-ticker').value.trim().toUpperCase();
-    const pos=ticker?getOpenPositions().find(p=>p.ticker===ticker):null;
-    const myHeld=pos?+pos.myQty.toFixed(4):0,broHeld=pos?+pos.broQty.toFixed(4):0;
-    const myOk=myQty===0||(myHeld>0&&myQty<=myHeld),broOk=broQty===0||(broHeld>0&&broQty<=broHeld);
-    document.getElementById('bal-me').innerHTML=myQty>0?`<span style="color:#888;font-size:0.55rem">ZUBAID HOLDS</span><br><span style="color:${myOk?'#00c853':'#ff3d3d'}">${myOk?'✅':'🚫'} ${myHeld}</span><br><span style="color:#555">Selling: ${myQty}</span>`:`<span style="color:#333;font-size:0.55rem">ZUBAID HOLDS</span><br><span style="color:#333">${myHeld>0?myHeld:'None'}</span>`;
-    document.getElementById('bal-bro').innerHTML=broQty>0?`<span style="color:#888;font-size:0.55rem">BIHZAD HOLDS</span><br><span style="color:${broOk?'#00c853':'#ff3d3d'}">${broOk?'✅':'🚫'} ${broHeld}</span><br><span style="color:#555">Selling: ${broQty}</span>`:`<span style="color:#333;font-size:0.55rem">BIHZAD HOLDS</span><br><span style="color:#333">${broHeld>0?broHeld:'None'}</span>`;
-  }
+  renderAll();
 }
 
 function updateClock(){
+  const el=document.getElementById('live-time');
+  if(!el||document.getElementById('main-app').style.display==='none')return;
   const now=new Date();
   const h=String(now.getHours()).padStart(2,'0');
   const m=String(now.getMinutes()).padStart(2,'0');
   const s=String(now.getSeconds()).padStart(2,'0');
   const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('live-time').textContent=`${h}:${m}:${s}`;
+  el.textContent=`${h}:${m}:${s}`;
   document.getElementById('live-date').textContent=`${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
   const trT=document.getElementById('tr-time');
   const depT=document.getElementById('dep-time');
   if(trT&&!trT.dataset.manual)trT.value=`${h}:${m}`;
   if(depT&&!depT.dataset.manual)depT.value=`${h}:${m}`;
 }
-setInterval(updateClock,1000);updateClock();
+setInterval(updateClock,1000);
 
 let pressTimer=null;
-const titleEl=document.getElementById('app-title');
-titleEl.addEventListener('touchstart',()=>{pressTimer=setTimeout(()=>openResetModal(),1500);});
-titleEl.addEventListener('touchend',()=>clearTimeout(pressTimer));
-titleEl.addEventListener('touchmove',()=>clearTimeout(pressTimer));
-titleEl.addEventListener('mousedown',()=>{pressTimer=setTimeout(()=>openResetModal(),1500);});
-titleEl.addEventListener('mouseup',()=>clearTimeout(pressTimer));
+function initTitlePress(){
+  const titleEl=document.getElementById('app-title');
+  if(!titleEl)return;
+  titleEl.addEventListener('touchstart',()=>{pressTimer=setTimeout(()=>openResetModal(),1500);});
+  titleEl.addEventListener('touchend',()=>clearTimeout(pressTimer));
+  titleEl.addEventListener('touchmove',()=>clearTimeout(pressTimer));
+  titleEl.addEventListener('mousedown',()=>{pressTimer=setTimeout(()=>openResetModal(),1500);});
+  titleEl.addEventListener('mouseup',()=>clearTimeout(pressTimer));
+}
 
 function openResetModal(){
   document.getElementById('reset-confirm-input').value='';
@@ -1040,9 +953,62 @@ function checkResetInput(){
   if(val==='DELETE'){btn.disabled=false;btn.style.background='#ff3d3d';btn.style.cursor='pointer';}
   else{btn.disabled=true;btn.style.background='#333';btn.style.cursor='not-allowed';}
 }
-function confirmReset(){DB={deposits:[],trades:[],nextDid:1,nextTid:1};save();renderAll();closeResetModal();msg('dep-msg','✅ All data cleared.',true);}
+function confirmReset(){DB={deposits:[],trades:[],nextDid:1,nextTid:1};save();renderAll();closeResetModal();msg('dep-msg','[OK] All data cleared.',true);}
 
-// ══ STATEMENTS ══
+function calcFeeSplit(myVal,broVal){
+  let myFee=0,broFee=0;
+  const combined=myVal+broVal;
+  if(myVal>0&&broVal>0){if(combined<FEE_THRESHOLD){myFee=+((myVal/combined)*BROKER_FEE).toFixed(4);broFee=+((broVal/combined)*BROKER_FEE).toFixed(4);}}
+  else if(myVal>0){myFee=myVal<FEE_THRESHOLD?BROKER_FEE:0;}
+  else if(broVal>0){broFee=broVal<FEE_THRESHOLD?BROKER_FEE:0;}
+  return{myFee:+myFee.toFixed(4),broFee:+broFee.toFixed(4)};
+}
+
+function setAction(a){
+  tradeAction=a;
+  document.getElementById('seg-buy').classList.toggle('active',a==='buy');
+  document.getElementById('seg-sell').classList.toggle('active',a==='sell');
+  document.getElementById('trade-btn').textContent=a==='buy'?'Record Buy':'Record Sell';
+  document.getElementById('trade-btn').className='btn '+(a==='buy'?'btn-green':'btn-red');
+  calcFees();
+}
+
+function calcFees(){
+  const myQty=parseNum(document.getElementById('tr-my-qty').value);
+  const broQty=parseNum(document.getElementById('tr-bro-qty').value);
+  const price=parseNum(document.getElementById('tr-price').value);
+  const myVal=myQty*price,broVal=broQty*price;
+  document.getElementById('tr-my-total').value=myVal>0?'EUR'+myVal.toFixed(2):'';
+  document.getElementById('tr-bro-total').value=broVal>0?'EUR'+broVal.toFixed(2):'';
+  if(!price||(!myQty&&!broQty)){document.getElementById('fee-box').textContent='💶 Enter price and quantities to calculate fees.';document.getElementById('balance-check').style.display='none';return;}
+  const{myFee,broFee}=calcFeeSplit(myVal,broVal);
+  const combined=myVal+broVal;
+  let reason='';
+  if(myQty>0&&broQty>0){reason=combined>=FEE_THRESHOLD?`Joint EUR${combined.toFixed(2)} ≥ EUR250 → No fee`:`Joint EUR${combined.toFixed(2)} < EUR250 → Fee split`;}
+  else{reason=combined>=FEE_THRESHOLD?`EUR${combined.toFixed(2)} ≥ EUR250 → No fee`:`EUR${combined.toFixed(2)} < EUR250 → Fee applies`;}
+  const parts=[];
+  if(myQty>0)parts.push(`Zubaid fee: EUR${myFee.toFixed(2)}`);
+  if(broQty>0)parts.push(`Bihzad fee: EUR${broFee.toFixed(2)}`);
+  document.getElementById('fee-box').textContent=`💶 ${reason}\n${parts.join('  ·  ')}`;
+  const balDiv=document.getElementById('balance-check');
+  balDiv.style.display='grid';
+  const myBal=getBalance('me'),broBal=getBalance('bro');
+  const myNeed=myVal+myFee,broNeed=broVal+broFee;
+  if(tradeAction==='buy'){
+    const myOk=myQty===0||myBal>=myNeed,broOk=broQty===0||broBal>=broNeed;
+    document.getElementById('bal-me').innerHTML=myQty>0?`<span style="color:#888;font-size:0.55rem">ZUBAID</span><br><span style="color:${myOk?'#00c853':'#ff3d3d'}">${myOk?'[OK]':'[NO]'} EUR${myBal.toFixed(2)}</span><br><span style="color:#555">Need EUR${myNeed.toFixed(2)}</span>`:`<span style="color:#333;font-size:0.55rem">ZUBAID</span><br><span style="color:#333">Not trading</span>`;
+    document.getElementById('bal-bro').innerHTML=broQty>0?`<span style="color:#888;font-size:0.55rem">BIHZAD</span><br><span style="color:${broOk?'#00c853':'#ff3d3d'}">${broOk?'[OK]':'[NO]'} EUR${broBal.toFixed(2)}</span><br><span style="color:#555">Need EUR${broNeed.toFixed(2)}</span>`:`<span style="color:#333;font-size:0.55rem">BIHZAD</span><br><span style="color:#333">Not trading</span>`;
+  }else{
+    const ticker=document.getElementById('tr-ticker').value.trim().toUpperCase();
+    const pos=ticker?getOpenPositions().find(p=>p.ticker===ticker):null;
+    const myHeld=pos?+pos.myQty.toFixed(4):0,broHeld=pos?+pos.broQty.toFixed(4):0;
+    const myOk=myQty===0||(myHeld>0&&myQty<=myHeld),broOk=broQty===0||(broHeld>0&&broQty<=broHeld);
+    document.getElementById('bal-me').innerHTML=myQty>0?`<span style="color:#888;font-size:0.55rem">ZUBAID HOLDS</span><br><span style="color:${myOk?'#00c853':'#ff3d3d'}">${myOk?'[OK]':'[NO]'} ${myHeld}</span><br><span style="color:#555">Selling: ${myQty}</span>`:`<span style="color:#333;font-size:0.55rem">ZUBAID HOLDS</span><br><span style="color:#333">${myHeld>0?myHeld:'None'}</span>`;
+    document.getElementById('bal-bro').innerHTML=broQty>0?`<span style="color:#888;font-size:0.55rem">BIHZAD HOLDS</span><br><span style="color:${broOk?'#00c853':'#ff3d3d'}">${broOk?'[OK]':'[NO]'} ${broHeld}</span><br><span style="color:#555">Selling: ${broQty}</span>`:`<span style="color:#333;font-size:0.55rem">BIHZAD HOLDS</span><br><span style="color:#333">${broHeld>0?broHeld:'None'}</span>`;
+  }
+}
+
+// == STATEMENTS ==
 let stmtTrader='me', stmtView='monthly';
 
 function setStmtTrader(who){
@@ -1068,28 +1034,21 @@ function setStmtView(view){
 function renderStatements(){
   const el=document.getElementById('stmt-content');
   if(!el)return;
-
   const who=stmtTrader;
   const name=who==='me'?'Zubaid':'Bihzad';
   const sells=DB.trades.filter(t=>t.action==='sell');
 
+  // Build period map
   const periods={};
-
   sells.forEach(t=>{
     const pnl=who==='me'?t.myPnl:t.broPnl;
     if(pnl===null)return;
-
     const d=new Date(t.date);
-    const key=stmtView==='monthly'
-      ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
-      : String(d.getFullYear());
-
+    const key=stmtView==='monthly'?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`:String(d.getFullYear());
     if(!periods[key])periods[key]={key,pnl:0,trades:[],fees:0};
     periods[key].pnl+=pnl;
-
     const fee=who==='me'?t.myFee:t.broFee;
     periods[key].fees+=fee;
-
     periods[key].trades.push(t);
   });
 
@@ -1103,25 +1062,27 @@ function renderStatements(){
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   el.innerHTML=sorted.map(p=>{
-    const periodLabel=stmtView==='monthly'
-      ? (()=>{const[y,m]=p.key.split('-');return`${months[parseInt(m)-1]} ${y}`;})()
-      : p.key;
-
+    const label=stmtView==='monthly'?()=>{
+      const[y,m]=p.key.split('-');
+      return`${months[parseInt(m)-1]} ${y}`;
+    }:()=>p.key;
+    const periodLabel=typeof label==='function'?label():label;
     const pnlColor=p.pnl>=0?'#00c853':'#ff3d3d';
     const trades=p.trades;
+    const buyCount=trades.filter(t=>t.action==='sell').length;
 
     return`<div style="background:#161616;border:1px solid #252525;border-radius:16px;padding:16px;margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div>
           <div style="font-size:1rem;font-weight:800;color:#fff">${periodLabel}</div>
-          <div style="font-size:0.62rem;color:#666;margin-top:2px">${trades.length} trade(s) · Fees: €${p.fees.toFixed(2)}</div>
+          <div style="font-size:0.62rem;color:#666;margin-top:2px">${buyCount} trade(s) · Fees: EUR${p.fees.toFixed(2)}</div>
         </div>
         <div style="text-align:right">
           <div style="font-family:'SF Mono',ui-monospace,monospace;font-size:1.2rem;font-weight:800;color:${pnlColor}">${fmt(p.pnl)}</div>
           <div style="font-size:0.62rem;color:#666;margin-top:2px">${p.pnl>=0?'Profit':'Loss'}</div>
         </div>
       </div>
-
+      <!-- Trade breakdown -->
       ${trades.map(t=>{
         const tpnl=who==='me'?t.myPnl:t.broPnl;
         const qty=who==='me'?t.myQty:t.broQty;
@@ -1132,100 +1093,87 @@ function renderStatements(){
             <span style="color:#666;margin-left:6px">${t.date}${t.time?' '+t.time:''}</span>
           </div>
           <div style="text-align:right">
-            <span style="color:#888">${qty}×€${t.price}</span>
+            <span style="color:#888">${qty}×EUR${t.price}</span>
             <span style="color:${tpnl>=0?'#00c853':'#ff3d3d'};font-weight:700;margin-left:8px">${fmt(tpnl)}</span>
           </div>
         </div>`;
       }).join('')}
-
+      <!-- PDF Download -->
       <button onclick="downloadPDF('${p.key}','${name}','${periodLabel}')" style="width:100%;margin-top:10px;padding:12px;background:#1e1e1e;border:1px solid #2e2e2e;border-radius:10px;color:#fff;-webkit-text-fill-color:#fff;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit;-webkit-appearance:none">⬇️ Download PDF Statement</button>
     </div>`;
   }).join('');
 }
 
 function downloadPDF(periodKey, name, periodLabel){
-  const who = name === 'Zubaid' ? 'me' : 'bro';
+  const who=name==='Zubaid'?'me':'bro';
+  const sells=DB.trades.filter(t=>t.action==='sell'&&t.date.startsWith(periodKey));
+  const totalPnl=sells.reduce((s,t)=>{const p=who==='me'?t.myPnl:t.broPnl;return s+(p||0);},0);
+  const totalFees=sells.reduce((s,t)=>s+(who==='me'?t.myFee:t.broFee),0);
 
-  const sells = DB.trades.filter(t=>{
-    if(t.action !== 'sell') return false;
-    return t.date.startsWith(periodKey);
-  });
+  const rows=sells.map(t=>{
+    const pnl=who==='me'?t.myPnl:t.broPnl;
+    const qty=who==='me'?t.myQty:t.broQty;
+    const fee=who==='me'?t.myFee:t.broFee;
+    if(!qty)return'';
+    return`<tr>
+      <td>${t.date}${t.time?' '+t.time:''}</td>
+      <td>${t.ticker}</td>
+      <td>${t.type}</td>
+      <td>${qty}</td>
+      <td>EUR${t.price}</td>
+      <td>EUR${(qty*t.price).toFixed(2)}</td>
+      <td>EUR${fee.toFixed(2)}</td>
+      <td style="color:${pnl>=0?'#00aa44':'#cc0000'};font-weight:bold">${pnl!==null?fmt(pnl):'-'}</td>
+    </tr>`;
+  }).join('');
 
-  const filtered = sells.filter(t => (who === 'me' ? t.myQty > 0 : t.broQty > 0));
+  const html=`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>TradeBook Statement - ${name} - ${periodLabel}</title>
+<style>
+  body{font-family:Arial,sans-serif;padding:30px;color:#111;background:#fff}
+  h1{font-size:22px;margin-bottom:4px}
+  .sub{color:#666;font-size:13px;margin-bottom:24px}
+  .summary{display:flex;gap:20px;margin-bottom:24px}
+  .sum-box{background:#f5f5f5;border-radius:8px;padding:14px 20px;min-width:120px}
+  .sum-lbl{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px}
+  .sum-val{font-size:20px;font-weight:bold}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#111;color:#fff;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.06em}
+  td{padding:9px 12px;border-bottom:1px solid #eee}
+  tr:hover td{background:#f9f9f9}
+  .footer{margin-top:30px;font-size:11px;color:#aaa;text-align:center}
+  .profit{color:#00aa44}.loss{color:#cc0000}
+</style>
 
-  const totalPnl = filtered.reduce((s,t)=>{
-    const p = who === 'me' ? t.myPnl : t.broPnl;
-    return s + (p || 0);
-  },0);
+</head>
+<body>
+<h1>📊 TradeBook Statement</h1>
+<div class="sub">${name} · ${periodLabel} · Generated ${new Date().toLocaleString()}</div>
+<div class="summary">
+  <div class="sum-box"><div class="sum-lbl">Realized P&L</div><div class="sum-val ${totalPnl>=0?'profit':'loss'}">${fmt(totalPnl)}</div></div>
+  <div class="sum-box"><div class="sum-lbl">Total Trades</div><div class="sum-val">${sells.filter(t=>who==='me'?t.myQty>0:t.broQty>0).length}</div></div>
+  <div class="sum-box"><div class="sum-lbl">Fees Paid</div><div class="sum-val">EUR${totalFees.toFixed(2)}</div></div>
+</div>
+<table>
+  <thead><tr><th>Date & Time</th><th>Ticker</th><th>Type</th><th>Qty</th><th>Price</th><th>Value</th><th>Fee</th><th>P&L</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="footer">TradeBook · Scalable Capital · ${name} · ${periodLabel}</div>
+</body>
+</html>`;
 
-  const totalFees = filtered.reduce((s,t)=>{
-    return s + (who === 'me' ? t.myFee : t.broFee);
-  },0);
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-
-  let y = 15;
-
-  doc.setFont("helvetica","bold");
-  doc.setFontSize(16);
-  doc.text("TradeBook Statement", 14, y);
-
-  y += 8;
-  doc.setFont("helvetica","normal");
-  doc.setFontSize(11);
-  doc.text(`${name}  |  ${periodLabel}`, 14, y);
-
-  y += 7;
-  doc.setFontSize(10);
-  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, y);
-
-  y += 10;
-  doc.setFont("helvetica","bold");
-  doc.text(`Realized P&L: ${fmt(totalPnl)}`, 14, y);
-
-  y += 6;
-  doc.text(`Total Trades: ${filtered.length}`, 14, y);
-
-  y += 6;
-  doc.text(`Fees Paid: €${totalFees.toFixed(2)}`, 14, y);
-
-  y += 10;
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica","bold");
-  doc.text("Date", 14, y);
-  doc.text("Ticker", 55, y);
-  doc.text("Qty", 95, y);
-  doc.text("Price", 115, y);
-  doc.text("P&L", 155, y);
-
-  y += 5;
-  doc.setLineWidth(0.3);
-  doc.line(14, y, 195, y);
-  y += 6;
-
-  doc.setFont("helvetica","normal");
-
-  filtered.forEach(t=>{
-    const qty = who === 'me' ? t.myQty : t.broQty;
-    const pnl = who === 'me' ? t.myPnl : t.broPnl;
-
-    if(y > 280){
-      doc.addPage();
-      y = 20;
-    }
-
-    doc.text(`${t.date} ${t.time||''}`, 14, y);
-    doc.text(t.ticker, 55, y);
-    doc.text(String(qty), 95, y);
-    doc.text("€"+String(t.price), 115, y);
-    doc.text(pnl !== null ? fmt(pnl) : "—", 155, y);
-
-    y += 6;
-  });
-
-  doc.save(`TradeBook_${name}_${periodKey}.pdf`);
+const blob=new Blob([html],{type:‘text/html’});
+const url=URL.createObjectURL(blob);
+const a=document.createElement(‘a’);
+a.href=url;
+a.download=`TradeBook_${name}_${periodKey}.html`;
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
 }
 </script>
 
