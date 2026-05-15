@@ -462,6 +462,8 @@ function doLogin(){
   document.getElementById('main-app').style.display='flex';
   document.getElementById('login-pass').value='';
   document.getElementById('login-user').value='';
+  initTitlePress();
+  updateClock();
   renderAll();
 }
 
@@ -577,6 +579,8 @@ window.addEventListener('load',()=>{
       document.getElementById('menu-username').textContent=user.name;
       document.getElementById('login-screen').style.display='none';
       document.getElementById('main-app').style.display='flex';
+      initTitlePress();
+      updateClock();
       renderAll();
       return;
     }
@@ -904,28 +908,33 @@ function goTo(id){
 }
 
 function updateClock(){
+  const el=document.getElementById('live-time');
+  if(!el||document.getElementById('main-app').style.display==='none')return;
   const now=new Date();
   const h=String(now.getHours()).padStart(2,'0');
   const m=String(now.getMinutes()).padStart(2,'0');
   const s=String(now.getSeconds()).padStart(2,'0');
   const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('live-time').textContent=`${h}:${m}:${s}`;
+  el.textContent=`${h}:${m}:${s}`;
   document.getElementById('live-date').textContent=`${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
   const trT=document.getElementById('tr-time');
   const depT=document.getElementById('dep-time');
   if(trT&&!trT.dataset.manual)trT.value=`${h}:${m}`;
   if(depT&&!depT.dataset.manual)depT.value=`${h}:${m}`;
 }
-setInterval(updateClock,1000);updateClock();
+setInterval(updateClock,1000);
 
 let pressTimer=null;
-const titleEl=document.getElementById('app-title');
-titleEl.addEventListener('touchstart',()=>{pressTimer=setTimeout(()=>openResetModal(),1500);});
-titleEl.addEventListener('touchend',()=>clearTimeout(pressTimer));
-titleEl.addEventListener('touchmove',()=>clearTimeout(pressTimer));
-titleEl.addEventListener('mousedown',()=>{pressTimer=setTimeout(()=>openResetModal(),1500);});
-titleEl.addEventListener('mouseup',()=>clearTimeout(pressTimer));
+function initTitlePress(){
+  const titleEl=document.getElementById('app-title');
+  if(!titleEl)return;
+  titleEl.addEventListener('touchstart',()=>{pressTimer=setTimeout(()=>openResetModal(),1500);});
+  titleEl.addEventListener('touchend',()=>clearTimeout(pressTimer));
+  titleEl.addEventListener('touchmove',()=>clearTimeout(pressTimer));
+  titleEl.addEventListener('mousedown',()=>{pressTimer=setTimeout(()=>openResetModal(),1500);});
+  titleEl.addEventListener('mouseup',()=>clearTimeout(pressTimer));
+}
 
 function openResetModal(){
   document.getElementById('reset-confirm-input').value='';
