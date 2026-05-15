@@ -405,6 +405,21 @@ function clearLoginError(){
   document.getElementById('login-error').style.display='none';
 }
 
+function initAppAfterLogin(){
+  try{
+    const now=new Date();
+    const today=now.toISOString().split('T')[0];
+    const time=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('dep-date').value=today;
+    document.getElementById('dep-time').value=time;
+    document.getElementById('tr-date').value=today;
+    document.getElementById('tr-time').value=time;
+  }catch(e){}
+  initTitlePress();
+  updateClock();
+  renderAll();
+}
+
 function doLogin(){
   // Check lockout
   if(Date.now()<lockoutUntil){
@@ -462,9 +477,7 @@ function doLogin(){
   document.getElementById('main-app').style.display='flex';
   document.getElementById('login-pass').value='';
   document.getElementById('login-user').value='';
-  initTitlePress();
-  updateClock();
-  renderAll();
+  initAppAfterLogin();
 }
 
 function showLoginError(msg){
@@ -548,20 +561,12 @@ function doChangePass(){
 // ══ AUTO SESSION CHECK ══
 window.addEventListener('load',()=>{
   load();
-  const now=new Date();
-  const today=now.toISOString().split('T')[0];
-  const time=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  document.getElementById('dep-date').value=today;
-  document.getElementById('dep-time').value=time;
-  document.getElementById('tr-date').value=today;
-  document.getElementById('tr-time').value=time;
 
   // Clear old incompatible password hash if present
   try{
     const u=localStorage.getItem('tb_users');
     if(u){
       const parsed=JSON.parse(u);
-      // If hash doesn't match new format, reset to defaults
       if(parsed&&parsed.zubaid&&!parsed.zubaid.passHash.startsWith('tbh_')){
         localStorage.removeItem('tb_users');
       }
@@ -579,13 +584,11 @@ window.addEventListener('load',()=>{
       document.getElementById('menu-username').textContent=user.name;
       document.getElementById('login-screen').style.display='none';
       document.getElementById('main-app').style.display='flex';
-      initTitlePress();
-      updateClock();
-      renderAll();
+      initAppAfterLogin();
       return;
     }
   }
-  // Show login
+  // Show login screen
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('main-app').style.display='none';
 });
