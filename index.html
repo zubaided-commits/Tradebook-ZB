@@ -173,6 +173,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
     <div>
       <div class="topbar-title" id="app-title" oncontextmenu="return false">Trade<span>Book</span></div>
       <div class="topbar-sub">Scalable Capital · EUR · <span id="logged-in-user" style="color:#00c853"></span></div>
+      <div id="sync-status" style="display:none;font-size:0.58rem;font-family:'SF Mono',ui-monospace,monospace;margin-top:2px"></div>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <div style="text-align:right">
@@ -350,11 +351,143 @@ var BROKER_FEE = 0.99;
 var FEE_THRESHOLD = 250;
 var DB = {deposits:[], trades:[], nextDid:1, nextTid:1};
 
+var SUPABASE_URL = 'https://bbdibaynxnmeoxijphje.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_uLoVa5Mf_sed4d48AQ4Ylg_atcxx7ad';
+
+function sbHeaders(){
+  return {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Prefer': 'return=minimal'
+  };
+}
+
 function parseNum(v){ return parseFloat(String(v||0).replace(',','.')) || 0; }
-function save(){ try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){} }
-function load(){ try{ var d=localStorage.getItem('tb_v2'); if(d) DB=JSON.parse(d); }catch(e){} }
 function fmt(n){ return (n<0?'-':'')+'EUR '+Math.abs(n).toFixed(2); }
 function empty(text,icon){ return '<div class="empty"><div class="empty-icon">'+icon+'</div><div class="empty-text">'+text+'</div></div>'; }
+
+// Save to both localStorage (offline) and Supabase (cloud)
+function save(){
+  try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){}
+  syncToCloud();
+}
+
+// Load from Supabase first, fallback to localStorage
+function load(){
+  try{ var d=localStorage.getItem('tb_v2'); if(d) DB=JSON.parse(d); }catch(e){}
+}
+
+function showSyncStatus(msg, ok){
+  var el = document.getElementById('sync-status');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = ok ? '#00c853' : '#ff3d3d';
+  el.style.display = 'block';
+  setTimeout(function(){ el.style.display='none'; }, 3000);
+}
+
+function syncToCloud(){
+  // Upload all deposits
+  fetch(SUPABASE_URL+'/rest/v1/deposits', {
+    method: 'DELETE',
+    headers: Object.assign({}, sbHeaders(), {'Prefer': 'return=minimal'})
+  }).then(function(){
+    if(DB.deposits.length === 0) return;
+    var rows = DB.deposits.map(function(d){
+      return {id:d.id, who:d.who, type:d.type, amt:d.amt, date:d.date, time:d.time, note:d.note||''};
+    });
+    return fetch(SUPABASE_URL+'/rest/v1/deposits', {
+      method: 'POST',
+      headers: sbHeaders(),
+      body: JSON.stringify(rows)
+    });
+  }).catch(function(){});
+
+  // Upload all trades
+  fetch(SUPABASE_URL+'/rest/v1/trades', {
+    method: 'DELETE',
+    headers: Object.assign({}, sbHeaders(), {'Prefer': 'return=minimal'})
+  }).then(function(){
+    if(DB.trades.length === 0) return;
+    var rows = DB.trades.map(function(t){
+      return {
+        id:t.id, action:t.action, type:t.type, ticker:t.ticker,
+        date:t.date, time:t.time,
+        my_qty:t.myQty, bro_qty:t.broQty,
+        price:t.price, my_val:t.myVal, bro_val:t.broVal,
+        my_fee:t.myFee, bro_fee:t.broFee,
+        my_pnl:t.myPnl, bro_pnl:t.broPnl
+      };
+    });
+    return fetch(SUPABASE_URL+'/rest/v1/trades', {
+      method: 'POST',
+      headers: sbHeaders(),
+      body: JSON.stringify(rows)
+    });
+  }).then(function(){
+    showSyncStatus('Synced to cloud', true);
+  }).catch(function(){
+    showSyncStatus('Offline - saved locally', false);
+  });
+}
+
+function loadFromCloud(callback){
+  var depositsLoaded = false;
+  var tradesLoaded = false;
+  var newDB = {deposits:[], trades:[], nextDid:1, nextTid:1};
+
+  function checkDone(){
+    if(depositsLoaded && tradesLoaded){
+      if(newDB.deposits.length > 0 || newDB.trades.length > 0){
+        // Map cloud fields back to app fields
+        DB.deposits = newDB.deposits.map(function(d){
+          return {id:d.id, who:d.who, type:d.type, amt:parseFloat(d.amt), date:d.date, time:d.time, note:d.note||''};
+        });
+        DB.trades = newDB.trades.map(function(t){
+          return {
+            id:t.id, action:t.action, type:t.type, ticker:t.ticker,
+            date:t.date, time:t.time,
+            myQty:parseFloat(t.my_qty||0), broQty:parseFloat(t.bro_qty||0),
+            price:parseFloat(t.price||0), myVal:parseFloat(t.my_val||0), broVal:parseFloat(t.bro_val||0),
+            myFee:parseFloat(t.my_fee||0), broFee:parseFloat(t.bro_fee||0),
+            myPnl:t.my_pnl!==null?parseFloat(t.my_pnl):null,
+            broPnl:t.bro_pnl!==null?parseFloat(t.bro_pnl):null
+          };
+        });
+        // Recalculate next IDs
+        DB.deposits.forEach(function(d){ if(d.id >= DB.nextDid) DB.nextDid = d.id+1; });
+        DB.trades.forEach(function(t){ if(t.id >= DB.nextTid) DB.nextTid = t.id+1; });
+        // Save to localStorage as backup
+        try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){}
+        showSyncStatus('Loaded from cloud', true);
+      }
+      if(callback) callback();
+    }
+  }
+
+  fetch(SUPABASE_URL+'/rest/v1/deposits?select=*&order=id', {
+    headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+SUPABASE_KEY}
+  }).then(function(r){ return r.json(); }).then(function(data){
+    if(Array.isArray(data)) newDB.deposits = data;
+    depositsLoaded = true;
+    checkDone();
+  }).catch(function(){
+    depositsLoaded = true;
+    checkDone();
+  });
+
+  fetch(SUPABASE_URL+'/rest/v1/trades?select=*&order=id', {
+    headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+SUPABASE_KEY}
+  }).then(function(r){ return r.json(); }).then(function(data){
+    if(Array.isArray(data)) newDB.trades = data;
+    tradesLoaded = true;
+    checkDone();
+  }).catch(function(){
+    tradesLoaded = true;
+    checkDone();
+  });
+}
 
 function hashPass(pass){
   var str = pass + 'TB_SALT_2024_SECURE';
@@ -451,7 +584,8 @@ function doLogin(){
   document.getElementById('main-app').style.display = 'flex';
   document.getElementById('login-pass').value = '';
   document.getElementById('login-user').value = '';
-  renderAll();
+  showSyncStatus('Loading from cloud...', true);
+  loadFromCloud(function(){ renderAll(); });
 }
 
 function doLogout(){
@@ -519,7 +653,8 @@ window.addEventListener('load', function(){
       document.getElementById('menu-username').textContent = user.name;
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('main-app').style.display = 'flex';
-      renderAll();
+      showSyncStatus('Loading from cloud...', true);
+      loadFromCloud(function(){ renderAll(); });
       return;
     }
   }
