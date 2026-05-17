@@ -1207,33 +1207,60 @@ function downloadPDF(periodKey, name, periodLabel){
   var filtered=sells.filter(function(t){ return who==='me'?t.myQty>0:t.broQty>0; });
   var totalPnl=filtered.reduce(function(s,t){ var p=who==='me'?t.myPnl:t.broPnl; return s+(p||0); },0);
   var totalFees=filtered.reduce(function(s,t){ return s+(who==='me'?t.myFee:t.broFee); },0);
+  var profitTrades=filtered.filter(function(t){ var p=who==='me'?t.myPnl:t.broPnl; return p!==null&&p>0; }).length;
+  var lossTrades=filtered.filter(function(t){ var p=who==='me'?t.myPnl:t.broPnl; return p!==null&&p<0; }).length;
+
   var doc=new window.jspdf.jsPDF();
   var y=15;
+
+  // Header
   doc.setFont('helvetica','bold'); doc.setFontSize(16);
   doc.text('TradeBook Statement',14,y); y+=8;
   doc.setFont('helvetica','normal'); doc.setFontSize(11);
   doc.text(name+' | '+periodLabel,14,y); y+=7;
   doc.setFontSize(10);
-  doc.text('Generated: '+new Date().toLocaleString(),14,y); y+=10;
-  doc.setFont('helvetica','bold');
-  doc.text('Realized P&L: '+fmt(totalPnl),14,y); y+=6;
-  doc.text('Total Trades: '+filtered.length,14,y); y+=6;
-  doc.text('Fees Paid: EUR '+totalFees.toFixed(2),14,y); y+=10;
-  doc.setFontSize(9);
-  doc.text('Date',14,y); doc.text('Ticker',55,y); doc.text('Qty',95,y); doc.text('Price',115,y); doc.text('P&L',155,y); y+=5;
+  doc.text('Generated: '+new Date().toLocaleString(),14,y); y+=12;
+
+  // Summary box
+  doc.setFillColor(245,245,245);
+  doc.rect(14,y-4,181,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('SUMMARY',16,y); y+=7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text('Total Trades: '+filtered.length+'   |   Profitable: '+profitTrades+'   |   Loss: '+lossTrades,16,y); y+=6;
+  doc.text('Total Fees Paid: EUR '+totalFees.toFixed(2),16,y); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  var pnlLabel = totalPnl >= 0 ? 'NET PROFIT: ' : 'NET LOSS: ';
+  doc.text(pnlLabel + fmt(totalPnl), 16, y); y+=12;
+
+  // Trade table header
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('Date',14,y); doc.text('Ticker',65,y); doc.text('Qty',105,y); doc.text('Price',125,y); doc.text('P&L',165,y); y+=5;
   doc.setLineWidth(0.3); doc.line(14,y,195,y); y+=6;
   doc.setFont('helvetica','normal');
+
+  // Trade rows
   filtered.forEach(function(t){
     var qty=who==='me'?t.myQty:t.broQty;
     var pnl=who==='me'?t.myPnl:t.broPnl;
-    if(y>280){ doc.addPage(); y=20; }
+    if(y>275){ doc.addPage(); y=20; }
     doc.text(t.date+(t.time?' '+t.time:''),14,y);
-    doc.text(t.ticker,55,y);
-    doc.text(String(qty),95,y);
-    doc.text('EUR '+String(t.price),115,y);
-    doc.text(pnl!==null?fmt(pnl):'--',155,y);
+    doc.text(t.ticker,65,y);
+    doc.text(String(qty),105,y);
+    doc.text('EUR '+String(t.price),125,y);
+    doc.text(pnl!==null?fmt(pnl):'--',165,y);
     y+=6;
   });
+
+  // Total line at bottom of trades
+  y+=4;
+  doc.setLineWidth(0.5); doc.line(14,y,195,y); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('TOTAL P&L: '+fmt(totalPnl),14,y);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  y+=10;
+  doc.text('TradeBook · Scalable Capital · '+name+' · '+periodLabel,14,y);
+
   doc.save('TradeBook_'+name+'_'+periodKey+'.pdf');
 }
 </script>
