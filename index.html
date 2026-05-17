@@ -290,14 +290,24 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
     <div class="page" id="pg-history"><div class="sh">All Trades</div><div id="hist-list"></div></div>
     <!-- STATEMENTS -->
     <div class="page" id="pg-statements">
-      <div class="sh">Statements</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div class="sh">Reports</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
         <div id="stmt-btn-me" onclick="setStmtTrader('me')" style="background:#00c853;color:#000;border-radius:12px;padding:12px;text-align:center;font-weight:800;font-size:0.85rem;cursor:pointer">Zubaid</div>
         <div id="stmt-btn-bro" onclick="setStmtTrader('bro')" style="background:#1e1e1e;color:#888;border:1px solid #2e2e2e;border-radius:12px;padding:12px;text-align:center;font-weight:800;font-size:0.85rem;cursor:pointer">Bihzad</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-        <div id="stmt-view-monthly" onclick="setStmtView('monthly')" style="background:#161616;border:1.5px solid #00c853;color:#00c853;border-radius:10px;padding:10px;text-align:center;font-weight:700;font-size:0.78rem;cursor:pointer">Monthly</div>
-        <div id="stmt-view-yearly" onclick="setStmtView('yearly')" style="background:#161616;border:1.5px solid #252525;color:#888;border-radius:10px;padding:10px;text-align:center;font-weight:700;font-size:0.78rem;cursor:pointer">Yearly</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px">
+        <div id="stmt-view-monthly" onclick="setStmtView('monthly')" style="background:#161616;border:1.5px solid #00c853;color:#00c853;border-radius:10px;padding:9px 4px;text-align:center;font-weight:700;font-size:0.72rem;cursor:pointer">Monthly</div>
+        <div id="stmt-view-yearly" onclick="setStmtView('yearly')" style="background:#161616;border:1.5px solid #252525;color:#888;border-radius:10px;padding:9px 4px;text-align:center;font-weight:700;font-size:0.72rem;cursor:pointer">Yearly</div>
+        <div id="stmt-view-custom" onclick="setStmtView('custom')" style="background:#161616;border:1.5px solid #252525;color:#888;border-radius:10px;padding:9px 4px;text-align:center;font-weight:700;font-size:0.72rem;cursor:pointer">Custom</div>
+      </div>
+      <!-- Custom date range box -->
+      <div id="custom-range-box" style="display:none;background:#161616;border:1px solid #252525;border-radius:14px;padding:14px;margin-bottom:14px">
+        <div style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#666;margin-bottom:10px">Select Date Range</div>
+        <div class="frow">
+          <div class="fg"><label>From</label><input type="date" id="custom-from"></div>
+          <div class="fg"><label>To</label><input type="date" id="custom-to"></div>
+        </div>
+        <button onclick="renderStatements()" style="width:100%;margin-top:8px;padding:12px;background:#00c853;color:#000;-webkit-text-fill-color:#000;border:none;border-radius:10px;font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;-webkit-appearance:none">Show Statement</button>
       </div>
       <div id="stmt-content"></div>
     </div>
@@ -1165,7 +1175,10 @@ function setStmtView(view){
   document.getElementById('stmt-view-monthly').style.color=view==='monthly'?'#00c853':'#888';
   document.getElementById('stmt-view-yearly').style.borderColor=view==='yearly'?'#00c853':'#252525';
   document.getElementById('stmt-view-yearly').style.color=view==='yearly'?'#00c853':'#888';
-  renderStatements();
+  document.getElementById('stmt-view-custom').style.borderColor=view==='custom'?'#00c853':'#252525';
+  document.getElementById('stmt-view-custom').style.color=view==='custom'?'#00c853':'#888';
+  document.getElementById('custom-range-box').style.display=view==='custom'?'block':'none';
+  if(view!=='custom') renderStatements();
 }
 
 function renderStatements(){
@@ -1174,6 +1187,48 @@ function renderStatements(){
   var who=stmtTrader;
   var name=who==='me'?'Zubaid':'Bihzad';
   var sells=DB.trades.filter(function(t){ return t.action==='sell'; });
+
+  // Custom date range mode
+  if(stmtView==='custom'){
+    var fromVal=document.getElementById('custom-from').value;
+    var toVal=document.getElementById('custom-to').value;
+    if(!fromVal||!toVal){ el.innerHTML='<div style="text-align:center;color:#666;padding:20px;font-size:0.85rem">Select a From and To date then tap Show Statement.</div>'; return; }
+    var fromDate=new Date(fromVal);
+    var toDate=new Date(toVal);
+    toDate.setHours(23,59,59);
+    if(fromDate>toDate){ el.innerHTML='<div style="text-align:center;color:#ff3d3d;padding:20px;font-size:0.85rem">From date must be before To date.</div>'; return; }
+
+    var filtered=sells.filter(function(t){
+      var d=new Date(t.date);
+      return d>=fromDate&&d<=toDate&&(who==='me'?t.myQty>0:t.broQty>0);
+    });
+
+    var totalPnl=filtered.reduce(function(s,t){ var p=who==='me'?t.myPnl:t.broPnl; return s+(p||0); },0);
+    var totalFees=filtered.reduce(function(s,t){ return s+(who==='me'?t.myFee:t.broFee); },0);
+    var periodLabel=fromVal+' to '+toVal;
+
+    if(!filtered.length){ el.innerHTML=empty('No trades for '+name+' in this period','📊'); return; }
+
+    var tradesHtml=filtered.map(function(t){
+      var tpnl=who==='me'?t.myPnl:t.broPnl;
+      var qty=who==='me'?t.myQty:t.broQty;
+      if(tpnl===null||qty===0) return '';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#111;border-radius:8px;margin-bottom:6px;font-size:0.72rem;font-family:\'SF Mono\',ui-monospace,monospace"><div><span style="color:#2196f3;font-weight:700">'+t.ticker+'</span><span style="color:#666;margin-left:6px">'+t.date+(t.time?' '+t.time:'')+'</span></div><div><span style="color:#888">'+qty+'xEUR'+t.price+'</span><span style="color:'+(tpnl>=0?'#00c853':'#ff3d3d')+';font-weight:700;margin-left:8px">'+fmt(tpnl)+'</span></div></div>';
+    }).join('');
+
+    el.innerHTML='<div style="background:#161616;border:1px solid #252525;border-radius:16px;padding:16px;margin-bottom:12px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+      +'<div><div style="font-size:0.85rem;font-weight:800;color:#fff">'+fromVal+' — '+toVal+'</div>'
+      +'<div style="font-size:0.62rem;color:#666;margin-top:2px">'+filtered.length+' trade(s) | Fees: EUR '+totalFees.toFixed(2)+'</div></div>'
+      +'<div style="text-align:right"><div style="font-family:\'SF Mono\',ui-monospace,monospace;font-size:1.2rem;font-weight:800;color:'+(totalPnl>=0?'#00c853':'#ff3d3d')+'">'+fmt(totalPnl)+'</div>'
+      +'<div style="font-size:0.62rem;color:#666;margin-top:2px">'+(totalPnl>=0?'Profit':'Loss')+'</div></div></div>'
+      +tradesHtml
+      +'<button onclick="downloadPDFCustom(\''+fromVal+'\',\''+toVal+'\',\''+name+'\')" style="width:100%;margin-top:10px;padding:12px;background:#1e1e1e;border:1px solid #2e2e2e;border-radius:10px;color:#fff;-webkit-text-fill-color:#fff;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:inherit;-webkit-appearance:none">Download PDF Statement</button>'
+      +'</div>';
+    return;
+  }
+
+  // Monthly / Yearly mode
   var periods={};
   sells.forEach(function(t){
     var pnl=who==='me'?t.myPnl:t.broPnl;
@@ -1201,9 +1256,72 @@ function renderStatements(){
   }).join('');
 }
 
+function downloadPDFCustom(fromVal, toVal, name){
+  var who=name==='Zubaid'?'me':'bro';
+  var fromDate=new Date(fromVal);
+  var toDate=new Date(toVal);
+  toDate.setHours(23,59,59);
+  var sells=DB.trades.filter(function(t){ return t.action==='sell'; });
+  var filtered=sells.filter(function(t){
+    var d=new Date(t.date);
+    return d>=fromDate&&d<=toDate&&(who==='me'?t.myQty>0:t.broQty>0);
+  });
+  var totalPnl=filtered.reduce(function(s,t){ var p=who==='me'?t.myPnl:t.broPnl; return s+(p||0); },0);
+  var totalFees=filtered.reduce(function(s,t){ return s+(who==='me'?t.myFee:t.broFee); },0);
+  var profitTrades=filtered.filter(function(t){ var p=who==='me'?t.myPnl:t.broPnl; return p!==null&&p>0; }).length;
+  var lossTrades=filtered.filter(function(t){ var p=who==='me'?t.myPnl:t.broPnl; return p!==null&&p<0; }).length;
+  var periodLabel=fromVal+' to '+toVal;
+
+  var doc=new window.jspdf.jsPDF();
+  var y=15;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('TradeBook Statement',14,y); y+=8;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(name+' | '+periodLabel,14,y); y+=7;
+  doc.setFontSize(10);
+  doc.text('Generated: '+new Date().toLocaleString(),14,y); y+=12;
+
+  doc.setFillColor(245,245,245);
+  doc.rect(14,y-4,181,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('SUMMARY',16,y); y+=7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text('Total Trades: '+filtered.length+'   |   Profitable: '+profitTrades+'   |   Loss: '+lossTrades,16,y); y+=6;
+  doc.text('Total Fees Paid: EUR '+totalFees.toFixed(2),16,y); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text((totalPnl>=0?'NET PROFIT: ':'NET LOSS: ')+fmt(totalPnl),16,y); y+=12;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('Date',14,y); doc.text('Ticker',65,y); doc.text('Qty',105,y); doc.text('Price',125,y); doc.text('P&L',165,y); y+=5;
+  doc.setLineWidth(0.3); doc.line(14,y,195,y); y+=6;
+  doc.setFont('helvetica','normal');
+
+  filtered.forEach(function(t){
+    var qty=who==='me'?t.myQty:t.broQty;
+    var pnl=who==='me'?t.myPnl:t.broPnl;
+    if(y>275){ doc.addPage(); y=20; }
+    doc.text(t.date+(t.time?' '+t.time:''),14,y);
+    doc.text(t.ticker,65,y);
+    doc.text(String(qty),105,y);
+    doc.text('EUR '+String(t.price),125,y);
+    doc.text(pnl!==null?fmt(pnl):'--',165,y);
+    y+=6;
+  });
+
+  y+=4;
+  doc.setLineWidth(0.5); doc.line(14,y,195,y); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('TOTAL P&L: '+fmt(totalPnl),14,y);
+  y+=10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.text('TradeBook · Scalable Capital · '+name+' · '+periodLabel,14,y);
+
+  doc.save('TradeBook_'+name+'_'+fromVal+'_'+toVal+'.pdf');
+}
+
 function downloadPDF(periodKey, name, periodLabel){
   var who=name==='Zubaid'?'me':'bro';
-  var sells=DB.trades.filter(function(t){ return t.action==='sell'&&t.date.indexOf(periodKey)===0; });
   var filtered=sells.filter(function(t){ return who==='me'?t.myQty>0:t.broQty>0; });
   var totalPnl=filtered.reduce(function(s,t){ var p=who==='me'?t.myPnl:t.broPnl; return s+(p||0); },0);
   var totalFees=filtered.reduce(function(s,t){ return s+(who==='me'?t.myFee:t.broFee); },0);
