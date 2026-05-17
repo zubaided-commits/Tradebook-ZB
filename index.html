@@ -188,8 +188,24 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
     <div class="page active" id="pg-home">
       <div class="sh">Balances</div>
       <div class="tgrid">
-        <div class="tcard me"><div class="tcard-lbl">Zubaid</div><div class="tcard-bal" id="d-my-bal">€0.00</div><div class="tcard-pnl" id="d-my-pnl"></div></div>
-        <div class="tcard bro"><div class="tcard-lbl">Bihzad</div><div class="tcard-bal" id="d-bro-bal">€0.00</div><div class="tcard-pnl" id="d-bro-pnl"></div></div>
+        <div class="tcard me">
+          <div class="tcard-lbl">Zubaid</div>
+          <div class="tcard-bal" id="d-my-bal">EUR 0.00</div>
+          <div style="font-size:0.62rem;color:#666;font-family:'SF Mono',ui-monospace,monospace;margin-top:4px">Cash available</div>
+          <div style="height:1px;background:#252525;margin:8px 0"></div>
+          <div style="font-size:0.68rem;font-family:'SF Mono',ui-monospace,monospace;color:#888;margin-bottom:2px">Holdings: <span id="d-my-holdings" style="color:#2196f3">EUR 0.00</span></div>
+          <div style="font-size:0.78rem;font-family:'SF Mono',ui-monospace,monospace;font-weight:700;color:#fff">Total: <span id="d-my-total">EUR 0.00</span></div>
+          <div class="tcard-pnl" id="d-my-pnl"></div>
+        </div>
+        <div class="tcard bro">
+          <div class="tcard-lbl">Bihzad</div>
+          <div class="tcard-bal" id="d-bro-bal">EUR 0.00</div>
+          <div style="font-size:0.62rem;color:#666;font-family:'SF Mono',ui-monospace,monospace;margin-top:4px">Cash available</div>
+          <div style="height:1px;background:#252525;margin:8px 0"></div>
+          <div style="font-size:0.68rem;font-family:'SF Mono',ui-monospace,monospace;color:#888;margin-bottom:2px">Holdings: <span id="d-bro-holdings" style="color:#2196f3">EUR 0.00</span></div>
+          <div style="font-size:0.78rem;font-family:'SF Mono',ui-monospace,monospace;font-weight:700;color:#fff">Total: <span id="d-bro-total">EUR 0.00</span></div>
+          <div class="tcard-pnl" id="d-bro-pnl"></div>
+        </div>
       </div>
       <div class="sh">Overview</div>
       <div class="srow">
@@ -975,15 +991,33 @@ function tradeCard(t){
 function renderDash(){
   var mb=getBalance('me'), bb=getBalance('bro');
   var mp=getRealizedPnL('me'), bp=getRealizedPnL('bro');
+
+  // Calculate cost basis of open positions for each person
+  var positions=getOpenPositions();
+  var myHoldingsVal=0, broHoldingsVal=0;
+  positions.forEach(function(p){
+    myHoldingsVal+=p.myCost;
+    broHoldingsVal+=p.broCost;
+  });
+
+  var myTotal=mb+myHoldingsVal;
+  var broTotal=bb+broHoldingsVal;
+
   document.getElementById('d-my-bal').textContent=fmt(mb);
   document.getElementById('d-bro-bal').textContent=fmt(bb);
+  document.getElementById('d-my-holdings').textContent=fmt(myHoldingsVal);
+  document.getElementById('d-bro-holdings').textContent=fmt(broHoldingsVal);
+  document.getElementById('d-my-total').textContent=fmt(myTotal);
+  document.getElementById('d-bro-total').textContent=fmt(broTotal);
+
   document.getElementById('d-my-pnl').innerHTML='P&L: <span class="'+(mp>=0?'green':'red')+'" onclick="showPnlBreakdown(\'me\')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">'+fmt(mp)+' [chart]</span>';
   document.getElementById('d-bro-pnl').innerHTML='P&L: <span class="'+(bp>=0?'green':'red')+'" onclick="showPnlBreakdown(\'bro\')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">'+fmt(bp)+' [chart]</span>';
+
   var totalDep=DB.deposits.filter(function(d){ return d.type==='deposit'; }).reduce(function(s,d){ return s+d.amt; },0);
   var totalFees=DB.trades.reduce(function(s,t){ return s+t.myFee+t.broFee; },0);
   document.getElementById('d-deps').textContent='EUR '+totalDep.toFixed(0);
   document.getElementById('d-fees').textContent='EUR '+totalFees.toFixed(2);
-  document.getElementById('d-pos').textContent=getOpenPositions().length;
+  document.getElementById('d-pos').textContent=positions.length;
   var recent=[...DB.trades].reverse().slice(0,5);
   document.getElementById('d-recent').innerHTML=recent.length?recent.map(tradeCard).join(''):empty('No trades yet','📈');
 }
