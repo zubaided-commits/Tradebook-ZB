@@ -791,7 +791,17 @@ function checkResetInput(){
 }
 function confirmReset(){
   DB={deposits:[],trades:[],nextDid:1,nextTid:1};
-  save(); renderAll(); closeResetModal();
+  try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){}
+  // Delete all cloud records
+  fetch(SUPABASE_URL+'/rest/v1/deposits?id=gte.0', {
+    method: 'DELETE',
+    headers: {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=minimal'}
+  }).catch(function(){});
+  fetch(SUPABASE_URL+'/rest/v1/trades?id=gte.0', {
+    method: 'DELETE',
+    headers: {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=minimal'}
+  }).catch(function(){});
+  renderAll(); closeResetModal();
   msg('dep-msg','All data cleared.',true);
 }
 
