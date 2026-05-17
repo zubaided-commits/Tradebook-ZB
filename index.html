@@ -353,30 +353,52 @@ var DB = {deposits:[], trades:[], nextDid:1, nextTid:1};
 
 var SUPABASE_URL = 'https://bbdibaynxnmeoxijphje.supabase.co';
 var SUPABASE_KEY = 'sb_publishable_uLoVa5Mf_sed4d48AQ4Ylg_atcxx7ad';
+var syncTimer = null;
 
-function sbHeaders(){
-  return {
-    'Content-Type': 'application/json',
-    'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
-    'Prefer': 'return=minimal'
-  };
+function sbGet(table, callback){
+  fetch(SUPABASE_URL+'/rest/v1/'+table+'?select=*&order=id', {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer '+SUPABASE_KEY
+    }
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){ if(Array.isArray(data)) callback(null, data); else callback('error', []); })
+  .catch(function(e){ callback(e, []); });
+}
+
+function sbUpsert(table, rows, callback){
+  if(!rows || rows.length === 0){ if(callback) callback(null); return; }
+  fetch(SUPABASE_URL+'/rest/v1/'+table, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer '+SUPABASE_KEY,
+      'Prefer': 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify(rows)
+  })
+  .then(function(){ if(callback) callback(null); })
+  .catch(function(e){ if(callback) callback(e); });
+}
+
+function sbDelete(table, id, callback){
+  fetch(SUPABASE_URL+'/rest/v1/'+table+'?id=eq.'+id, {
+    method: 'DELETE',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer '+SUPABASE_KEY,
+      'Prefer': 'return=minimal'
+    }
+  })
+  .then(function(){ if(callback) callback(null); })
+  .catch(function(e){ if(callback) callback(e); });
 }
 
 function parseNum(v){ return parseFloat(String(v||0).replace(',','.')) || 0; }
 function fmt(n){ return (n<0?'-':'')+'EUR '+Math.abs(n).toFixed(2); }
 function empty(text,icon){ return '<div class="empty"><div class="empty-icon">'+icon+'</div><div class="empty-text">'+text+'</div></div>'; }
-
-// Save to both localStorage (offline) and Supabase (cloud)
-function save(){
-  try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){}
-  syncToCloud();
-}
-
-// Load from Supabase first, fallback to localStorage
-function load(){
-  try{ var d=localStorage.getItem('tb_v2'); if(d) DB=JSON.parse(d); }catch(e){}
-}
 
 function showSyncStatus(msg, ok){
   var el = document.getElementById('sync-status');
@@ -384,109 +406,148 @@ function showSyncStatus(msg, ok){
   el.textContent = msg;
   el.style.color = ok ? '#00c853' : '#ff3d3d';
   el.style.display = 'block';
-  setTimeout(function(){ el.style.display='none'; }, 3000);
+  clearTimeout(el._timer);
+  el._timer = setTimeout(function(){ el.style.display='none'; }, 2500);
+}
+
+// Always save to localStorage immediately
+function save(){
+  try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){}
+  // Debounce cloud sync — wait 500ms after last change
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(function(){ syncToCloud(); }, 500);
+}
+
+function load(){
+  try{ var d=localStorage.getItem('tb_v2'); if(d) DB=JSON.parse(d); }catch(e){}
 }
 
 function syncToCloud(){
-  // Upload all deposits
-  fetch(SUPABASE_URL+'/rest/v1/deposits', {
-    method: 'DELETE',
-    headers: Object.assign({}, sbHeaders(), {'Prefer': 'return=minimal'})
-  }).then(function(){
-    if(DB.deposits.length === 0) return;
-    var rows = DB.deposits.map(function(d){
-      return {id:d.id, who:d.who, type:d.type, amt:d.amt, date:d.date, time:d.time, note:d.note||''};
-    });
-    return fetch(SUPABASE_URL+'/rest/v1/deposits', {
-      method: 'POST',
-      headers: sbHeaders(),
-      body: JSON.stringify(rows)
-    });
-  }).catch(function(){});
-
-  // Upload all trades
-  fetch(SUPABASE_URL+'/rest/v1/trades', {
-    method: 'DELETE',
-    headers: Object.assign({}, sbHeaders(), {'Prefer': 'return=minimal'})
-  }).then(function(){
-    if(DB.trades.length === 0) return;
-    var rows = DB.trades.map(function(t){
-      return {
-        id:t.id, action:t.action, type:t.type, ticker:t.ticker,
-        date:t.date, time:t.time,
-        my_qty:t.myQty, bro_qty:t.broQty,
-        price:t.price, my_val:t.myVal, bro_val:t.broVal,
-        my_fee:t.myFee, bro_fee:t.broFee,
-        my_pnl:t.myPnl, bro_pnl:t.broPnl
-      };
-    });
-    return fetch(SUPABASE_URL+'/rest/v1/trades', {
-      method: 'POST',
-      headers: sbHeaders(),
-      body: JSON.stringify(rows)
-    });
-  }).then(function(){
-    showSyncStatus('Synced to cloud', true);
-  }).catch(function(){
-    showSyncStatus('Offline - saved locally', false);
+  var depRows = DB.deposits.map(function(d){
+    return {id:d.id, who:d.who, type:d.type, amt:d.amt, date:d.date, time:d.time||'', note:d.note||''};
   });
-}
+  var tradeRows = DB.trades.map(function(t){
+    return {
+      id:t.id, action:t.action, type:t.type, ticker:t.ticker,
+      date:t.date, time:t.time||'',
+      my_qty:t.myQty||0, bro_qty:t.broQty||0,
+      price:t.price||0, my_val:t.myVal||0, bro_val:t.broVal||0,
+      my_fee:t.myFee||0, bro_fee:t.broFee||0,
+      my_pnl:t.myPnl, bro_pnl:t.broPnl
+    };
+  });
 
-function loadFromCloud(callback){
-  var depositsLoaded = false;
-  var tradesLoaded = false;
-  var newDB = {deposits:[], trades:[], nextDid:1, nextTid:1};
-
-  function checkDone(){
-    if(depositsLoaded && tradesLoaded){
-      if(newDB.deposits.length > 0 || newDB.trades.length > 0){
-        // Map cloud fields back to app fields
-        DB.deposits = newDB.deposits.map(function(d){
-          return {id:d.id, who:d.who, type:d.type, amt:parseFloat(d.amt), date:d.date, time:d.time, note:d.note||''};
-        });
-        DB.trades = newDB.trades.map(function(t){
-          return {
-            id:t.id, action:t.action, type:t.type, ticker:t.ticker,
-            date:t.date, time:t.time,
-            myQty:parseFloat(t.my_qty||0), broQty:parseFloat(t.bro_qty||0),
-            price:parseFloat(t.price||0), myVal:parseFloat(t.my_val||0), broVal:parseFloat(t.bro_val||0),
-            myFee:parseFloat(t.my_fee||0), broFee:parseFloat(t.bro_fee||0),
-            myPnl:t.my_pnl!==null?parseFloat(t.my_pnl):null,
-            broPnl:t.bro_pnl!==null?parseFloat(t.bro_pnl):null
-          };
-        });
-        // Recalculate next IDs
-        DB.deposits.forEach(function(d){ if(d.id >= DB.nextDid) DB.nextDid = d.id+1; });
-        DB.trades.forEach(function(t){ if(t.id >= DB.nextTid) DB.nextTid = t.id+1; });
-        // Save to localStorage as backup
-        try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){}
-        showSyncStatus('Loaded from cloud', true);
-      }
-      if(callback) callback();
+  var done = 0;
+  var errors = 0;
+  function check(err){
+    if(err) errors++;
+    done++;
+    if(done === 2){
+      if(errors === 0) showSyncStatus('Cloud synced', true);
+      else showSyncStatus('Saved locally (offline)', false);
     }
   }
 
-  fetch(SUPABASE_URL+'/rest/v1/deposits?select=*&order=id', {
-    headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+SUPABASE_KEY}
-  }).then(function(r){ return r.json(); }).then(function(data){
-    if(Array.isArray(data)) newDB.deposits = data;
-    depositsLoaded = true;
-    checkDone();
-  }).catch(function(){
-    depositsLoaded = true;
+  sbUpsert('deposits', depRows, check);
+  sbUpsert('trades', tradeRows, check);
+}
+
+// Delete a single record from cloud when user deletes it
+function cloudDeleteDeposit(id){
+  sbDelete('deposits', id, null);
+}
+function cloudDeleteTrade(id){
+  sbDelete('trades', id, null);
+}
+
+function loadFromCloud(callback){
+  showSyncStatus('Loading...', true);
+  var deps = null, trades = null;
+
+  function checkDone(){
+    if(deps === null || trades === null) return;
+
+    // Always use cloud data if available
+    DB.deposits = deps.map(function(d){
+      return {
+        id:Number(d.id), who:d.who, type:d.type,
+        amt:parseFloat(d.amt)||0, date:d.date,
+        time:d.time||'', note:d.note||''
+      };
+    });
+    DB.trades = trades.map(function(t){
+      return {
+        id:Number(t.id), action:t.action, type:t.type, ticker:t.ticker,
+        date:t.date, time:t.time||'',
+        myQty:parseFloat(t.my_qty)||0, broQty:parseFloat(t.bro_qty)||0,
+        price:parseFloat(t.price)||0,
+        myVal:parseFloat(t.my_val)||0, broVal:parseFloat(t.bro_val)||0,
+        myFee:parseFloat(t.my_fee)||0, broFee:parseFloat(t.bro_fee)||0,
+        myPnl:t.my_pnl!==null&&t.my_pnl!==undefined?parseFloat(t.my_pnl):null,
+        broPnl:t.bro_pnl!==null&&t.bro_pnl!==undefined?parseFloat(t.bro_pnl):null
+      };
+    });
+
+    // Recalculate next IDs
+    DB.nextDid = 1;
+    DB.nextTid = 1;
+    DB.deposits.forEach(function(d){ if(d.id >= DB.nextDid) DB.nextDid = d.id+1; });
+    DB.trades.forEach(function(t){ if(t.id >= DB.nextTid) DB.nextTid = t.id+1; });
+
+    // Backup to localStorage
+    try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){}
+    showSyncStatus('Cloud loaded', true);
+    if(callback) callback();
+  }
+
+  sbGet('deposits', function(err, data){
+    deps = err ? [] : data;
     checkDone();
   });
 
-  fetch(SUPABASE_URL+'/rest/v1/trades?select=*&order=id', {
-    headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+SUPABASE_KEY}
-  }).then(function(r){ return r.json(); }).then(function(data){
-    if(Array.isArray(data)) newDB.trades = data;
-    tradesLoaded = true;
-    checkDone();
-  }).catch(function(){
-    tradesLoaded = true;
+  sbGet('trades', function(err, data){
+    trades = err ? [] : data;
     checkDone();
   });
+}
+
+// Auto-refresh from cloud every 30 seconds when app is open
+function startAutoRefresh(){
+  setInterval(function(){
+    if(document.getElementById('main-app').style.display !== 'none'){
+      sbGet('deposits', function(err, data){
+        if(!err && Array.isArray(data)){
+          DB.deposits = data.map(function(d){
+            return {id:Number(d.id), who:d.who, type:d.type, amt:parseFloat(d.amt)||0, date:d.date, time:d.time||'', note:d.note||''};
+          });
+          DB.nextDid = 1;
+          DB.deposits.forEach(function(d){ if(d.id >= DB.nextDid) DB.nextDid = d.id+1; });
+          try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){}
+          renderAll();
+        }
+      });
+      sbGet('trades', function(err, data){
+        if(!err && Array.isArray(data)){
+          DB.trades = data.map(function(t){
+            return {
+              id:Number(t.id), action:t.action, type:t.type, ticker:t.ticker,
+              date:t.date, time:t.time||'',
+              myQty:parseFloat(t.my_qty)||0, broQty:parseFloat(t.bro_qty)||0,
+              price:parseFloat(t.price)||0,
+              myVal:parseFloat(t.my_val)||0, broVal:parseFloat(t.bro_val)||0,
+              myFee:parseFloat(t.my_fee)||0, broFee:parseFloat(t.bro_fee)||0,
+              myPnl:t.my_pnl!==null&&t.my_pnl!==undefined?parseFloat(t.my_pnl):null,
+              broPnl:t.bro_pnl!==null&&t.bro_pnl!==undefined?parseFloat(t.bro_pnl):null
+            };
+          });
+          DB.nextTid = 1;
+          DB.trades.forEach(function(t){ if(t.id >= DB.nextTid) DB.nextTid = t.id+1; });
+          try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){}
+          renderAll();
+        }
+      });
+    }
+  }, 30000);
 }
 
 function hashPass(pass){
@@ -585,7 +646,7 @@ function doLogin(){
   document.getElementById('login-pass').value = '';
   document.getElementById('login-user').value = '';
   showSyncStatus('Loading from cloud...', true);
-  loadFromCloud(function(){ renderAll(); });
+  loadFromCloud(function(){ renderAll(); startAutoRefresh(); });
 }
 
 function doLogout(){
@@ -654,7 +715,7 @@ window.addEventListener('load', function(){
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('main-app').style.display = 'flex';
       showSyncStatus('Loading from cloud...', true);
-      loadFromCloud(function(){ renderAll(); });
+      loadFromCloud(function(){ renderAll(); startAutoRefresh(); });
       return;
     }
   }
@@ -846,7 +907,7 @@ function addDeposit(){
   document.getElementById('dep-amt').value='';
   document.getElementById('dep-note').value='';
 }
-function delDeposit(id){ if(confirm('Delete this entry?')){ DB.deposits=DB.deposits.filter(function(d){ return d.id!==id; }); save(); renderAll(); } }
+function delDeposit(id){ if(confirm('Delete this entry?')){ DB.deposits=DB.deposits.filter(function(d){ return d.id!==id; }); save(); cloudDeleteDeposit(id); renderAll(); } }
 
 function addTrade(){
   var type=document.getElementById('tr-type').value;
@@ -890,7 +951,7 @@ function addTrade(){
   document.getElementById('ticker-tag').style.display='none';
   calcFees();
 }
-function delTrade(id){ if(confirm('Delete this trade?')){ DB.trades=DB.trades.filter(function(t){ return t.id!==id; }); save(); renderAll(); } }
+function delTrade(id){ if(confirm('Delete this trade?')){ DB.trades=DB.trades.filter(function(t){ return t.id!==id; }); save(); cloudDeleteTrade(id); renderAll(); } }
 
 function renderAll(){ renderDash(); renderDeps(); renderHist(); renderPort(); renderStatements(); }
 
