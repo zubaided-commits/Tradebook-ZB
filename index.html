@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#0a0a0a">
 <meta name="color-scheme" content="dark">
 <title>TradeBook</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{color-scheme:dark;background:#0a0a0a}
@@ -111,9 +112,9 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 <div id="login-screen" style="display:flex;position:fixed;inset:0;z-index:9999;background:#0a0a0a;flex-direction:column;align-items:center;justify-content:center;padding:30px;padding-top:env(safe-area-inset-top,44px)">
   <div style="width:100%;max-width:340px">
     <div style="text-align:center;margin-bottom:36px">
-      <div style="font-size:2.8rem;margin-bottom:10px">📈</div>
+      <div style="font-size:2.8rem;margin-bottom:10px">ð</div>
       <div style="font-size:1.6rem;font-weight:800;color:#fff">Trade<span style="color:#00c853">Book</span></div>
-      <div style="font-size:0.72rem;color:#666;font-family:'SF Mono',ui-monospace,monospace;margin-top:4px">Scalable Capital · EUR</div>
+      <div style="font-size:0.72rem;color:#666;font-family:'SF Mono',ui-monospace,monospace;margin-top:4px">Scalable Capital Â· EUR</div>
     </div>
     <div style="background:#161616;border:1px solid #252525;border-radius:20px;padding:24px">
       <div style="font-size:0.88rem;font-weight:700;color:#fff;margin-bottom:18px;text-align:center">Sign In to Your Account</div>
@@ -136,7 +137,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
       <div id="login-lockout" style="display:none;color:#ffd600;font-size:0.75rem;text-align:center;margin:10px 0;padding:8px;background:rgba(255,214,0,0.08);border-radius:8px;border:1px solid rgba(255,214,0,0.2)"></div>
       <button onclick="doLogin()" style="width:100%;margin-top:14px;padding:15px;background:#00c853 !important;color:#000 !important;-webkit-text-fill-color:#000 !important;border:none;border-radius:12px;font-size:0.92rem;font-weight:800;cursor:pointer;font-family:inherit;-webkit-appearance:none">Sign In</button>
     </div>
-    <div style="text-align:center;margin-top:16px;font-size:0.65rem;color:#444">Secured · Data stored locally</div>
+    <div style="text-align:center;margin-top:16px;font-size:0.65rem;color:#444">Secured Â· Data stored locally</div>
   </div>
 </div>
 
@@ -171,7 +172,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   <div class="topbar">
     <div>
       <div class="topbar-title" id="app-title" oncontextmenu="return false">Trade<span>Book</span></div>
-      <div class="topbar-sub">Scalable Capital · EUR · <span id="logged-in-user" style="color:#00c853"></span></div>
+      <div class="topbar-sub">Scalable Capital Â· EUR Â· <span id="logged-in-user" style="color:#00c853"></span></div>
       <div id="sync-status" style="display:none;font-size:0.58rem;font-family:'SF Mono',ui-monospace,monospace;margin-top:2px"></div>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
@@ -208,8 +209,8 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
       </div>
       <div class="sh">Overview</div>
       <div class="srow">
-        <div class="sbox"><div class="sbox-lbl">Deposited</div><div class="sbox-val" id="d-deps">€0</div></div>
-        <div class="sbox"><div class="sbox-lbl">Fees Paid</div><div class="sbox-val" id="d-fees">€0.00</div></div>
+        <div class="sbox"><div class="sbox-lbl">Deposited</div><div class="sbox-val" id="d-deps">â¬0</div></div>
+        <div class="sbox"><div class="sbox-lbl">Fees Paid</div><div class="sbox-val" id="d-fees">â¬0.00</div></div>
         <div class="sbox"><div class="sbox-lbl">Positions</div><div class="sbox-val" id="d-pos">0</div></div>
       </div>
       <div class="sh">Recent Trades</div>
@@ -312,12 +313,12 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
     </div>
   </div>
   <nav class="bottom-nav">
-    <div class="nav-item active" id="nav-home" onclick="goTo('home')"><div class="nav-icon">🏠</div><div class="nav-label">Home</div></div>
-    <div class="nav-item" id="nav-deposit" onclick="goTo('deposit')"><div class="nav-icon">💳</div><div class="nav-label">Deposits</div></div>
+    <div class="nav-item active" id="nav-home" onclick="goTo('home')"><div class="nav-icon">ð </div><div class="nav-label">Home</div></div>
+    <div class="nav-item" id="nav-deposit" onclick="goTo('deposit')"><div class="nav-icon">ð³</div><div class="nav-label">Deposits</div></div>
     <div class="nav-item" id="nav-trade" onclick="goTo('trade')"><div class="nav-icon">+</div><div class="nav-label">Trade</div></div>
-    <div class="nav-item" id="nav-portfolio" onclick="goTo('portfolio')"><div class="nav-icon">📂</div><div class="nav-label">Portfolio</div></div>
-    <div class="nav-item" id="nav-history" onclick="goTo('history')"><div class="nav-icon">📋</div><div class="nav-label">History</div></div>
-    <div class="nav-item" id="nav-statements" onclick="goTo('statements')"><div class="nav-icon">📊</div><div class="nav-label">Reports</div></div>
+    <div class="nav-item" id="nav-portfolio" onclick="goTo('portfolio')"><div class="nav-icon">ð</div><div class="nav-label">Portfolio</div></div>
+    <div class="nav-item" id="nav-history" onclick="goTo('history')"><div class="nav-icon">ð</div><div class="nav-label">History</div></div>
+    <div class="nav-item" id="nav-statements" onclick="goTo('statements')"><div class="nav-icon">ð</div><div class="nav-label">Reports</div></div>
   </nav>
 </div>
 
@@ -355,7 +356,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   <div style="position:absolute;bottom:0;left:0;right:0;background:#161616;border-radius:22px 22px 0 0;padding:20px 16px;padding-bottom:env(safe-area-inset-bottom,20px)">
     <div style="width:36px;height:4px;background:#2e2e2e;border-radius:2px;margin:0 auto 16px"></div>
     <div id="menu-username" style="font-size:1rem;font-weight:800;text-align:center;color:#fff;margin-bottom:4px"></div>
-    <div style="font-size:0.7rem;color:#666;text-align:center;margin-bottom:20px">Logged in · TradeBook</div>
+    <div style="font-size:0.7rem;color:#666;text-align:center;margin-bottom:20px">Logged in Â· TradeBook</div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <button onclick="openChangePass()" style="background:#1e1e1e;color:#fff;-webkit-text-fill-color:#fff;border:1px solid #2e2e2e;border-radius:12px;padding:14px;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:inherit;text-align:left">Change Password</button>
       <button onclick="doLogout()" style="background:rgba(255,61,61,0.12);color:#ff3d3d;-webkit-text-fill-color:#ff3d3d;border:1px solid rgba(255,61,61,0.25);border-radius:12px;padding:14px;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:inherit;text-align:left">Sign Out</button>
@@ -438,7 +439,7 @@ function showSyncStatus(msg, ok){
 // Always save to localStorage immediately
 function save(){
   try{ localStorage.setItem('tb_v2', JSON.stringify(DB)); }catch(e){}
-  // Debounce cloud sync — wait 500ms after last change
+  // Debounce cloud sync â wait 500ms after last change
   clearTimeout(syncTimer);
   syncTimer = setTimeout(function(){ syncToCloud(); }, 500);
 }
@@ -1028,27 +1029,27 @@ function renderDash(){
   document.getElementById('d-fees').textContent='EUR '+totalFees.toFixed(2);
   document.getElementById('d-pos').textContent=positions.length;
   var recent=[...DB.trades].reverse().slice(0,5);
-  document.getElementById('d-recent').innerHTML=recent.length?recent.map(tradeCard).join(''):empty('No trades yet','📈');
+  document.getElementById('d-recent').innerHTML=recent.length?recent.map(tradeCard).join(''):empty('No trades yet','ð');
 }
 
 function renderDeps(){
   var list=document.getElementById('dep-list');
-  if(!DB.deposits.length){ list.innerHTML=empty('No entries yet','💳'); return; }
+  if(!DB.deposits.length){ list.innerHTML=empty('No entries yet','ð³'); return; }
   list.innerHTML=[...DB.deposits].reverse().map(function(d){
-    return '<div class="dep-item"><div class="dep-icon">'+(d.type==='deposit'?'💰':'↩')+'</div><div class="dep-info"><div class="dep-who">'+(d.who==='me'?'Zubaid':'Bihzad')+' <span class="badge '+(d.type==='deposit'?'b-dep':'b-wit')+'">'+d.type+'</span></div><div class="dep-note">'+(d.note||'')+'</div><div class="dep-date">'+d.date+(d.time?' · '+d.time:'')+'</div></div><div><div class="dep-amt '+(d.type==='deposit'?'green':'red')+'">'+(d.type==='deposit'?'+':'-')+'EUR '+d.amt.toFixed(2)+'</div><button class="del-btn" onclick="delDeposit('+d.id+')">x</button></div></div>';
+    return '<div class="dep-item"><div class="dep-icon">'+(d.type==='deposit'?'ð°':'â©')+'</div><div class="dep-info"><div class="dep-who">'+(d.who==='me'?'Zubaid':'Bihzad')+' <span class="badge '+(d.type==='deposit'?'b-dep':'b-wit')+'">'+d.type+'</span></div><div class="dep-note">'+(d.note||'')+'</div><div class="dep-date">'+d.date+(d.time?' Â· '+d.time:'')+'</div></div><div><div class="dep-amt '+(d.type==='deposit'?'green':'red')+'">'+(d.type==='deposit'?'+':'-')+'EUR '+d.amt.toFixed(2)+'</div><button class="del-btn" onclick="delDeposit('+d.id+')">x</button></div></div>';
   }).join('');
 }
 
 function renderHist(){
   var list=document.getElementById('hist-list');
-  if(!DB.trades.length){ list.innerHTML=empty('No trades yet','📋'); return; }
+  if(!DB.trades.length){ list.innerHTML=empty('No trades yet','ð'); return; }
   list.innerHTML=[...DB.trades].reverse().map(tradeCard).join('');
 }
 
 function renderPort(){
   var positions=getOpenPositions();
   var list=document.getElementById('port-list');
-  if(!positions.length){ list.innerHTML=empty('No open positions','📂'); return; }
+  if(!positions.length){ list.innerHTML=empty('No open positions','ð'); return; }
   list.innerHTML=positions.map(function(p){
     var myAvg=p.myQty>0?(p.myCost/p.myQty).toFixed(4):'--';
     var broAvg=p.broQty>0?(p.broCost/p.broQty).toFixed(4):'--';
@@ -1073,7 +1074,7 @@ function showPnlBreakdown(who){
   var items=Object.values(byTicker).sort(function(a,b){ return b.totalPnl-a.totalPnl; });
   var totalPnl=items.reduce(function(s,i){ return s+i.totalPnl; },0);
   document.getElementById('modal-title').textContent=name+"'s P&L Breakdown";
-  if(!items.length){ document.getElementById('modal-body').innerHTML=empty('No closed trades yet','📊'); document.getElementById('pnl-modal').style.display='flex'; return; }
+  if(!items.length){ document.getElementById('modal-body').innerHTML=empty('No closed trades yet','ð'); document.getElementById('pnl-modal').style.display='flex'; return; }
   var html='<div style="background:#111;border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.7rem;color:#888;text-transform:uppercase">Total P&L</span><span style="font-family:\'SF Mono\',ui-monospace,monospace;font-size:1.1rem;font-weight:700;color:'+(totalPnl>=0?'#00c853':'#ff3d3d')+'">'+fmt(totalPnl)+'</span></div>';
   items.forEach(function(item){
     var pct=totalPnl!==0?Math.abs(item.totalPnl/totalPnl*100).toFixed(1):'0.0';
@@ -1206,7 +1207,7 @@ function renderStatements(){
     var totalFees=filtered.reduce(function(s,t){ return s+(who==='me'?t.myFee:t.broFee); },0);
     var periodLabel=fromVal+' to '+toVal;
 
-    if(!filtered.length){ el.innerHTML=empty('No trades for '+name+' in this period','📊'); return; }
+    if(!filtered.length){ el.innerHTML=empty('No trades for '+name+' in this period','ð'); return; }
 
     var tradesHtml=filtered.map(function(t){
       var tpnl=who==='me'?t.myPnl:t.broPnl;
@@ -1217,7 +1218,7 @@ function renderStatements(){
 
     el.innerHTML='<div style="background:#161616;border:1px solid #252525;border-radius:16px;padding:16px;margin-bottom:12px">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
-      +'<div><div style="font-size:0.85rem;font-weight:800;color:#fff">'+fromVal+' — '+toVal+'</div>'
+      +'<div><div style="font-size:0.85rem;font-weight:800;color:#fff">'+fromVal+' â '+toVal+'</div>'
       +'<div style="font-size:0.62rem;color:#666;margin-top:2px">'+filtered.length+' trade(s) | Fees: EUR '+totalFees.toFixed(2)+'</div></div>'
       +'<div style="text-align:right"><div style="font-family:\'SF Mono\',ui-monospace,monospace;font-size:1.2rem;font-weight:800;color:'+(totalPnl>=0?'#00c853':'#ff3d3d')+'">'+fmt(totalPnl)+'</div>'
       +'<div style="font-size:0.62rem;color:#666;margin-top:2px">'+(totalPnl>=0?'Profit':'Loss')+'</div></div></div>'
@@ -1240,7 +1241,7 @@ function renderStatements(){
     periods[key].trades.push(t);
   });
   var sorted=Object.values(periods).sort(function(a,b){ return b.key.localeCompare(a.key); });
-  if(!sorted.length){ el.innerHTML=empty('No closed trades for '+name+' yet','📊'); return; }
+  if(!sorted.length){ el.innerHTML=empty('No closed trades for '+name+' yet','ð'); return; }
   var monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   el.innerHTML=sorted.map(function(p){
     var periodLabel=stmtView==='monthly'?(function(){ var parts=p.key.split('-'); return monthNames[parseInt(parts[1])-1]+' '+parts[0]; })():p.key;
@@ -1255,109 +1256,130 @@ function renderStatements(){
   }).join('');
 }
 
-function buildPrintPage(filtered, name, periodLabel, who){
+function downloadPDFCustom(fromVal, toVal, name){
+  var who=name==='Zubaid'?'me':'bro';
+  var fromDate=new Date(fromVal);
+  var toDate=new Date(toVal);
+  toDate.setHours(23,59,59);
+  var sells=DB.trades.filter(function(t){ return t.action==='sell'; });
+  var filtered=sells.filter(function(t){
+    var d=new Date(t.date);
+    return d>=fromDate&&d<=toDate&&(who==='me'?t.myQty>0:t.broQty>0);
+  });
+  var totalPnl=filtered.reduce(function(s,t){ var p=who==='me'?t.myPnl:t.broPnl; return s+(p||0); },0);
+  var totalFees=filtered.reduce(function(s,t){ return s+(who==='me'?t.myFee:t.broFee); },0);
+  var profitTrades=filtered.filter(function(t){ var p=who==='me'?t.myPnl:t.broPnl; return p!==null&&p>0; }).length;
+  var lossTrades=filtered.filter(function(t){ var p=who==='me'?t.myPnl:t.broPnl; return p!==null&&p<0; }).length;
+  var periodLabel=fromVal+' to '+toVal;
+
+  var doc=new window.jspdf.jsPDF();
+  var y=15;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('TradeBook Statement',14,y); y+=8;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(name+' | '+periodLabel,14,y); y+=7;
+  doc.setFontSize(10);
+  doc.text('Generated: '+new Date().toLocaleString(),14,y); y+=12;
+
+  doc.setFillColor(245,245,245);
+  doc.rect(14,y-4,181,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('SUMMARY',16,y); y+=7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text('Total Trades: '+filtered.length+'   |   Profitable: '+profitTrades+'   |   Loss: '+lossTrades,16,y); y+=6;
+  doc.text('Total Fees Paid: EUR '+totalFees.toFixed(2),16,y); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text((totalPnl>=0?'NET PROFIT: ':'NET LOSS: ')+fmt(totalPnl),16,y); y+=12;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('Date',14,y); doc.text('Ticker',65,y); doc.text('Qty',105,y); doc.text('Price',125,y); doc.text('P&L',165,y); y+=5;
+  doc.setLineWidth(0.3); doc.line(14,y,195,y); y+=6;
+  doc.setFont('helvetica','normal');
+
+  filtered.forEach(function(t){
+    var qty=who==='me'?t.myQty:t.broQty;
+    var pnl=who==='me'?t.myPnl:t.broPnl;
+    if(y>275){ doc.addPage(); y=20; }
+    doc.text(t.date+(t.time?' '+t.time:''),14,y);
+    doc.text(t.ticker,65,y);
+    doc.text(String(qty),105,y);
+    doc.text('EUR '+String(t.price),125,y);
+    doc.text(pnl!==null?fmt(pnl):'--',165,y);
+    y+=6;
+  });
+
+  y+=4;
+  doc.setLineWidth(0.5); doc.line(14,y,195,y); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('TOTAL P&L: '+fmt(totalPnl),14,y);
+  y+=10;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.text('TradeBook Â· Scalable Capital Â· '+name+' Â· '+periodLabel,14,y);
+
+  doc.save('TradeBook_'+name+'_'+fromVal+'_'+toVal+'.pdf');
+}
+
+function downloadPDF(periodKey, name, periodLabel){
+  var who=name==='Zubaid'?'me':'bro';
+  var filtered=sells.filter(function(t){ return who==='me'?t.myQty>0:t.broQty>0; });
   var totalPnl=filtered.reduce(function(s,t){ var p=who==='me'?t.myPnl:t.broPnl; return s+(p||0); },0);
   var totalFees=filtered.reduce(function(s,t){ return s+(who==='me'?t.myFee:t.broFee); },0);
   var profitTrades=filtered.filter(function(t){ var p=who==='me'?t.myPnl:t.broPnl; return p!==null&&p>0; }).length;
   var lossTrades=filtered.filter(function(t){ var p=who==='me'?t.myPnl:t.broPnl; return p!==null&&p<0; }).length;
 
-  var rows=filtered.map(function(t){
+  var doc=new window.jspdf.jsPDF();
+  var y=15;
+
+  // Header
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('TradeBook Statement',14,y); y+=8;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(name+' | '+periodLabel,14,y); y+=7;
+  doc.setFontSize(10);
+  doc.text('Generated: '+new Date().toLocaleString(),14,y); y+=12;
+
+  // Summary box
+  doc.setFillColor(245,245,245);
+  doc.rect(14,y-4,181,28,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('SUMMARY',16,y); y+=7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text('Total Trades: '+filtered.length+'   |   Profitable: '+profitTrades+'   |   Loss: '+lossTrades,16,y); y+=6;
+  doc.text('Total Fees Paid: EUR '+totalFees.toFixed(2),16,y); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  var pnlLabel = totalPnl >= 0 ? 'NET PROFIT: ' : 'NET LOSS: ';
+  doc.text(pnlLabel + fmt(totalPnl), 16, y); y+=12;
+
+  // Trade table header
+  doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text('Date',14,y); doc.text('Ticker',65,y); doc.text('Qty',105,y); doc.text('Price',125,y); doc.text('P&L',165,y); y+=5;
+  doc.setLineWidth(0.3); doc.line(14,y,195,y); y+=6;
+  doc.setFont('helvetica','normal');
+
+  // Trade rows
+  filtered.forEach(function(t){
     var qty=who==='me'?t.myQty:t.broQty;
     var pnl=who==='me'?t.myPnl:t.broPnl;
-    if(!qty) return '';
-    var pnlColor=pnl>=0?'#00aa44':'#cc0000';
-    return '<tr>'
-      +'<td>'+t.date+(t.time?' '+t.time:'')+'</td>'
-      +'<td><strong>'+t.ticker+'</strong></td>'
-      +'<td>'+t.type+'</td>'
-      +'<td>'+qty+'</td>'
-      +'<td>EUR '+t.price+'</td>'
-      +'<td>EUR '+(qty*t.price).toFixed(2)+'</td>'
-      +'<td>EUR '+(who==='me'?t.myFee:t.broFee).toFixed(2)+'</td>'
-      +'<td style="color:'+pnlColor+';font-weight:bold">'+(pnl!==null?fmt(pnl):'--')+'</td>'
-      +'</tr>';
-  }).join('');
+    if(y>275){ doc.addPage(); y=20; }
+    doc.text(t.date+(t.time?' '+t.time:''),14,y);
+    doc.text(t.ticker,65,y);
+    doc.text(String(qty),105,y);
+    doc.text('EUR '+String(t.price),125,y);
+    doc.text(pnl!==null?fmt(pnl):'--',165,y);
+    y+=6;
+  });
 
-  var netColor=totalPnl>=0?'#00aa44':'#cc0000';
+  // Total line at bottom of trades
+  y+=4;
+  doc.setLineWidth(0.5); doc.line(14,y,195,y); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('TOTAL P&L: '+fmt(totalPnl),14,y);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  y+=10;
+  doc.text('TradeBook Â· Scalable Capital Â· '+name+' Â· '+periodLabel,14,y);
 
-  return '<!DOCTYPE html><html><head><meta charset="UTF-8">'
-    +'<title>TradeBook - '+name+' - '+periodLabel+'</title>'
-    +'<style>'
-    +'body{font-family:Arial,sans-serif;padding:30px;color:#111;background:#fff;max-width:900px;margin:0 auto}'
-    +'h1{font-size:22px;margin-bottom:4px;color:#111}'
-    +'.sub{color:#555;font-size:13px;margin-bottom:6px}'
-    +'.generated{color:#888;font-size:11px;margin-bottom:24px}'
-    +'.summary{background:#f5f5f5;border-radius:8px;padding:16px 20px;margin-bottom:24px}'
-    +'.summary h2{font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-bottom:10px}'
-    +'.summary-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}'
-    +'.stat{background:#fff;border-radius:6px;padding:10px 14px}'
-    +'.stat-label{font-size:10px;text-transform:uppercase;color:#888;margin-bottom:3px}'
-    +'.stat-value{font-size:16px;font-weight:bold}'
-    +'.net{font-size:20px;font-weight:bold;padding:12px 16px;border-radius:6px;display:inline-block;margin-top:4px}'
-    +'table{width:100%;border-collapse:collapse;font-size:12px}'
-    +'th{background:#111;color:#fff;padding:9px 10px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.06em}'
-    +'td{padding:8px 10px;border-bottom:1px solid #eee}'
-    +'tr:hover td{background:#f9f9f9}'
-    +'.total-row td{font-weight:bold;font-size:13px;border-top:2px solid #111;background:#f5f5f5}'
-    +'.footer{margin-top:24px;font-size:10px;color:#aaa;text-align:center}'
-    +'@media print{body{padding:10px}.no-print{display:none}}'
-    +'</style></head><body>'
-
-```
-+'<h1>TradeBook Statement</h1>'
-+'<div class="sub">'+name+' &nbsp;|&nbsp; '+periodLabel+'</div>'
-+'<div class="generated">Generated: '+new Date().toLocaleString()+'</div>'
-+'<div class="summary">'
-+'<h2>Summary</h2>'
-+'<div class="summary-grid">'
-+'<div class="stat"><div class="stat-label">Total Trades</div><div class="stat-value">'+filtered.length+'</div></div>'
-+'<div class="stat"><div class="stat-label">Profitable</div><div class="stat-value" style="color:#00aa44">'+profitTrades+'</div></div>'
-+'<div class="stat"><div class="stat-label">Loss Trades</div><div class="stat-value" style="color:#cc0000">'+lossTrades+'</div></div>'
-+'</div>'
-+'<div class="stat" style="display:inline-block;margin-right:12px"><div class="stat-label">Fees Paid</div><div class="stat-value">EUR '+totalFees.toFixed(2)+'</div></div>'
-+'<div class="net" style="background:'+(totalPnl>=0?'#e8f5e9':'#ffebee')+';color:'+netColor+'">'
-+(totalPnl>=0?'NET PROFIT: ':'NET LOSS: ')+fmt(totalPnl)
-+'</div>'
-+'</div>'
-+'<table>'
-+'<thead><tr><th>Date &amp; Time</th><th>Ticker</th><th>Type</th><th>Qty</th><th>Price</th><th>Value</th><th>Fee</th><th>P&amp;L</th></tr></thead>'
-+'<tbody>'+rows+'</tbody>'
-+'<tfoot><tr class="total-row"><td colspan="7">TOTAL P&amp;L</td><td style="color:'+netColor+'">'+fmt(totalPnl)+'</td></tr></tfoot>'
-+'</table>'
-+'<div class="footer">TradeBook &nbsp;·&nbsp; Scalable Capital &nbsp;·&nbsp; '+name+' &nbsp;·&nbsp; '+periodLabel+'</div>'
-+'<div class="no-print" style="margin-top:24px;text-align:center">'
-+'<button onclick="window.print()" style="padding:12px 30px;background:#111;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer">Print / Save as PDF</button>'
-+'</div>'
-+'</body></html>';
-```
-
-}
-
-function openStatement(html){
-var w=window.open(’’,’_blank’);
-if(w){ w.document.write(html); w.document.close(); }
-else{ alert(‘Please allow popups for this site to download statements.’); }
-}
-
-function downloadPDFCustom(fromVal, toVal, name){
-var who=name===‘Zubaid’?‘me’:‘bro’;
-var fromDate=new Date(fromVal);
-var toDate=new Date(toVal);
-toDate.setHours(23,59,59);
-var sells=DB.trades.filter(function(t){ return t.action===‘sell’; });
-var filtered=sells.filter(function(t){
-var d=new Date(t.date);
-return d>=fromDate&&d<=toDate&&(who===‘me’?t.myQty>0:t.broQty>0);
-});
-var periodLabel=fromVal+’ to ’+toVal;
-openStatement(buildPrintPage(filtered, name, periodLabel, who));
-}
-
-function downloadPDF(periodKey, name, periodLabel){
-var who=name===‘Zubaid’?‘me’:‘bro’;
-var sells=DB.trades.filter(function(t){ return t.action===‘sell’&&t.date.indexOf(periodKey)===0; });
-var filtered=sells.filter(function(t){ return who===‘me’?t.myQty>0:t.broQty>0; });
-openStatement(buildPrintPage(filtered, name, periodLabel, who));
+  doc.save('TradeBook_'+name+'_'+periodKey+'.pdf');
 }
 </script>
 
