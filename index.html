@@ -530,6 +530,15 @@ function loadFromCloud(callback){
 }
 
 // Auto-refresh from cloud every 30 seconds when app is open
+// Keep Supabase alive - ping every 4 days to prevent 7-day inactivity pause
+function keepSupabaseAlive(){
+  fetch(SUPABASE_URL+'/rest/v1/deposits?select=id&limit=1', {
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+  }).catch(function(){});
+}
+keepSupabaseAlive();
+setInterval(keepSupabaseAlive, 4*24*60*60*1000);
+
 function startAutoRefresh(){
   setInterval(function(){
     if(document.getElementById('main-app').style.display !== 'none'){
