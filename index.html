@@ -673,7 +673,7 @@ function doLogin(){
   document.getElementById('login-pass').value = '';
   document.getElementById('login-user').value = '';
   showSyncStatus('Loading from cloud...', true);
-  loadFromCloud(function(){ renderAll(); startAutoRefresh(); });
+  loadFromCloud(function(){ recalcAllPnL(); renderAll(); startAutoRefresh(); });
 }
 
 function doLogout(){
@@ -742,7 +742,7 @@ window.addEventListener('load', function(){
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('main-app').style.display = 'flex';
       showSyncStatus('Loading from cloud...', true);
-      loadFromCloud(function(){ renderAll(); startAutoRefresh(); });
+      loadFromCloud(function(){ recalcAllPnL(); renderAll(); startAutoRefresh(); });
       return;
     }
   }
@@ -880,18 +880,40 @@ function getOpenPositions(){
   return Object.values(pos).filter(function(p){ return p.myQty>0.0001||p.broQty>0.0001; });
 }
 
-function computePnL(ticker,sellMyQty,sellBroQty,sellPrice,sellMyFee,sellBroFee){
-  var buys=DB.trades.filter(function(t){ return t.action==='buy'&&t.ticker===ticker; });
+function computePnL(ticker,sellMyQty,sellBroQty,sellPrice,sellMyFee,sellBroFee,beforeId){
+  var buys=DB.trades.filter(function(t){ return t.action==='buy'&&t.ticker===ticker&&(beforeId===undefined||t.id<beforeId); });
+  // Quantities already consumed by earlier sells of this ticker (FIFO)
+  var priorSells=DB.trades.filter(function(t){ return t.action==='sell'&&t.ticker===ticker&&(beforeId===undefined||t.id<beforeId); });
+  var myConsumed=0,broConsumed=0;
+  priorSells.forEach(function(s){ myConsumed+=(s.myQty||0); broConsumed+=(s.broQty||0); });
+
   var myBuyCost=0,broBuyCost=0,myRem=sellMyQty,broRem=sellBroQty;
   for(var i=0;i<buys.length;i++){
     var b=buys[i];
-    if(myRem>0&&b.myQty>0){ var u=Math.min(myRem,b.myQty); myBuyCost+=u*b.price+(u/b.myQty)*b.myFee; myRem-=u; }
-    if(broRem>0&&b.broQty>0){ var u2=Math.min(broRem,b.broQty); broBuyCost+=u2*b.price+(u2/b.broQty)*b.broFee; broRem-=u2; }
+    // Skip the part of this buy lot already sold earlier
+    var availMy=b.myQty||0;
+    if(myConsumed>0){ var skipM=Math.min(myConsumed,availMy); availMy-=skipM; myConsumed-=skipM; }
+    if(myRem>0&&availMy>0){ var u=Math.min(myRem,availMy); myBuyCost+=u*b.price+(u/b.myQty)*b.myFee; myRem-=u; }
+
+    var availBro=b.broQty||0;
+    if(broConsumed>0){ var skipB=Math.min(broConsumed,availBro); availBro-=skipB; broConsumed-=skipB; }
+    if(broRem>0&&availBro>0){ var u2=Math.min(broRem,availBro); broBuyCost+=u2*b.price+(u2/b.broQty)*b.broFee; broRem-=u2; }
   }
   return {
     myPnl: sellMyQty>0?+((sellMyQty*sellPrice-sellMyFee)-myBuyCost).toFixed(4):null,
     broPnl: sellBroQty>0?+((sellBroQty*sellPrice-sellBroFee)-broBuyCost).toFixed(4):null
   };
+}
+
+// One-time correction: recompute all stored sell P&Ls with the fixed FIFO
+function recalcAllPnL(){
+  var sells=DB.trades.filter(function(t){ return t.action==='sell'; }).sort(function(a,b){ return a.id-b.id; });
+  var changed=false;
+  sells.forEach(function(s){
+    var p=computePnL(s.ticker,s.myQty,s.broQty,s.price,s.myFee,s.broFee,s.id);
+    if(p.myPnl!==s.myPnl||p.broPnl!==s.broPnl){ s.myPnl=p.myPnl; s.broPnl=p.broPnl; changed=true; }
+  });
+  if(changed) save();
 }
 
 function calcFees(){
