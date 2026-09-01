@@ -1,0 +1,11 @@
+# Es darf nichts mit Patientenbezug ins Repository geraten.
+*.log
+state.json
+node_modules/
+.DS_Store
+Thumbs.db
+
+# Konfiguration enthaelt Praxisname und interne IP-Adressen.
+# Dieses Repository liegt oeffentlich auf GitHub — daher aktiviert.
+# Vorlage zum Kopieren: config.beispiel.json
+config.json

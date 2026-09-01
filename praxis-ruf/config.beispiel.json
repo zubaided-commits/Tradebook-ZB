@@ -1,0 +1,39 @@
+{
+  "_hinweis": "Diese Datei nach config.json kopieren und auf JEDEM Sprechzimmer-PC anpassen. Nur 'sprechzimmer' und 'andereSprechzimmer' unterscheiden sich zwischen den beiden PCs.",
+  "praxis": "Name der Praxis",
+  "port": 8080,
+  "sprechzimmer": {
+    "name": "Sprechzimmer 1",
+    "kurz": "1"
+  },
+  "andereSprechzimmer": [
+    "IP-ADRESSE-DES-ANDEREN-PCS"
+  ],
+  "wartezimmer": [
+    {
+      "id": "wz1",
+      "name": "Wartezimmer 1"
+    },
+    {
+      "id": "wz2",
+      "name": "Wartezimmer 2"
+    }
+  ],
+  "nurNachname": false,
+  "wiederholen": true,
+  "gong": true,
+  "anzeigeDauerSekunden": 45,
+  "stimme": {
+    "sprache": "de-DE",
+    "bevorzugt": [
+      "Google Deutsch",
+      "Microsoft Katja",
+      "Microsoft Hedda",
+      "Anna",
+      "Petra"
+    ],
+    "tempo": 0.88,
+    "tonhoehe": 1.0,
+    "lautstaerke": 1.0
+  }
+}

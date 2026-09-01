@@ -51,6 +51,10 @@ Den Ordner `praxis-ruf` auf jeden der beiden PCs kopieren, z. B. nach
 
 ## Schritt 3 — `config.json` anpassen
 
+Im Ordner liegt die Vorlage `config.beispiel.json`. Einmal je PC kopieren und
+in `config.json` umbenennen — darin stehen Praxisname und die internen
+Adressen, deshalb gehoert sie nicht ins Repository.
+
 Nur **zwei Zeilen** unterscheiden sich zwischen den beiden PCs.
 
 **Auf dem PC von Sprechzimmer 1:**

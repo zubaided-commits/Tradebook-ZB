@@ -2,387 +2,330 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wartezimmer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wartezimmer-Anzeige</title>
 <style>
   :root{
-    --gruen-tief:#024629; --gruen:#15633d; --gruen-hell:#1d7a4c;
-    --mint:#e3f0e9; --papier:#f2f7f4; --linie:#d5e4dc;
-    --text:#17251e; --grau:#617068; --messing:#b8862c; --rot:#a8452f;
+    --gruen-tief:#024629; --gruen-hell:#1d7a4c;
+    --mint:#a9d9bf; --papier:#f2f7f4; --messing:#e0b458;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
+  html,body{height:100%;overflow:hidden}
   body{
     background:var(--gruen-tief);color:var(--papier);
     font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
-    -webkit-font-smoothing:antialiased;overflow:hidden;
-    cursor:none;user-select:none;-webkit-user-select:none
+    -webkit-font-smoothing:antialiased;cursor:none
   }
+  .rahmen{height:100%;display:grid;grid-template-rows:auto 1fr auto}
 
-  /* Zustandspunkt oben links */
-  .punkt{
-    position:fixed;top:22px;left:24px;width:14px;height:14px;border-radius:50%;
-    background:var(--rot);z-index:20;transition:background .3s
+  .kopf{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:2.2vh 3.5vw;font-size:clamp(13px,1.5vh,20px);
+    letter-spacing:.16em;text-transform:uppercase;color:var(--mint);opacity:.75
   }
-  .punkt.gruen{background:#4cc98a}
-  .punkt.gelb{background:#f0c14b}
-  .punkt.rot{background:var(--rot)}
+  .kopf b{font-weight:600}
+  .uhr{font-variant-numeric:tabular-nums;letter-spacing:.08em}
+  .puls{
+    display:inline-block;width:.55em;height:.55em;border-radius:50%;
+    background:var(--gruen-hell);margin-right:.6em
+  }
+  .puls.teil{background:#d8a63c}
+  .puls.aus{background:#b4553f}
 
-  .raumname{
-    position:fixed;top:18px;right:26px;z-index:20;
-    font-size:15px;letter-spacing:.2em;text-transform:uppercase;opacity:.35
-  }
+  .buehne{position:relative;display:grid;place-items:center;padding:0 4vw}
 
-  /* Ruhezustand */
-  .ruhe{
-    height:100%;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:18px;text-align:center;padding:30px
+  .ruhe{text-align:center;animation:atmen 7s ease-in-out infinite}
+  .ruhe .marke{font-size:clamp(22px,4.4vh,44px);font-weight:300;opacity:.92;line-height:1.25}
+  .ruhe .hinweis{margin-top:2.6vh;font-size:clamp(14px,2.1vh,24px);color:var(--mint);opacity:.6;letter-spacing:.05em}
+  .kranz{
+    width:clamp(52px,7vh,90px);height:clamp(52px,7vh,90px);margin:0 auto 3.4vh;
+    border:2px solid rgba(169,217,191,.35);border-radius:50%;display:grid;place-items:center
   }
-  .ruhe .praxis{font-size:clamp(18px,2.4vw,30px);letter-spacing:.06em;opacity:.5}
-  .ruhe .uhr{font-size:clamp(56px,11vw,150px);font-weight:200;letter-spacing:.02em;opacity:.32}
-  .ruhe .hinweis{font-size:clamp(14px,1.5vw,19px);opacity:.3;max-width:22em;line-height:1.5}
+  .kranz::after{
+    content:"";width:38%;height:38%;border-radius:50%;
+    background:linear-gradient(180deg,var(--mint) 0 50%,transparent 50% 100%);opacity:.55
+  }
+  @keyframes atmen{0%,100%{opacity:.82}50%{opacity:1}}
 
-  /* Aufruf */
-  .aufruf{
-    position:fixed;inset:0;z-index:10;background:var(--gruen-tief);
-    display:none;flex-direction:column;align-items:center;justify-content:center;
-    gap:clamp(16px,3vh,40px);text-align:center;padding:4vh 5vw
-  }
-  .aufruf.an{display:flex;animation:auf .4s ease-out}
-  @keyframes auf{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+  .aufruf{display:none;width:100%;text-align:center}
+  body.ruft .aufruf{display:block}
+  body.ruft .ruhe{display:none}
 
-  .aufruf .wer{
-    font-size:clamp(46px,13vw,210px);font-weight:600;line-height:1.05;
-    letter-spacing:-.01em;max-width:100%;overflow-wrap:break-word;hyphens:auto
+  .eyebrow{
+    font-size:clamp(13px,1.9vh,22px);letter-spacing:.34em;text-transform:uppercase;
+    color:var(--messing);margin-bottom:2.2vh;animation:einblenden .5s .05s both
   }
-  .aufruf .wohin{
-    font-size:clamp(24px,5vw,78px);font-weight:300;color:#8fe0b4;line-height:1.2
+  .name{
+    font-weight:700;line-height:1.02;letter-spacing:-.02em;
+    font-size:clamp(44px,13.5vh,190px);word-break:break-word;
+    animation:einblenden .55s .12s both
   }
-  .aufruf .balken{
-    position:absolute;left:0;bottom:0;height:6px;background:#8fe0b4;opacity:.5;width:100%
-  }
+  .name.lang{font-size:clamp(38px,9.5vh,132px)}
+  .name.sehrlang{font-size:clamp(32px,7vh,96px)}
 
-  /* Durchsage läuft */
-  .durchsage{
-    position:fixed;inset:0;z-index:12;background:var(--gruen);display:none;
-    flex-direction:column;align-items:center;justify-content:center;gap:26px;text-align:center
+  .ziel{
+    margin-top:4.2vh;display:flex;align-items:center;justify-content:center;gap:2.4vw;
+    animation:einblenden .55s .3s both
   }
-  .durchsage.an{display:flex}
-  .durchsage .wellen{display:flex;gap:9px;align-items:flex-end;height:70px}
-  .durchsage .wellen i{
-    display:block;width:11px;background:var(--papier);border-radius:6px;
-    animation:welle 1s ease-in-out infinite
-  }
-  .durchsage .wellen i:nth-child(1){height:26px;animation-delay:0s}
-  .durchsage .wellen i:nth-child(2){height:52px;animation-delay:.12s}
-  .durchsage .wellen i:nth-child(3){height:70px;animation-delay:.24s}
-  .durchsage .wellen i:nth-child(4){height:44px;animation-delay:.36s}
-  .durchsage .wellen i:nth-child(5){height:22px;animation-delay:.48s}
-  @keyframes welle{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
-  .durchsage p{font-size:clamp(20px,3.4vw,44px);font-weight:300;letter-spacing:.02em}
+  .ziel .text{text-align:left;font-size:clamp(18px,3.4vh,42px);font-weight:300;color:var(--mint);line-height:1.2}
+  .ziel .text small{display:block;font-size:.62em;opacity:.7;letter-spacing:.14em;text-transform:uppercase;margin-bottom:.35em}
 
-  /* Startschicht */
-  .start{
-    position:fixed;inset:0;z-index:40;background:var(--gruen-tief);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:26px;text-align:center;padding:30px;cursor:pointer
-  }
-  .start.weg{display:none}
-  .start h1{font-size:clamp(24px,3.6vw,44px);font-weight:300;letter-spacing:.03em}
-  .start button{
-    background:var(--papier);color:var(--gruen-tief);border:0;border-radius:999px;
-    padding:20px 44px;font:inherit;font-size:clamp(18px,2.2vw,26px);font-weight:600;cursor:pointer
-  }
-  .start p{font-size:clamp(13px,1.4vw,17px);opacity:.45;max-width:26em;line-height:1.55}
+  .ring{position:relative;flex:0 0 auto;width:clamp(88px,17vh,210px);height:clamp(88px,17vh,210px);display:grid;place-items:center}
+  .ring::before{content:"";position:absolute;inset:0;border-radius:50%;border:clamp(3px,.55vh,7px) solid var(--messing);opacity:.9}
+  .ring::after{content:"";position:absolute;inset:0;border-radius:50%;border:clamp(3px,.55vh,7px) solid var(--messing);animation:welle 2.6s ease-out 3}
+  .ring span{font-size:clamp(44px,9.6vh,124px);font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+  @keyframes welle{0%{transform:scale(1);opacity:.75}100%{transform:scale(1.55);opacity:0}}
+  @keyframes einblenden{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
-  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  .verlauf{display:flex;border-top:1px solid rgba(169,217,191,.18);min-height:9vh;align-items:stretch}
+  .verlauf .titel{
+    padding:2.2vh 2.4vw;font-size:clamp(10px,1.25vh,15px);letter-spacing:.22em;
+    text-transform:uppercase;color:var(--mint);opacity:.45;display:flex;align-items:center;white-space:nowrap
+  }
+  .verlauf ol{list-style:none;display:flex;flex:1;overflow:hidden}
+  .verlauf li{
+    flex:1;padding:2.2vh 1.6vw;border-left:1px solid rgba(169,217,191,.14);
+    display:flex;flex-direction:column;justify-content:center;gap:.4em;
+    font-size:clamp(12px,1.9vh,22px);opacity:.55;min-width:0
+  }
+  .verlauf li:first-child{opacity:.9}
+  .verlauf li .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .verlauf li .s{font-size:.72em;color:var(--mint);letter-spacing:.06em}
+
+  .freigabe{position:fixed;inset:0;background:var(--gruen-tief);z-index:50;display:grid;place-items:center;text-align:center;padding:6vw;cursor:pointer}
+  .freigabe.weg{display:none}
+  .freigabe h1{font-size:clamp(20px,3.6vh,38px);font-weight:300;margin-bottom:1.6vh}
+  .freigabe p{color:var(--mint);opacity:.7;font-size:clamp(14px,2vh,20px);max-width:34ch;margin:0 auto 4vh}
+  .freigabe button{
+    font:inherit;font-size:clamp(16px,2.4vh,24px);background:var(--messing);color:#1a2b20;
+    border:0;border-radius:999px;padding:1.1em 2.6em;font-weight:600;cursor:pointer
+  }
+  .freigabe button:focus-visible{outline:3px solid var(--papier);outline-offset:4px}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
 <body>
 
-<div class="punkt rot" id="punkt" title="Keine Verbindung"></div>
-<div class="raumname" id="raumname"></div>
-
-<div class="ruhe">
-  <div class="praxis" id="praxisName"></div>
-  <div class="uhr" id="uhr">--:--</div>
-  <div class="hinweis" id="hinweis">Bitte nehmen Sie Platz. Sie werden aufgerufen.</div>
+<div class="freigabe" id="freigabe">
+  <div>
+    <h1 id="freigabeTitel">Wartezimmer-Anzeige</h1>
+    <p>Einmal antippen, damit der Lautsprecher die Aufrufe ansagen darf. Danach läuft die Anzeige von selbst.</p>
+    <button id="startKnopf">Anzeige starten</button>
+  </div>
 </div>
 
-<div class="aufruf" id="aufruf">
-  <div class="wer" id="aufrufName"></div>
-  <div class="wohin" id="aufrufWohin"></div>
-  <div class="balken" id="balken"></div>
-</div>
+<div class="rahmen">
+  <header class="kopf">
+    <div><span class="puls aus" id="puls"></span><b id="raumName">Wartezimmer</b></div>
+    <div class="uhr" id="uhr">--:--</div>
+  </header>
 
-<div class="durchsage" id="durchsageSchicht">
-  <div class="wellen"><i></i><i></i><i></i><i></i><i></i></div>
-  <p>Durchsage aus dem Sprechzimmer</p>
-</div>
+  <main class="buehne">
+    <section class="ruhe" id="ruhe">
+      <div class="kranz"></div>
+      <div class="marke" id="praxisName">Hausarztpraxis</div>
+      <div class="hinweis">Bitte nehmen Sie Platz — Sie werden hier aufgerufen.</div>
+    </section>
 
-<div class="start" id="start">
-  <h1>Wartezimmer-Anzeige</h1>
-  <button type="button" id="startKnopf">Anzeige starten</button>
-  <p id="startHinweis">
-    Einmal antippen — danach läuft die Anzeige von allein.
-    Der Tipp ist nötig, damit der Browser Ton abspielen darf.
-  </p>
+    <section class="aufruf" aria-live="assertive">
+      <div class="eyebrow">Aufruf</div>
+      <div class="name" id="nameFeld"></div>
+      <div class="ziel">
+        <div class="ring"><span id="ringZahl"></span></div>
+        <div class="text"><small>Bitte in</small><span id="zielText"></span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="verlauf">
+    <div class="titel">Zuletzt aufgerufen</div>
+    <ol id="verlaufListe"><li><span class="s">Noch keine Aufrufe</span></li></ol>
+  </footer>
 </div>
 
 <script>
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-  const parameter = new URLSearchParams(location.search);
-  const raum = (parameter.get('raum') || '').trim();
-  const quellen = (parameter.get('quellen') || location.host)
-    .split(',').map((s) => s.trim()).filter(Boolean);
+  const params = new URLSearchParams(location.search);
+  const raum = params.get('raum') || 'wz1';
 
-  // Voreinstellungen, falls /api/config nicht erreichbar ist.
-  let konfig = {
-    praxis: 'Praxis', wiederholen: true, gong: true,
-    anzeigeDauerSekunden: 45, stimme: { tempo: 0.88 },
-    wartezimmer: []
-  };
+  // Alle Sprechzimmer-PCs, denen dieser Bildschirm zuhört.
+  // Beispiel:  ?quellen=192.168.178.41:8080,192.168.178.42:8080
+  const quellen = (params.get('quellen') || location.host)
+    .split(',').map(s => s.trim()).filter(Boolean)
+    .map(s => (s.startsWith('http') ? s : 'http://' + s));
 
-  if (!raum) {
-    $('startHinweis').textContent =
-      'In der Adresse fehlt "?raum=wz1". Bitte die Adresse aus dem Startfenster ' +
-      'des Programms verwenden.';
-    $('startKnopf').disabled = true;
-  }
+  let konfig = null, stimme = null, tonFrei = false, audioCtx = null, ausblendTimer = null;
+  let sageUhren = [];                 // laufende Uhren fuer Ansage und Wiederholung
+  const verbindungen = new Map();     // Quelle -> verbunden ja/nein
+  let verlauf = [];                   // nur im Arbeitsspeicher dieser Seite
 
   /* ---------- Uhr ---------- */
-  function uhrStellen() {
-    $('uhr').textContent = new Date().toLocaleTimeString('de-DE',
-      { hour: '2-digit', minute: '2-digit' });
-  }
-  uhrStellen();
-  setInterval(uhrStellen, 15000);
+  const uhr = () => $('uhr').textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  uhr(); setInterval(uhr, 15000);
 
-  /* ---------- Konfiguration ---------- */
-  fetch('/api/config').then((r) => r.json()).then((c) => {
-    konfig = Object.assign(konfig, c);
-    $('praxisName').textContent = konfig.praxis;
-    const w = (konfig.wartezimmer || []).find((x) => x.id === raum);
-    $('raumname').textContent = w ? w.name : raum;
-    document.title = (w ? w.name : 'Wartezimmer') + ' — ' + konfig.praxis;
-  }).catch(() => {
-    $('raumname').textContent = raum;
-  });
-
-  /* ---------- Ton: Gong ---------- */
-  let tonKontext = null;
-
-  function gongSpielen() {
-    return new Promise((fertig) => {
-      if (!konfig.gong || !tonKontext) return fertig();
-      const jetzt = tonKontext.currentTime;
-      // Zwei Töne, absteigende Quarte — freundlich und gut hörbar.
-      [[880, 0], [659.25, 0.26]].forEach(([hertz, versatz]) => {
-        const ton = tonKontext.createOscillator();
-        const huelle = tonKontext.createGain();
-        ton.type = 'sine';
-        ton.frequency.value = hertz;
-        huelle.gain.setValueAtTime(0.0001, jetzt + versatz);
-        huelle.gain.exponentialRampToValueAtTime(0.32, jetzt + versatz + 0.02);
-        huelle.gain.exponentialRampToValueAtTime(0.0001, jetzt + versatz + 1.1);
-        ton.connect(huelle).connect(tonKontext.destination);
-        ton.start(jetzt + versatz);
-        ton.stop(jetzt + versatz + 1.2);
-      });
-      setTimeout(fertig, 1200);
-    });
-  }
-
-  /* ---------- Ton: Sprachausgabe ---------- */
-  let stimme = null;
-
-  function stimmeWaehlen() {
-    const alle = window.speechSynthesis ? speechSynthesis.getVoices() : [];
-    const deutsch = alle.filter((s) => /^de/i.test(s.lang));
-    if (!deutsch.length) return;
-    const bevorzugt = ['Google Deutsch', 'Microsoft Katja', 'Microsoft Hedda', 'Anna'];
-    for (const name of bevorzugt) {
-      const treffer = deutsch.find((s) => s.name.indexOf(name) !== -1);
-      if (treffer) { stimme = treffer; return; }
-    }
-    stimme = deutsch[0];
-  }
-  if (window.speechSynthesis) {
+  /* ---------- Konfiguration (von der eigenen Quelle) ---------- */
+  fetch(quellen[0] + '/api/config').then(r => r.json()).then(c => {
+    konfig = c;
+    const wz = (c.wartezimmer || []).find(w => w.id === raum);
+    const label = wz ? wz.name : raum;
+    $('raumName').textContent = label;
+    $('freigabeTitel').textContent = label;
+    $('praxisName').textContent = c.praxis || 'Praxis';
+    document.title = label + ' — Anzeige';
     stimmeWaehlen();
-    speechSynthesis.addEventListener('voiceschanged', stimmeWaehlen);
+  }).catch(() => {});
+
+  /* ---------- Sprachausgabe ---------- */
+  function stimmeWaehlen() {
+    const alle = speechSynthesis.getVoices();
+    if (!alle.length) return;
+    for (const w of ((konfig && konfig.stimme && konfig.stimme.bevorzugt) || [])) {
+      const t = alle.find(v => v.name.toLowerCase().includes(w.toLowerCase()));
+      if (t) { stimme = t; return; }
+    }
+    stimme = alle.find(v => v.lang === 'de-DE') || alle.find(v => v.lang.startsWith('de')) || null;
   }
+  speechSynthesis.onvoiceschanged = stimmeWaehlen;
 
   function sprechen(text) {
-    return new Promise((fertig) => {
-      if (!window.speechSynthesis) return fertig();
-      const rede = new SpeechSynthesisUtterance(text);
-      rede.lang = 'de-DE';
-      rede.rate = konfig.stimme && konfig.stimme.tempo ? konfig.stimme.tempo : 0.88;
-      rede.pitch = 1;
-      rede.volume = 1;
-      if (stimme) rede.voice = stimme;
-
-      // Chrome meldet das Ende gelegentlich nicht — deshalb zusätzlich eine Uhr.
-      let erledigt = false;
-      const abschliessen = () => { if (!erledigt) { erledigt = true; fertig(); } };
-      rede.onend = abschliessen;
-      rede.onerror = abschliessen;
-      setTimeout(abschliessen, 1500 + text.length * 190);
-
-      try { speechSynthesis.speak(rede); } catch (fehler) { abschliessen(); }
-    });
+    if (!tonFrei) return;
+    const s = (konfig && konfig.stimme) || {};
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = s.sprache || 'de-DE';
+    if (stimme) u.voice = stimme;
+    u.rate = s.tempo || 0.88;
+    u.pitch = s.tonhoehe || 1.0;
+    u.volume = s.lautstaerke || 1.0;
+    speechSynthesis.speak(u);
   }
 
-  const warten = (ms) => new Promise((f) => setTimeout(f, ms));
-
-  /* ---------- Anzeige ---------- */
-  let anzeigeUhr = null;
-
-  function aufrufZeigen(daten) {
-    const voll = ((daten.anrede ? daten.anrede + ' ' : '') + daten.name).trim();
-    $('aufrufName').textContent = voll;
-    $('aufrufWohin').textContent = 'bitte in ' + daten.sprechzimmer.name;
-    $('aufruf').classList.add('an');
-
-    const dauer = konfig.anzeigeDauerSekunden * 1000;
-    const balken = $('balken');
-    balken.style.transition = 'none';
-    balken.style.width = '100%';
-    // Erzwingt, dass der Browser die Breite übernimmt, bevor sie animiert wird.
-    void balken.offsetWidth;
-    balken.style.transition = 'width ' + dauer + 'ms linear';
-    balken.style.width = '0%';
-
-    clearTimeout(anzeigeUhr);
-    anzeigeUhr = setTimeout(anzeigeLeeren, dauer);
-  }
-
-  function anzeigeLeeren() {
-    clearTimeout(anzeigeUhr);
-    $('aufruf').classList.remove('an');
-  }
-
-  /* ---------- Warteschlange ---------- */
-  // Aufrufe und Durchsagen nacheinander abspielen, damit sich nichts überlagert.
-  const warteschlange = [];
-  let laeuft = false;
-
-  function einreihen(vorgang) {
-    warteschlange.push(vorgang);
-    if (!laeuft) naechstes();
-  }
-
-  async function naechstes() {
-    const vorgang = warteschlange.shift();
-    if (!vorgang) { laeuft = false; return; }
-    laeuft = true;
+  function gong() {
+    if (!tonFrei || (konfig && konfig.gong === false)) return;
     try {
-      if (vorgang.art === 'aufruf') await aufrufAbspielen(vorgang.daten);
-      else await durchsageAbspielen(vorgang.quelle, vorgang.id);
-    } catch (fehler) { /* ein Fehler darf die Warteschlange nicht anhalten */ }
-    naechstes();
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      for (const [hz, versatz] of [[784, 0], [1046.5, 0.16]]) {
+        const t = audioCtx.currentTime + versatz;
+        const osz = audioCtx.createOscillator(), amp = audioCtx.createGain();
+        osz.type = 'sine'; osz.frequency.value = hz;
+        amp.gain.setValueAtTime(0.0001, t);
+        amp.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+        amp.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+        osz.connect(amp).connect(audioCtx.destination);
+        osz.start(t); osz.stop(t + 1.2);
+      }
+    } catch (e) {}
   }
 
-  async function aufrufAbspielen(daten) {
-    aufrufZeigen(daten);
-    await gongSpielen();
-    const satz = ((daten.anrede ? daten.anrede + ' ' : '') + daten.name).trim() +
-                 ', bitte in ' + daten.sprechzimmer.name + '.';
-    await sprechen(satz);
-    if (konfig.wiederholen) {
-      await warten(700);
-      await sprechen(satz);
-    }
+  /* ---------- Aufruf ---------- */
+  function aufrufZeigen(ev) {
+    const voll = ((ev.anrede ? ev.anrede + ' ' : '') + ev.name).trim();
+    const feld = $('nameFeld');
+    feld.textContent = voll;
+    feld.className = 'name' + (voll.length > 26 ? ' sehrlang' : voll.length > 15 ? ' lang' : '');
+    $('zielText').textContent = ev.sprechzimmer;
+    $('ringZahl').textContent = ev.sprechzimmerKurz || '';
+
+    const ring = document.querySelector('.ring');
+    ring.style.animation = 'none'; void ring.offsetWidth; ring.style.animation = '';
+    document.body.classList.add('ruft');
+
+    ansageAbbrechen();
+    gong();
+    const satz = voll + ', bitte in ' + ev.sprechzimmer + '.';
+    sageUhren.push(setTimeout(() => sprechen(satz), 1250));
+    if (ev.wiederholen !== false) sageUhren.push(setTimeout(() => sprechen(satz), 5200));
+
+    verlauf.unshift({ voll, sprechzimmer: ev.sprechzimmer, ts: ev.ts || Date.now() });
+    verlauf = verlauf.slice(0, 4);
+    verlaufZeichnen();
+
+    clearTimeout(ausblendTimer);
+    ausblendTimer = setTimeout(() => document.body.classList.remove('ruft'),
+      ((konfig && konfig.anzeigeDauerSekunden) || 45) * 1000);
   }
 
-  function durchsageAbspielen(quelle, id) {
-    return new Promise((fertig) => {
-      const schicht = $('durchsageSchicht');
-      schicht.classList.add('an');
-      const ton = new Audio('http://' + quelle + '/api/audio/' + encodeURIComponent(id));
-      ton.volume = 1;
-
-      let erledigt = false;
-      const abschliessen = () => {
-        if (erledigt) return;
-        erledigt = true;
-        schicht.classList.remove('an');
-        fertig();
-      };
-      ton.addEventListener('ended', abschliessen);
-      ton.addEventListener('error', abschliessen);
-      setTimeout(abschliessen, 125000);   // Notbremse, Durchsagen sind kurz
-
-      ton.play().catch(abschliessen);
-    });
+  // speechSynthesis.cancel() beendet nur, was gerade gesprochen wird. Ohne das
+  // Loeschen der Uhren sagt der Lautsprecher nach einem neuen Aufruf noch einmal
+  // den vorherigen Namen an.
+  function ansageAbbrechen() {
+    sageUhren.forEach(clearTimeout);
+    sageUhren = [];
+    speechSynthesis.cancel();
   }
 
-  /* ---------- Verbindungen zu den Sprechzimmern ---------- */
-  const zustand = new Map();
-  quellen.forEach((q) => zustand.set(q, false));
-
-  function punktAktualisieren() {
-    let offen = 0;
-    for (const da of zustand.values()) if (da) offen++;
-    const punkt = $('punkt');
-    punkt.className = 'punkt ' + (offen === 0 ? 'rot' : (offen < quellen.length ? 'gelb' : 'gruen'));
-    punkt.title = offen + ' von ' + quellen.length + ' Sprechzimmern verbunden';
+  function verlaufZeichnen() {
+    $('verlaufListe').innerHTML = verlauf.length ? verlauf.map(v => {
+      const zeit = new Date(v.ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      return `<li><span class="n">${esc(v.voll)}</span><span class="s">${esc(v.sprechzimmer)} · ${zeit}</span></li>`;
+    }).join('') : '<li><span class="s">Noch keine Aufrufe</span></li>';
   }
 
-  function verbinden() {
-    for (const quelle of quellen) {
-      const strom = new EventSource(
-        'http://' + quelle + '/api/events?raum=' + encodeURIComponent(raum));
-
-      strom.addEventListener('open', () => { zustand.set(quelle, true); punktAktualisieren(); });
-      strom.addEventListener('error', () => { zustand.set(quelle, false); punktAktualisieren(); });
-      strom.addEventListener('bereit', () => { zustand.set(quelle, true); punktAktualisieren(); });
-
-      strom.addEventListener('aufruf', (e) => {
-        try { einreihen({ art: 'aufruf', daten: JSON.parse(e.data) }); } catch (f) {}
-      });
-      strom.addEventListener('durchsage', (e) => {
-        try { einreihen({ art: 'durchsage', quelle, id: JSON.parse(e.data).id }); } catch (f) {}
-      });
-      strom.addEventListener('leeren', anzeigeLeeren);
-    }
-    punktAktualisieren();
+  function durchsage(url) {
+    if (!tonFrei) return;
+    ansageAbbrechen();
+    new Audio(url).play().catch(() => {});
   }
 
-  /* ---------- Bildschirm wachhalten ---------- */
-  let wachSperre = null;
+  /* ---------- Verbindung zu allen Sprechzimmern ---------- */
+  function pulsAktualisieren() {
+    const gesamt = quellen.length;
+    const offen = [...verbindungen.values()].filter(Boolean).length;
+    const p = $('puls');
+    p.className = 'puls' + (offen === 0 ? ' aus' : offen < gesamt ? ' teil' : '');
+    p.title = offen + ' von ' + gesamt + ' Sprechzimmern verbunden';
+  }
+
+  function verbinden(quelle) {
+    const q = new EventSource(quelle + '/api/events?raum=' + encodeURIComponent(raum));
+    q.onopen = () => { verbindungen.set(quelle, true); pulsAktualisieren(); };
+    q.onerror = () => {
+      verbindungen.set(quelle, false); pulsAktualisieren();
+      q.close(); setTimeout(() => verbinden(quelle), 4000);
+    };
+    q.onmessage = (e) => {
+      let d; try { d = JSON.parse(e.data); } catch (_) { return; }
+      if (d.type === 'aufruf')    aufrufZeigen(d);
+      if (d.type === 'durchsage') durchsage(d.url);
+      if (d.type === 'leeren')    { clearTimeout(ausblendTimer); ansageAbbrechen(); document.body.classList.remove('ruft'); }
+    };
+  }
 
   async function wachHalten() {
-    if (!navigator.wakeLock) return;
-    try { wachSperre = await navigator.wakeLock.request('screen'); } catch (fehler) {}
-  }
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && !wachSperre) wachHalten();
-  });
-
-  /* ---------- Start ---------- */
-  $('startKnopf').addEventListener('click', async () => {
-    // Der Tastendruck gibt Ton frei und macht die Seite zum Vollbild.
     try {
-      const Kontext = window.AudioContext || window.webkitAudioContext;
-      if (Kontext) {
-        tonKontext = new Kontext();
-        if (tonKontext.state === 'suspended') await tonKontext.resume();
+      if ('wakeLock' in navigator) {
+        let sperre = await navigator.wakeLock.request('screen');
+        document.addEventListener('visibilitychange', async () => {
+          if (document.visibilityState === 'visible') {
+            try { sperre = await navigator.wakeLock.request('screen'); } catch (e) {}
+          }
+        });
       }
-    } catch (fehler) { tonKontext = null; }
+    } catch (e) {}
+  }
 
-    // Eine stumme, sehr kurze Ansage schaltet die Sprachausgabe frei.
-    try { speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); } catch (fehler) {}
-
-    try { await document.documentElement.requestFullscreen(); } catch (fehler) {}
+  $('startKnopf').addEventListener('click', async () => {
+    tonFrei = true;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      await audioCtx.resume();
+      const stumm = new SpeechSynthesisUtterance(' ');
+      stumm.volume = 0; speechSynthesis.speak(stumm);
+    } catch (e) {}
+    $('freigabe').classList.add('weg');
     wachHalten();
-
-    $('start').classList.add('weg');
-    verbinden();
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
   });
+
+  quellen.forEach(q => { verbindungen.set(q, false); verbinden(q); });
+  pulsAktualisieren();
 })();
 </script>
 </body>

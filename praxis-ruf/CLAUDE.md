@@ -37,7 +37,8 @@ Der Bildschirm öffnet eine EventSource **pro Quelle**. Deshalb erreichen beide
 | Datei | Zweck |
 |---|---|
 | `server.js` | Reiner Relay-Server. Keine Abhängigkeiten, nur Node-Standardmodule. |
-| `config.json` | Pro PC unterschiedlich: `sprechzimmer` und `andereSprechzimmer`. |
+| `config.json` | Pro PC unterschiedlich: `sprechzimmer` und `andereSprechzimmer`. Nicht im Repository — enthaelt Praxisname und interne IP-Adressen. |
+| `config.beispiel.json` | Vorlage zum Kopieren nach `config.json`. |
 | `public/praxis.html` | Bedienseite der Ärztin. Name eingeben, Wartezimmer antippen, Push-to-Talk. |
 | `public/wartezimmer.html` | Anzeige + Lautsprecher. Sprachausgabe über Web Speech API, Gong über WebAudio. |
 | `ANLEITUNG.md` | Deutsche Einrichtungsanleitung für die Praxis. Bei Änderungen mitpflegen. |
