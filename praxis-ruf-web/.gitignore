@@ -1,0 +1,10 @@
+# Enthaelt Passwort und Praxisnamen.
+config.php
+
+# Laufende Daten: Aufrufe, Namen, Sprachaufnahmen. Niemals ins Repository.
+# Der Ordner selbst und seine Sperr-Dateien werden dagegen mit ausgeliefert.
+daten/*
+!daten/.htaccess
+!daten/ton/
+daten/ton/*
+!daten/ton/.gitkeep

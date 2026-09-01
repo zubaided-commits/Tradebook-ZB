@@ -1,0 +1,24 @@
+# Praxis-Ruf Web — Grundeinstellungen fuer IONOS
+
+# 1) Immer verschluesselt. Ohne HTTPS gibt der Browser das Mikrofon
+#    fuer die Durchsage nicht frei, und Namen liefen ungeschuetzt durchs Netz.
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+# 2) Verzeichnisinhalte nicht auflisten
+Options -Indexes
+
+# 3) Konfiguration und Zustandsdaten sind nicht abrufbar
+<FilesMatch "^(config\.php|config\.beispiel\.php|inc\.php)$">
+    Require all denied
+</FilesMatch>
+
+# 4) Suchmaschinen fernhalten
+<IfModule mod_headers.c>
+    Header set X-Robots-Tag "noindex, nofollow"
+    Header set Referrer-Policy "no-referrer"
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+</IfModule>
