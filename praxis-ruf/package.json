@@ -1,0 +1,14 @@
+{
+  "name": "praxis-ruf",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Patientenaufrufsystem fuer eine Hausarztpraxis. Laeuft lokal, ohne Abhaengigkeiten.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}

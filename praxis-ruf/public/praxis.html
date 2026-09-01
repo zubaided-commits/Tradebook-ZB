@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Praxis-Ruf</title>
+<style>
+  :root{
+    --gruen-tief:#024629; --gruen:#15633d; --gruen-hell:#1d7a4c;
+    --mint:#e3f0e9; --papier:#f2f7f4; --linie:#d5e4dc;
+    --text:#17251e; --grau:#617068; --messing:#b8862c; --rot:#a8452f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--papier);color:var(--text);
+    font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;min-height:100vh;
+    display:flex;flex-direction:column
+  }
+  button,input,select{font:inherit}
+  button{cursor:pointer;border:0}
+  :focus-visible{outline:3px solid var(--gruen-hell);outline-offset:2px}
+
+  header{background:var(--gruen-tief);color:var(--papier);padding:16px 20px}
+  header .praxis{font-size:11px;letter-spacing:.22em;text-transform:uppercase;opacity:.55}
+  header .raum{font-size:21px;font-weight:600;margin-top:5px}
+
+  main{flex:1;padding:22px 20px;max-width:620px;width:100%;margin:0 auto}
+
+  label.feld{display:block;font-size:13px;color:var(--grau);margin-bottom:7px;letter-spacing:.02em}
+  .eingabe{display:flex;gap:8px;margin-bottom:18px}
+  .eingabe select{padding:16px 10px;border:1px solid var(--linie);border-radius:11px;background:#fff}
+  .eingabe input{
+    flex:1;min-width:0;padding:16px 15px;border:1px solid var(--linie);
+    border-radius:11px;background:#fff;font-size:19px
+  }
+
+  .ziele{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+  .ziele button{
+    background:var(--gruen);color:#fff;border-radius:13px;
+    padding:22px 12px;font-size:17px;font-weight:600;line-height:1.3;
+    display:flex;flex-direction:column;align-items:center;gap:7px
+  }
+  .ziele button:active{background:var(--gruen-tief)}
+  .ziele button:disabled{background:#b9cec3;cursor:default}
+  .ziele button .lampe{
+    width:8px;height:8px;border-radius:50%;background:#8fe0b4;opacity:.95
+  }
+  .ziele button .lampe.fehlt{background:#f0c14b}
+  .beide{
+    width:100%;margin-top:10px;background:transparent;color:var(--gruen);
+    padding:13px;font-size:14px;text-decoration:underline;border-radius:10px
+  }
+
+  .trenner{height:1px;background:var(--linie);margin:26px 0 20px}
+
+  h2{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--grau);margin-bottom:12px}
+
+  ul.verlauf{list-style:none;background:#fff;border:1px solid var(--linie);border-radius:13px;overflow:hidden}
+  ul.verlauf li{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--linie)}
+  ul.verlauf li:last-child{border-bottom:0}
+  ul.verlauf .wer{flex:1;min-width:0}
+  ul.verlauf .nm{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  ul.verlauf .meta{font-size:12px;color:var(--grau);margin-top:2px}
+  ul.verlauf button{background:var(--mint);color:var(--gruen-tief);border-radius:9px;padding:10px 15px;font-size:14px;font-weight:600}
+  .leer{padding:18px 14px;color:var(--grau);font-size:14px;background:#fff;border:1px solid var(--linie);border-radius:13px}
+
+  /* Durchsage */
+  .durchsage{
+    background:#fff;border:1px solid var(--linie);border-radius:13px;
+    padding:14px;display:flex;align-items:center;gap:14px
+  }
+  .mikro{
+    flex:0 0 auto;width:78px;height:78px;border-radius:50%;
+    background:var(--gruen-tief);color:#fff;display:grid;place-items:center;
+    font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+    line-height:1.3;touch-action:none;user-select:none;-webkit-user-select:none;
+    transition:transform .12s, background .12s
+  }
+  .mikro.laeuft{background:var(--rot);transform:scale(1.06)}
+  .mikro:disabled{background:var(--linie);color:var(--grau);cursor:default}
+  .durchsage .info{flex:1;min-width:0}
+  .durchsage .info b{display:block;font-size:14px;margin-bottom:3px}
+  .durchsage .info span{font-size:12.5px;color:var(--grau)}
+  .durchsage select{margin-top:9px;width:100%;padding:10px;border:1px solid var(--linie);border-radius:9px;background:#fff}
+
+  .warnung{
+    background:#fdf4e0;border:1px solid #e8d5a8;border-radius:11px;
+    padding:12px 14px;font-size:13px;color:#5b4715;margin-bottom:16px;display:none
+  }
+  .warnung.an{display:block}
+
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);
+    background:var(--gruen-tief);color:#fff;padding:13px 22px;border-radius:999px;
+    font-size:14.5px;opacity:0;pointer-events:none;transition:.22s;z-index:40;
+    max-width:90vw;text-align:center
+  }
+  .toast.an{opacity:1;transform:translateX(-50%)}
+  .toast.warn{background:var(--messing);color:#1a1408}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="praxis" id="praxisName">Praxis-Ruf</div>
+  <div class="raum" id="raumName">Sprechzimmer</div>
+</header>
+
+<main>
+  <div class="warnung" id="warnung"></div>
+
+  <label class="feld" for="name">Wen rufen Sie auf?</label>
+  <div class="eingabe">
+    <select id="anrede" aria-label="Anrede">
+      <option value="">ohne</option>
+      <option>Herr</option>
+      <option>Frau</option>
+    </select>
+    <input id="name" placeholder="Name" autocomplete="off" autocapitalize="words" maxlength="60" enterkeyhint="go">
+  </div>
+
+  <div class="ziele" id="ziele"></div>
+  <button class="beide" id="beide">In beide Wartezimmer rufen</button>
+
+  <div class="trenner"></div>
+
+  <h2>Zuletzt aufgerufen</h2>
+  <div id="verlaufBox"><div class="leer">Noch keine Aufrufe in dieser Sitzung.</div></div>
+
+  <div class="trenner"></div>
+
+  <h2>Durchsage mit eigener Stimme</h2>
+  <div class="durchsage">
+    <button class="mikro" id="mikro">Halten<br>zum<br>Sprechen</button>
+    <div class="info">
+      <b id="mikroTitel">Gedrückt halten, sprechen, loslassen</b>
+      <span id="mikroStatus">Die Aufnahme wird sofort abgespielt.</span>
+      <select id="durchsageZiel"></select>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  let konfig = null, raeume = {}, verlauf = [];   // Verlauf nur im Arbeitsspeicher
+
+  function toast(text, warn) {
+    const el = $('toast');
+    el.textContent = text;
+    el.className = 'toast an' + (warn ? ' warn' : '');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.className = 'toast', 2600);
+  }
+
+  /* ---------- Aufbau ---------- */
+  fetch('/api/config').then(r => r.json()).then(c => {
+    konfig = c;
+    $('praxisName').textContent = c.praxis || 'Praxis-Ruf';
+    $('raumName').textContent = c.sprechzimmer.name;
+    document.title = 'Praxis-Ruf — ' + c.sprechzimmer.name;
+
+    $('ziele').innerHTML = c.wartezimmer.map(w =>
+      `<button type="button" data-wz="${w.id}"><span class="lampe fehlt" data-lampe="${w.id}"></span>${esc(w.name)}</button>`
+    ).join('');
+
+    $('durchsageZiel').innerHTML =
+      `<option value="alle">An beide Wartezimmer</option>` +
+      c.wartezimmer.map(w => `<option value="${w.id}">Nur ${esc(w.name)}</option>`).join('');
+
+    $('ziele').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-wz]');
+      if (b) rufen(b.dataset.wz);
+    });
+    statusHolen();
+    setInterval(statusHolen, 8000);
+  });
+
+  $('beide').addEventListener('click', () => rufen('alle'));
+  $('name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && konfig) rufen(konfig.wartezimmer[0].id);
+  });
+
+  /* ---------- Aufrufen ---------- */
+  async function rufen(wartezimmer, vorgabe) {
+    const name = vorgabe ? vorgabe.name : $('name').value.trim();
+    const anrede = vorgabe ? vorgabe.anrede : $('anrede').value;
+    if (!name) { $('name').focus(); return toast('Bitte zuerst einen Namen eingeben', true); }
+
+    try {
+      const r = await fetch('/api/call', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, anrede, wartezimmer })
+      }).then(x => x.json());
+      if (!r.ok) return toast(r.fehler || 'Aufruf fehlgeschlagen', true);
+
+      const wo = wartezimmer === 'alle'
+        ? 'beide Wartezimmer'
+        : (konfig.wartezimmer.find(w => w.id === wartezimmer) || {}).name;
+
+      if (r.erreicht === 0) {
+        toast('Kein Bildschirm in ' + wo + ' verbunden', true);
+      } else {
+        toast(`${(anrede ? anrede + ' ' : '')}${r.aufruf.name} → ${wo}`);
+      }
+
+      verlauf.unshift({ name, anrede, wartezimmer, wo, ts: Date.now() });
+      verlauf = verlauf.slice(0, 6);
+      verlaufZeichnen();
+      if (!vorgabe) { $('name').value = ''; $('anrede').value = ''; $('name').focus(); }
+    } catch (e) {
+      toast('Keine Verbindung zum Programm', true);
+    }
+  }
+
+  function verlaufZeichnen() {
+    if (!verlauf.length) {
+      $('verlaufBox').innerHTML = '<div class="leer">Noch keine Aufrufe in dieser Sitzung.</div>';
+      return;
+    }
+    $('verlaufBox').innerHTML = '<ul class="verlauf">' + verlauf.map((v, i) => {
+      const zeit = new Date(v.ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      return `<li>
+        <div class="wer">
+          <div class="nm">${esc(((v.anrede ? v.anrede + ' ' : '') + v.name).trim())}</div>
+          <div class="meta">${esc(v.wo)} · ${zeit}</div>
+        </div>
+        <button type="button" data-nochmal="${i}">Nochmal</button>
+      </li>`;
+    }).join('') + '</ul>';
+  }
+
+  $('verlaufBox').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-nochmal]');
+    if (!b) return;
+    const v = verlauf[Number(b.dataset.nochmal)];
+    if (v) rufen(v.wartezimmer, v);
+  });
+
+  /* ---------- Bildschirm-Status ---------- */
+  async function statusHolen() {
+    try {
+      const r = await fetch('/api/status').then(x => x.json());
+      raeume = r.raeume || {};
+    } catch (e) { raeume = {}; }
+    for (const w of (konfig ? konfig.wartezimmer : [])) {
+      const l = document.querySelector(`[data-lampe="${w.id}"]`);
+      if (!l) continue;
+      const da = raeume[w.id] > 0;
+      l.className = 'lampe' + (da ? '' : ' fehlt');
+      l.closest('button').title = da
+        ? 'Bildschirm verbunden'
+        : 'Kein Bildschirm verbunden — Aufruf wird nicht gehört';
+    }
+  }
+
+  /* ---------- Durchsage ---------- */
+  const mikro = $('mikro');
+  let recorder = null, teile = [], laeuft = false;
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    mikro.disabled = true;
+    $('mikroTitel').textContent = 'Mikrofon nicht verfügbar';
+    $('mikroStatus').textContent = 'Diese Seite bitte über http://localhost öffnen, nicht über die IP-Adresse.';
+    $('warnung').textContent = 'Für die Durchsage muss diese Seite auf DIESEM PC über http://localhost geöffnet werden. Aufrufe funktionieren trotzdem.';
+    $('warnung').classList.add('an');
+  }
+
+  async function aufnahmeStarten() {
+    if (laeuft || mikro.disabled) return;
+    try {
+      const strom = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+      teile = [];
+      recorder = new MediaRecorder(strom);
+      recorder.ondataavailable = (e) => { if (e.data.size) teile.push(e.data); };
+      recorder.onstop = async () => {
+        strom.getTracks().forEach(t => t.stop());
+        const blob = new Blob(teile, { type: recorder.mimeType || 'audio/webm' });
+        if (blob.size < 1200) { $('mikroStatus').textContent = 'Zu kurz — Taste länger halten.'; return; }
+        $('mikroStatus').textContent = 'Wird gesendet …';
+        try {
+          const r = await fetch('/api/announce?ziel=' + encodeURIComponent($('durchsageZiel').value), {
+            method: 'POST', headers: { 'Content-Type': blob.type }, body: blob
+          }).then(x => x.json());
+          const wo = $('durchsageZiel').selectedOptions[0].textContent;
+          if (r.erreicht === 0) toast('Kein Bildschirm verbunden — nicht gehört', true);
+          else toast('Durchsage läuft · ' + wo);
+          $('mikroStatus').textContent = 'Die Aufnahme wird sofort abgespielt.';
+        } catch (e) {
+          $('mikroStatus').textContent = 'Senden fehlgeschlagen.';
+        }
+      };
+      recorder.start();
+      laeuft = true;
+      mikro.classList.add('laeuft');
+      mikro.innerHTML = 'Sprechen';
+      $('mikroTitel').textContent = 'Aufnahme läuft';
+      $('mikroStatus').textContent = 'Loslassen zum Senden.';
+    } catch (e) {
+      $('mikroStatus').textContent = 'Kein Zugriff auf das Mikrofon.';
+    }
+  }
+
+  function aufnahmeBeenden() {
+    if (!laeuft) return;
+    laeuft = false;
+    mikro.classList.remove('laeuft');
+    mikro.innerHTML = 'Halten<br>zum<br>Sprechen';
+    $('mikroTitel').textContent = 'Gedrückt halten, sprechen, loslassen';
+    try { recorder.stop(); } catch (e) {}
+  }
+
+  mikro.addEventListener('pointerdown', (e) => { e.preventDefault(); aufnahmeStarten(); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => mikro.addEventListener(ev, aufnahmeBeenden));
+  mikro.addEventListener('contextmenu', (e) => e.preventDefault());
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "praxis": "Hausarztpraxis",
+  "port": 8080,
+
+  "sprechzimmer": { "name": "Sprechzimmer 1", "kurz": "1" },
+  "andereSprechzimmer": ["192.168.178.42"],
+
+  "wartezimmer": [
+    { "id": "wz1", "name": "Wartezimmer 1" },
+    { "id": "wz2", "name": "Wartezimmer 2" }
+  ],
+
+  "nurNachname": false,
+  "wiederholen": true,
+  "gong": true,
+  "anzeigeDauerSekunden": 45,
+  "stimme": { "tempo": 0.88 }
+}

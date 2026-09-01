@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wartezimmer</title>
+<style>
+  :root{
+    --gruen-tief:#024629; --gruen:#15633d; --gruen-hell:#1d7a4c;
+    --mint:#e3f0e9; --papier:#f2f7f4; --linie:#d5e4dc;
+    --text:#17251e; --grau:#617068; --messing:#b8862c; --rot:#a8452f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--gruen-tief);color:var(--papier);
+    font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;overflow:hidden;
+    cursor:none;user-select:none;-webkit-user-select:none
+  }
+
+  /* Zustandspunkt oben links */
+  .punkt{
+    position:fixed;top:22px;left:24px;width:14px;height:14px;border-radius:50%;
+    background:var(--rot);z-index:20;transition:background .3s
+  }
+  .punkt.gruen{background:#4cc98a}
+  .punkt.gelb{background:#f0c14b}
+  .punkt.rot{background:var(--rot)}
+
+  .raumname{
+    position:fixed;top:18px;right:26px;z-index:20;
+    font-size:15px;letter-spacing:.2em;text-transform:uppercase;opacity:.35
+  }
+
+  /* Ruhezustand */
+  .ruhe{
+    height:100%;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;text-align:center;padding:30px
+  }
+  .ruhe .praxis{font-size:clamp(18px,2.4vw,30px);letter-spacing:.06em;opacity:.5}
+  .ruhe .uhr{font-size:clamp(56px,11vw,150px);font-weight:200;letter-spacing:.02em;opacity:.32}
+  .ruhe .hinweis{font-size:clamp(14px,1.5vw,19px);opacity:.3;max-width:22em;line-height:1.5}
+
+  /* Aufruf */
+  .aufruf{
+    position:fixed;inset:0;z-index:10;background:var(--gruen-tief);
+    display:none;flex-direction:column;align-items:center;justify-content:center;
+    gap:clamp(16px,3vh,40px);text-align:center;padding:4vh 5vw
+  }
+  .aufruf.an{display:flex;animation:auf .4s ease-out}
+  @keyframes auf{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+
+  .aufruf .wer{
+    font-size:clamp(46px,13vw,210px);font-weight:600;line-height:1.05;
+    letter-spacing:-.01em;max-width:100%;overflow-wrap:break-word;hyphens:auto
+  }
+  .aufruf .wohin{
+    font-size:clamp(24px,5vw,78px);font-weight:300;color:#8fe0b4;line-height:1.2
+  }
+  .aufruf .balken{
+    position:absolute;left:0;bottom:0;height:6px;background:#8fe0b4;opacity:.5;width:100%
+  }
+
+  /* Durchsage läuft */
+  .durchsage{
+    position:fixed;inset:0;z-index:12;background:var(--gruen);display:none;
+    flex-direction:column;align-items:center;justify-content:center;gap:26px;text-align:center
+  }
+  .durchsage.an{display:flex}
+  .durchsage .wellen{display:flex;gap:9px;align-items:flex-end;height:70px}
+  .durchsage .wellen i{
+    display:block;width:11px;background:var(--papier);border-radius:6px;
+    animation:welle 1s ease-in-out infinite
+  }
+  .durchsage .wellen i:nth-child(1){height:26px;animation-delay:0s}
+  .durchsage .wellen i:nth-child(2){height:52px;animation-delay:.12s}
+  .durchsage .wellen i:nth-child(3){height:70px;animation-delay:.24s}
+  .durchsage .wellen i:nth-child(4){height:44px;animation-delay:.36s}
+  .durchsage .wellen i:nth-child(5){height:22px;animation-delay:.48s}
+  @keyframes welle{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+  .durchsage p{font-size:clamp(20px,3.4vw,44px);font-weight:300;letter-spacing:.02em}
+
+  /* Startschicht */
+  .start{
+    position:fixed;inset:0;z-index:40;background:var(--gruen-tief);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:26px;text-align:center;padding:30px;cursor:pointer
+  }
+  .start.weg{display:none}
+  .start h1{font-size:clamp(24px,3.6vw,44px);font-weight:300;letter-spacing:.03em}
+  .start button{
+    background:var(--papier);color:var(--gruen-tief);border:0;border-radius:999px;
+    padding:20px 44px;font:inherit;font-size:clamp(18px,2.2vw,26px);font-weight:600;cursor:pointer
+  }
+  .start p{font-size:clamp(13px,1.4vw,17px);opacity:.45;max-width:26em;line-height:1.55}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="punkt rot" id="punkt" title="Keine Verbindung"></div>
+<div class="raumname" id="raumname"></div>
+
+<div class="ruhe">
+  <div class="praxis" id="praxisName"></div>
+  <div class="uhr" id="uhr">--:--</div>
+  <div class="hinweis" id="hinweis">Bitte nehmen Sie Platz. Sie werden aufgerufen.</div>
+</div>
+
+<div class="aufruf" id="aufruf">
+  <div class="wer" id="aufrufName"></div>
+  <div class="wohin" id="aufrufWohin"></div>
+  <div class="balken" id="balken"></div>
+</div>
+
+<div class="durchsage" id="durchsageSchicht">
+  <div class="wellen"><i></i><i></i><i></i><i></i><i></i></div>
+  <p>Durchsage aus dem Sprechzimmer</p>
+</div>
+
+<div class="start" id="start">
+  <h1>Wartezimmer-Anzeige</h1>
+  <button type="button" id="startKnopf">Anzeige starten</button>
+  <p id="startHinweis">
+    Einmal antippen — danach läuft die Anzeige von allein.
+    Der Tipp ist nötig, damit der Browser Ton abspielen darf.
+  </p>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+
+  const parameter = new URLSearchParams(location.search);
+  const raum = (parameter.get('raum') || '').trim();
+  const quellen = (parameter.get('quellen') || location.host)
+    .split(',').map((s) => s.trim()).filter(Boolean);
+
+  // Voreinstellungen, falls /api/config nicht erreichbar ist.
+  let konfig = {
+    praxis: 'Praxis', wiederholen: true, gong: true,
+    anzeigeDauerSekunden: 45, stimme: { tempo: 0.88 },
+    wartezimmer: []
+  };
+
+  if (!raum) {
+    $('startHinweis').textContent =
+      'In der Adresse fehlt "?raum=wz1". Bitte die Adresse aus dem Startfenster ' +
+      'des Programms verwenden.';
+    $('startKnopf').disabled = true;
+  }
+
+  /* ---------- Uhr ---------- */
+  function uhrStellen() {
+    $('uhr').textContent = new Date().toLocaleTimeString('de-DE',
+      { hour: '2-digit', minute: '2-digit' });
+  }
+  uhrStellen();
+  setInterval(uhrStellen, 15000);
+
+  /* ---------- Konfiguration ---------- */
+  fetch('/api/config').then((r) => r.json()).then((c) => {
+    konfig = Object.assign(konfig, c);
+    $('praxisName').textContent = konfig.praxis;
+    const w = (konfig.wartezimmer || []).find((x) => x.id === raum);
+    $('raumname').textContent = w ? w.name : raum;
+    document.title = (w ? w.name : 'Wartezimmer') + ' — ' + konfig.praxis;
+  }).catch(() => {
+    $('raumname').textContent = raum;
+  });
+
+  /* ---------- Ton: Gong ---------- */
+  let tonKontext = null;
+
+  function gongSpielen() {
+    return new Promise((fertig) => {
+      if (!konfig.gong || !tonKontext) return fertig();
+      const jetzt = tonKontext.currentTime;
+      // Zwei Töne, absteigende Quarte — freundlich und gut hörbar.
+      [[880, 0], [659.25, 0.26]].forEach(([hertz, versatz]) => {
+        const ton = tonKontext.createOscillator();
+        const huelle = tonKontext.createGain();
+        ton.type = 'sine';
+        ton.frequency.value = hertz;
+        huelle.gain.setValueAtTime(0.0001, jetzt + versatz);
+        huelle.gain.exponentialRampToValueAtTime(0.32, jetzt + versatz + 0.02);
+        huelle.gain.exponentialRampToValueAtTime(0.0001, jetzt + versatz + 1.1);
+        ton.connect(huelle).connect(tonKontext.destination);
+        ton.start(jetzt + versatz);
+        ton.stop(jetzt + versatz + 1.2);
+      });
+      setTimeout(fertig, 1200);
+    });
+  }
+
+  /* ---------- Ton: Sprachausgabe ---------- */
+  let stimme = null;
+
+  function stimmeWaehlen() {
+    const alle = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+    const deutsch = alle.filter((s) => /^de/i.test(s.lang));
+    if (!deutsch.length) return;
+    const bevorzugt = ['Google Deutsch', 'Microsoft Katja', 'Microsoft Hedda', 'Anna'];
+    for (const name of bevorzugt) {
+      const treffer = deutsch.find((s) => s.name.indexOf(name) !== -1);
+      if (treffer) { stimme = treffer; return; }
+    }
+    stimme = deutsch[0];
+  }
+  if (window.speechSynthesis) {
+    stimmeWaehlen();
+    speechSynthesis.addEventListener('voiceschanged', stimmeWaehlen);
+  }
+
+  function sprechen(text) {
+    return new Promise((fertig) => {
+      if (!window.speechSynthesis) return fertig();
+      const rede = new SpeechSynthesisUtterance(text);
+      rede.lang = 'de-DE';
+      rede.rate = konfig.stimme && konfig.stimme.tempo ? konfig.stimme.tempo : 0.88;
+      rede.pitch = 1;
+      rede.volume = 1;
+      if (stimme) rede.voice = stimme;
+
+      // Chrome meldet das Ende gelegentlich nicht — deshalb zusätzlich eine Uhr.
+      let erledigt = false;
+      const abschliessen = () => { if (!erledigt) { erledigt = true; fertig(); } };
+      rede.onend = abschliessen;
+      rede.onerror = abschliessen;
+      setTimeout(abschliessen, 1500 + text.length * 190);
+
+      try { speechSynthesis.speak(rede); } catch (fehler) { abschliessen(); }
+    });
+  }
+
+  const warten = (ms) => new Promise((f) => setTimeout(f, ms));
+
+  /* ---------- Anzeige ---------- */
+  let anzeigeUhr = null;
+
+  function aufrufZeigen(daten) {
+    const voll = ((daten.anrede ? daten.anrede + ' ' : '') + daten.name).trim();
+    $('aufrufName').textContent = voll;
+    $('aufrufWohin').textContent = 'bitte in ' + daten.sprechzimmer.name;
+    $('aufruf').classList.add('an');
+
+    const dauer = konfig.anzeigeDauerSekunden * 1000;
+    const balken = $('balken');
+    balken.style.transition = 'none';
+    balken.style.width = '100%';
+    // Erzwingt, dass der Browser die Breite übernimmt, bevor sie animiert wird.
+    void balken.offsetWidth;
+    balken.style.transition = 'width ' + dauer + 'ms linear';
+    balken.style.width = '0%';
+
+    clearTimeout(anzeigeUhr);
+    anzeigeUhr = setTimeout(anzeigeLeeren, dauer);
+  }
+
+  function anzeigeLeeren() {
+    clearTimeout(anzeigeUhr);
+    $('aufruf').classList.remove('an');
+  }
+
+  /* ---------- Warteschlange ---------- */
+  // Aufrufe und Durchsagen nacheinander abspielen, damit sich nichts überlagert.
+  const warteschlange = [];
+  let laeuft = false;
+
+  function einreihen(vorgang) {
+    warteschlange.push(vorgang);
+    if (!laeuft) naechstes();
+  }
+
+  async function naechstes() {
+    const vorgang = warteschlange.shift();
+    if (!vorgang) { laeuft = false; return; }
+    laeuft = true;
+    try {
+      if (vorgang.art === 'aufruf') await aufrufAbspielen(vorgang.daten);
+      else await durchsageAbspielen(vorgang.quelle, vorgang.id);
+    } catch (fehler) { /* ein Fehler darf die Warteschlange nicht anhalten */ }
+    naechstes();
+  }
+
+  async function aufrufAbspielen(daten) {
+    aufrufZeigen(daten);
+    await gongSpielen();
+    const satz = ((daten.anrede ? daten.anrede + ' ' : '') + daten.name).trim() +
+                 ', bitte in ' + daten.sprechzimmer.name + '.';
+    await sprechen(satz);
+    if (konfig.wiederholen) {
+      await warten(700);
+      await sprechen(satz);
+    }
+  }
+
+  function durchsageAbspielen(quelle, id) {
+    return new Promise((fertig) => {
+      const schicht = $('durchsageSchicht');
+      schicht.classList.add('an');
+      const ton = new Audio('http://' + quelle + '/api/audio/' + encodeURIComponent(id));
+      ton.volume = 1;
+
+      let erledigt = false;
+      const abschliessen = () => {
+        if (erledigt) return;
+        erledigt = true;
+        schicht.classList.remove('an');
+        fertig();
+      };
+      ton.addEventListener('ended', abschliessen);
+      ton.addEventListener('error', abschliessen);
+      setTimeout(abschliessen, 125000);   // Notbremse, Durchsagen sind kurz
+
+      ton.play().catch(abschliessen);
+    });
+  }
+
+  /* ---------- Verbindungen zu den Sprechzimmern ---------- */
+  const zustand = new Map();
+  quellen.forEach((q) => zustand.set(q, false));
+
+  function punktAktualisieren() {
+    let offen = 0;
+    for (const da of zustand.values()) if (da) offen++;
+    const punkt = $('punkt');
+    punkt.className = 'punkt ' + (offen === 0 ? 'rot' : (offen < quellen.length ? 'gelb' : 'gruen'));
+    punkt.title = offen + ' von ' + quellen.length + ' Sprechzimmern verbunden';
+  }
+
+  function verbinden() {
+    for (const quelle of quellen) {
+      const strom = new EventSource(
+        'http://' + quelle + '/api/events?raum=' + encodeURIComponent(raum));
+
+      strom.addEventListener('open', () => { zustand.set(quelle, true); punktAktualisieren(); });
+      strom.addEventListener('error', () => { zustand.set(quelle, false); punktAktualisieren(); });
+      strom.addEventListener('bereit', () => { zustand.set(quelle, true); punktAktualisieren(); });
+
+      strom.addEventListener('aufruf', (e) => {
+        try { einreihen({ art: 'aufruf', daten: JSON.parse(e.data) }); } catch (f) {}
+      });
+      strom.addEventListener('durchsage', (e) => {
+        try { einreihen({ art: 'durchsage', quelle, id: JSON.parse(e.data).id }); } catch (f) {}
+      });
+      strom.addEventListener('leeren', anzeigeLeeren);
+    }
+    punktAktualisieren();
+  }
+
+  /* ---------- Bildschirm wachhalten ---------- */
+  let wachSperre = null;
+
+  async function wachHalten() {
+    if (!navigator.wakeLock) return;
+    try { wachSperre = await navigator.wakeLock.request('screen'); } catch (fehler) {}
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !wachSperre) wachHalten();
+  });
+
+  /* ---------- Start ---------- */
+  $('startKnopf').addEventListener('click', async () => {
+    // Der Tastendruck gibt Ton frei und macht die Seite zum Vollbild.
+    try {
+      const Kontext = window.AudioContext || window.webkitAudioContext;
+      if (Kontext) {
+        tonKontext = new Kontext();
+        if (tonKontext.state === 'suspended') await tonKontext.resume();
+      }
+    } catch (fehler) { tonKontext = null; }
+
+    // Eine stumme, sehr kurze Ansage schaltet die Sprachausgabe frei.
+    try { speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); } catch (fehler) {}
+
+    try { await document.documentElement.requestFullscreen(); } catch (fehler) {}
+    wachHalten();
+
+    $('start').classList.add('weg');
+    verbinden();
+  });
+})();
+</script>
+</body>
+</html>
