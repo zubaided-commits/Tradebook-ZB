@@ -248,7 +248,12 @@ Was dafür nötig ist:
 3. **Eintrag im Verzeichnis von Verarbeitungstätigkeiten** ergänzen.
 4. **Passwort** sorgfältig wählen und nicht weitergeben. Es ist der einzige
    Schutz davor, dass Fremde Aufrufe auslösen oder Namen mitlesen.
-5. Bei Personalwechsel Passwort ändern.
+5. **Bei Personalwechsel Passwort ändern.** Das ist auch der eigentliche
+   Weg, ein Gerät „abzumelden": „Abmelden" auf einem Gerät entfernt die
+   Anmeldung nur auf diesem einen Gerät. Ein woanders bereits angemeldetes
+   Gerät bleibt bis zu 30 Tage angemeldet — es sei denn, das Passwort wird
+   geändert. Dann sind augenblicklich alle Geräte abgemeldet, auch die
+   eigenen, und alle müssen sich neu anmelden.
 
 Was das Programm selbst dafür tut:
 

@@ -2,7 +2,6 @@
 declare(strict_types=1);
 require __DIR__ . '/inc.php';
 
-sitzungStarten();
 $k = konfig();
 $fehler = '';
 
@@ -10,11 +9,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     if (!anmeldungErlaubt()) {
         $fehler = 'Zu viele Fehlversuche. Bitte zehn Minuten warten.';
     } elseif (hash_equals((string) $k['passwort'], (string) ($_POST['passwort'] ?? ''))) {
-        session_regenerate_id(true);
-        $_SESSION['angemeldet'] = true;
+        $rolle = ($_POST['rolle'] ?? '') === 'lautsprecher' ? 'lautsprecher' : 'arzt';
+        anmelden($rolle);
         fehlversucheLoeschen();
-        header('Location: ' . (($_POST['rolle'] ?? '') === 'lautsprecher'
-            ? 'lautsprecher.php' : 'ruf.php'));
+        header('Location: ' . ($rolle === 'lautsprecher' ? 'lautsprecher.php' : 'ruf.php'));
         exit;
     } else {
         fehlversuchMerken();

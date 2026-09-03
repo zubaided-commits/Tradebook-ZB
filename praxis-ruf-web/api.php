@@ -150,12 +150,12 @@ switch ($was) {
             antwort(['fehler' => 'Kein Audioformat'], 415);
         }
 
-        $daten = file_get_contents('php://input');
-        if ($daten === false || $daten === '') {
-            antwort(['fehler' => 'Leere Aufnahme'], 400);
-        }
-        if (strlen($daten) > TON_MAX_BYTES) {
+        $daten = koerperBegrenztLesen(TON_MAX_BYTES);
+        if ($daten === false) {
             antwort(['fehler' => 'Durchsage zu lang'], 413);
+        }
+        if ($daten === '') {
+            antwort(['fehler' => 'Leere Aufnahme'], 400);
         }
 
         ordnerSicherstellen();

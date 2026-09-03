@@ -22,6 +22,8 @@ const TON_ORDNER    = __DIR__ . '/daten/ton';
 const TON_LEBEN_S   = 120;      // Durchsagen verfallen nach 2 Minuten
 const GERAET_LEBEN_S = 30;      // danach gilt ein Geraet als getrennt
 const TON_MAX_BYTES = 5242880;  // 5 MB je Durchsage
+const AUTH_COOKIE   = 'praxisruf_auth';
+const AUTH_TAGE     = 30;       // wie lange eine Anmeldung gilt
 
 /* ------------------------------------------------------------------ *
  * Konfiguration
@@ -74,24 +76,21 @@ function abbruch(string $text): void
 }
 
 /* ------------------------------------------------------------------ *
- * Anmeldung
+ * Anmeldung — ueber ein selbst signiertes Cookie, absichtlich OHNE
+ * PHP-Sitzung.
+ *
+ * Auf geteiltem Webhosting steht session.gc_maxlifetime selten auf
+ * 30 Tage — oft bleibt es bei der Voreinstellung von rund 24 Minuten.
+ * Ein Cookie mit 30 Tagen Laufzeit haette dann im Browser weiterhin
+ * gegolten, waehrend die zugehoerige Sitzungsdatei auf dem Server laengst
+ * geloescht war — die Anmeldung waere mitten am Tag unbemerkt abgerissen,
+ * ausgerechnet auf dem unbeaufsichtigten Empfangs-PC. Das selbst
+ * signierte Cookie braucht keine Server-Ablage: Rolle und Ablaufzeit
+ * stehen im Cookie selbst, gesichert per HMAC mit dem Praxis-Passwort als
+ * Schluessel. Wird das Passwort geaendert, werden dadurch automatisch
+ * alle bestehenden Anmeldungen ungueltig — praktisch bei einem
+ * Personalwechsel.
  * ------------------------------------------------------------------ */
-
-function sitzungStarten(): void
-{
-    if (session_status() === PHP_SESSION_ACTIVE) {
-        return;
-    }
-    session_set_cookie_params([
-        'lifetime' => 60 * 60 * 24 * 30,   // damit das Lautsprecher-Geraet angemeldet bleibt
-        'path'     => '/',
-        'secure'   => istHttps(),
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
-    session_name('praxisruf');
-    session_start();
-}
 
 function istHttps(): bool
 {
@@ -102,10 +101,61 @@ function istHttps(): bool
     return (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
 }
 
+function authSignatur(string $wert): string
+{
+    return hash_hmac('sha256', $wert, (string) konfig()['passwort']);
+}
+
+/** Meldet an, mit "arzt" oder "lautsprecher". Setzt das Cookie fuer AUTH_TAGE Tage. */
+function anmelden(string $rolle): void
+{
+    $rolle = $rolle === 'lautsprecher' ? 'lautsprecher' : 'arzt';
+    $ablauf = time() + 60 * 60 * 24 * AUTH_TAGE;
+    $wert = $rolle . '.' . $ablauf;
+    $wert .= '.' . authSignatur($wert);
+
+    setcookie(AUTH_COOKIE, $wert, [
+        'expires'  => $ablauf,
+        'path'     => '/',
+        'secure'   => istHttps(),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    $_COOKIE[AUTH_COOKIE] = $wert;   // noch im selben Aufruf verfuegbar
+}
+
+function abmelden(): void
+{
+    setcookie(AUTH_COOKIE, '', [
+        'expires' => time() - 3600, 'path' => '/',
+        'secure' => istHttps(), 'httponly' => true, 'samesite' => 'Lax',
+    ]);
+    unset($_COOKIE[AUTH_COOKIE]);
+}
+
+/** "arzt" oder "lautsprecher" bei gueltiger Anmeldung, sonst null. */
+function angemeldeteRolle(): ?string
+{
+    $teile = explode('.', (string) ($_COOKIE[AUTH_COOKIE] ?? ''));
+    if (count($teile) !== 3) {
+        return null;
+    }
+    [$rolle, $ablauf, $signatur] = $teile;
+    if (!in_array($rolle, ['arzt', 'lautsprecher'], true) || !ctype_digit($ablauf)) {
+        return null;
+    }
+    if ((int) $ablauf < time()) {
+        return null;
+    }
+    if (!hash_equals(authSignatur($rolle . '.' . $ablauf), $signatur)) {
+        return null;
+    }
+    return $rolle;
+}
+
 function angemeldet(): bool
 {
-    sitzungStarten();
-    return !empty($_SESSION['angemeldet']);
+    return angemeldeteRolle() !== null;
 }
 
 function anmeldungVerlangen(): void
@@ -155,8 +205,21 @@ function fehlversucheLoeschen(): void
     });
 }
 
+/**
+ * IP-Adresse fuer die Fehlversuch-Sperre. IONOS liegt hinter einem
+ * Lastverteiler — ohne X-Forwarded-For waere REMOTE_ADDR fuer alle
+ * Besucher dieselbe Adresse, und acht Fehlversuche von irgendjemandem
+ * wuerden die gesamte Praxis fuer zehn Minuten aussperren.
+ */
 function herkunft(): string
 {
+    $weitergeleitet = (string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? '');
+    if ($weitergeleitet !== '') {
+        $erste = trim(explode(',', $weitergeleitet)[0]);
+        if ($erste !== '') {
+            return substr(hash('sha256', $erste), 0, 16);
+        }
+    }
     return substr(hash('sha256', $_SERVER['REMOTE_ADDR'] ?? '-'), 0, 16);
 }
 
@@ -284,6 +347,34 @@ function altenTonLoeschen(): void
 /* ------------------------------------------------------------------ *
  * Kleine Helfer
  * ------------------------------------------------------------------ */
+
+/**
+ * Liest den Anfragekoerper, bricht aber ab, sobald mehr als maxBytes
+ * eingegangen sind — damit eine zu grosse Uebertragung nicht erst
+ * vollstaendig im Speicher landet, bevor sie abgelehnt wird.
+ * Gibt false bei Ueberschreitung zurueck, sonst den (auch leeren) Inhalt.
+ */
+function koerperBegrenztLesen(int $maxBytes): string|false
+{
+    $griff = fopen('php://input', 'rb');
+    if ($griff === false) {
+        return false;
+    }
+    $daten = '';
+    while (!feof($griff)) {
+        $stueck = fread($griff, 65536);
+        if ($stueck === false) {
+            break;
+        }
+        $daten .= $stueck;
+        if (strlen($daten) > $maxBytes) {
+            fclose($griff);
+            return false;
+        }
+    }
+    fclose($griff);
+    return $daten;
+}
 
 function antwort(array $daten, int $code = 200): void
 {
