@@ -3,10 +3,12 @@
 Patientenaufruf über das Internet, für gewöhnliches PHP-Webhosting (IONOS).
 Schwesterfassung zu `../praxis-ruf`, die im Praxisnetz läuft.
 
-**Im Wartezimmer wird kein Bildschirm gebraucht — nur ein Lautsprecher an
-einem kleinen Gerät, das die Seite geöffnet hält.** Für Bluetooth-Lautsprecher
-hält ein leiser Weckton das Gerät wach; reine WLAN-Lautsprecher (Sonos,
-Chromecast, AirPlay) sind nicht geeignet — siehe ANLEITUNG-WEB.md.
+**Im Wartezimmer wird kein Bildschirm gebraucht — nur ein Lautsprecher.**
+Läuft in der Praxis bereits ein Empfangs-PC, genügt der: Bluetooth-Lautsprecher
+koppeln, `lautsprecher-starten.bat` einrichten, fertig — keine zusätzliche
+Anschaffung nötig. Ein leiser Weckton hält den Lautsprecher wach; reine
+WLAN-Lautsprecher (Sonos, Chromecast, AirPlay) sind nicht geeignet — siehe
+ANLEITUNG-WEB.md.
 
 - **Einrichtung, Bedienung und Datenschutz:** [ANLEITUNG-WEB.md](ANLEITUNG-WEB.md)
 
@@ -31,6 +33,7 @@ auch dort, wo dauerhafte Verbindungen (SSE, WebSocket) abgeschnitten werden.
 | `lautsprecher.php` | Gerät im Wartezimmer, reine Tonausgabe |
 | `anmelden.php` / `abmelden.php` | Zugang per gemeinsamem Passwort |
 | `config.beispiel.php` | Vorlage für `config.php` (nicht im Repository) |
+| `lautsprecher-starten.bat` | Startet `lautsprecher.php` am Empfangs-PC in einem eigenen Fenster |
 
 ## Datenschutz in Kürze
 

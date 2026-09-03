@@ -313,6 +313,16 @@ $k = konfig();
     gong();                         // kurze Probe: der Lautsprecher ist zu hören
     nachfragen();
     setInterval(nachfragen, TAKT_MS);
+
+    // Läuft diese Seite als Browser-Tab auf einem PC, der auch für anderes
+    // benutzt wird (z. B. am Empfang), bremst Chrome das Nachfragen im
+    // Hintergrund aus — nach einigen Minuten außerhalb des sichtbaren
+    // Bereichs bis auf einmal pro Minute. Damit ein Aufruf nicht liegen
+    // bleibt, wird beim Zurückkehren sofort nachgefragt, statt auf den
+    // nächsten Takt zu warten.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') nachfragen();
+    });
   });
 })();
 </script>

@@ -14,49 +14,64 @@ Im Wartezimmer wird **kein Bildschirm** gebraucht. Nur Ton.
 ## Zuerst: was Sie im Wartezimmer wirklich brauchen
 
 Ein Lautsprecher allein genügt leider nicht. Ein Lautsprecher kann sich nicht
-selbst mit dem Internet verbinden — es braucht ein kleines Gerät, das die
-Seite geöffnet hält und den Ton ausgibt.
+selbst mit dem Internet verbinden — es braucht ein Gerät, das die Seite
+geöffnet hält und den Ton ausgibt.
 
-Zwei Wege, beide bewährt:
+**Ohne zusätzliche Anschaffung: den vorhandenen Empfangs-PC benutzen.**
+Läuft in Ihrer Praxis am Empfang bereits ein PC, ist das der einfachste Weg —
+kein Mini-PC, kein Tablet, keine neue Hardware nötig. Nur ein
+Bluetooth-Lautsprecher zum Anschließen an die Steckdose.
 
-**A — Am zuverlässigsten: kleiner Mini-PC oder Raspberry Pi**
-Einmal einrichten, dann läuft er durch. Ein Bildschirm wird nur zum Einrichten
-gebraucht und kann danach abgezogen werden.
+* **Lautsprecher koppeln.** Windows: Einstellungen → Bluetooth & Geräte →
+  Gerät hinzufügen → Lautsprecher in den Kopplungsmodus versetzen (meist
+  Ein/Aus-Taste gedrückt halten) → verbinden. Danach unter Sound-Einstellungen
+  als **Standard-Wiedergabegerät** festlegen.
+* **`lautsprecher-starten.bat`** (liegt in diesem Ordner) öffnet die Seite in
+  einem eigenen kleinen Fenster statt in einem gewöhnlichen Browser-Tab —
+  wichtig, siehe unten. Adresse in der Datei einmal eintragen, dann per
+  Verknüpfung in den Autostart-Ordner legen (`Win + R` → `shell:startup`).
+* **Ruhezustand für diesen PC ausschalten** (Energieoptionen), zumindest
+  während der Öffnungszeiten — sonst reißt die Verbindung ab, sobald Windows
+  einschläft.
+* **Das Fenster sichtbar lassen — nicht minimieren.** Läuft die Seite als
+  Tab oder Fenster im Hintergrund, drosselt Chrome das Nachfragen nach
+  einigen Minuten spürbar aus, um Akku/Leistung zu sparen (das betrifft
+  jeden PC, nicht nur Laptops). Deshalb startet die `.bat`-Datei ein
+  kleines **eigenes Fenster**, keinen Tab — das in eine Ecke des
+  Bildschirms schieben und dort stehen lassen reicht; es muss nicht im
+  Vordergrund sein, nur sichtbar (nicht verdeckt, nicht minimiert).
+  Gerät jemand versehentlich ins Minimieren, holt die Seite beim
+  Zurückholen sofort den aktuellen Stand nach — aber besser, es kommt gar
+  nicht erst so weit.
+* **Eingebautes Sicherheitsnetz:** Meldet sich der Empfangs-PC 30 Sekunden
+  lang nicht, springt bei beiden Ärztinnen die Lampe für dieses Wartezimmer
+  von Grün auf Gelb — sie sehen also sofort, wenn dort etwas nicht stimmt.
 
-* Mini-PC oder Raspberry Pi (ca. 60–150 €)
-* Aktivlautsprecher am Kopfhörerausgang oder per USB
-* Chrome im Kiosk-Modus mit der Adresse `.../lautsprecher.php`
+**Falls kein PC in Wartezimmernähe steht**, zwei Alternativen mit eigener,
+kleiner Anschaffung:
 
-**B — Am günstigsten: altes Tablet oder Smartphone**
-Ein ausgedientes Android-Tablet reicht völlig.
-
-* Tablet am **Ladekabel lassen**, Display-Timeout auf „Nie"
-* Lautsprecher per Klinkenkabel oder Bluetooth
-* Tablet flach hinlegen oder in eine Schublade — der Bildschirm darf dunkel
-  sein, die Seite muss aber **im Vordergrund geöffnet bleiben**. Wird das
-  Tablet gesperrt oder die App gewechselt, bremst Android die Seite aus und
-  Aufrufe können ausbleiben.
+* **Mini-PC oder Raspberry Pi** (ca. 60–150 €) — läuft am zuverlässigsten
+  durch, da vollständig eigenständig.
+* **Altes Tablet am Ladekabel** — kostenlos, wenn eines übrig ist, aber
+  anfälliger: sperrt sich das Tablet oder wechselt die App, bremst Android
+  die Seite genauso aus wie oben beschrieben, oft stärker.
 
 ### Welcher Lautsprecher?
 
 Aufstellung ist wichtiger als der Preis: mittig im Raum, in Ohrhöhe, nicht in
 einer Ecke und nicht hinter einer Pflanze.
 
-**Am Kabel (empfohlen).** Ein Aktivlautsprecher am Kopfhörerausgang des
-Geräts. Nichts schläft ein, nichts muss gekoppelt werden, die ersten Silben
-werden nie abgeschnitten. In `config.php` dann `'wachton' => false`.
+**Ein gewöhnlicher Bluetooth-Lautsprecher genügt** — kein bestimmtes Modell
+nötig, auch ein normaler Musik-Lautsprecher (JBL o. ä.) funktioniert. Wichtig
+ist nur: **Strom aus der Steckdose**, nicht Akkubetrieb. Ohne Akku entfällt
+das automatische Abschalten, das tragbare Lautsprecher zum Batteriesparen
+eingebaut haben.
 
-**Per Bluetooth (JBL & ähnliche).** Funktioniert, aber mit zwei Tücken:
-
-* Die meisten tragbaren Funklautsprecher **schalten sich nach 10–20 Minuten
-  Stille selbst ab**. Im Praxisalltag sind die Pausen zwischen zwei Aufrufen
-  oft länger — der nächste Patient würde dann ins Leere gerufen.
-* Nach einer Pause braucht die Funkstrecke eine knappe Sekunde, bis Ton
-  kommt. Die ersten Silben fehlen.
-
-Beides fängt der **Weckton** ab: alle 60 Sekunden ein sehr leiser, tiefer Ton
-(60 Hz). Im Raum ist er nicht zu hören, der Lautsprecher sieht aber ein
-Signal und bleibt wach. Voreingestellt ist er an:
+Eine Kleinigkeit bleibt trotzdem: Manche Bluetooth-Verstärker legen die
+**Funkstrecke selbst** nach einigen Minuten Stille schlafen (unabhängig vom
+Stromanschluss) — dann fehlt beim Aufwachen die erste Silbe. Dagegen läuft
+der eingebaute **Weckton**: alle 60 Sekunden ein sehr leiser, tiefer Ton
+(60 Hz), im Raum nicht hörbar, hält aber die Funkstrecke wach.
 
 ```php
 'wachton'         => true,
@@ -65,17 +80,14 @@ Signal und bleibt wach. Voreingestellt ist er an:
 'wachtonStaerke'  => 0.02,
 ```
 
-Schaltet sich Ihr Lautsprecher trotzdem ab, `'wachtonSekunden' => 30` und
-notfalls `'wachtonStaerke' => 0.05` setzen. Ist der Weckton im ruhigen
-Wartezimmer leise hörbar, `0.01` versuchen.
+Bleibt es trotzdem einmal stumm, `'wachtonSekunden' => 30` setzen. Ist der
+Weckton im ruhigen Wartezimmer leise hörbar, `0.01` versuchen. Hängt der
+Lautsprecher stattdessen am Kabel (Kopfhörerausgang des PCs), kann
+`'wachton' => false` gesetzt werden — dann wird nichts gebraucht.
 
-**Bitte testen Sie das einmal bewusst:** Aufruf auslösen, dann 30 Minuten
-nichts tun, dann erneut aufrufen. Kommt der zweite Aufruf sauber und
-vollständig, ist der Lautsprecher geeignet.
-
-Weitere Hinweise zu Bluetooth: Lautsprecher **am Ladekabel lassen**, im
-Gerät als Standard-Wiedergabegerät festlegen, und die Lautstärke am
-Lautsprecher selbst auf etwa drei Viertel stellen.
+**Bitte einmal bewusst testen:** Aufruf auslösen, 30 Minuten nichts tun,
+erneut aufrufen. Kommt der zweite Aufruf sauber und vollständig an, passt
+der Lautsprecher.
 
 **Nicht geeignet: reine WLAN-Lautsprecher** (Sonos, Chromecast built-in,
 AirPlay, JBL Authentics und ähnliche). Eine Internetseite kann von sich aus
@@ -153,17 +165,29 @@ Als Lesezeichen speichern.
 
 ## Schritt 6 — Wartezimmer-Gerät einrichten
 
-Auf dem Gerät im Wartezimmer dieselbe Adresse öffnen, Passwort eingeben und
-diesmal **„Lautsprecher"** auswählen. Dann das Wartezimmer wählen und auf
-**„Ton freigeben und starten"** tippen.
+**Auf dem Empfangs-PC (empfohlener Weg):**
 
-Der eine Tipp ist nötig, damit der Browser Ton abspielen darf. Zur Bestätigung
-ertönt sofort ein Gong — hören Sie ihn, ist alles richtig.
+1. `lautsprecher-starten.bat` öffnen (Rechtsklick → Bearbeiten) und in der
+   Zeile `set ADRESSE=` die eigene Domain eintragen, z. B.
+   `https://ihre-domain.de/praxisruf/lautsprecher.php`. Speichern.
+2. Doppelklick auf die Datei — ein kleines eigenes Fenster öffnet sich.
+3. Passwort eingeben, **„Lautsprecher"** auswählen, anmelden.
+4. Wartezimmer wählen, auf **„Ton freigeben und starten"** tippen. Zur
+   Bestätigung ertönt sofort ein Gong.
+5. Fenster in eine Bildschirmecke schieben und dort **sichtbar** stehen
+   lassen (nicht minimieren — siehe Hinweis weiter oben).
+6. Eine Verknüpfung zu `lautsprecher-starten.bat` in den Autostart-Ordner
+   legen (`Win + R` → `shell:startup`). Nach einem Neustart öffnet sich das
+   Fenster von selbst; Schritt 3–4 sind dann nur noch einmal pro Neustart
+   nötig (die Anmeldung selbst bleibt 30 Tage gespeichert).
 
-Danach zeigt die Seite nur noch einen grünen Punkt. Der Bildschirm darf
-dunkel werden.
+**Auf einem Mini-PC, Raspberry Pi oder Tablet (Alternative):**
 
-**Kiosk-Modus (Mini-PC oder Raspberry Pi), empfohlen:**
+Dieselbe Adresse öffnen, „Lautsprecher" wählen, Wartezimmer wählen, „Ton
+freigeben und starten" tippen. Danach zeigt die Seite nur noch einen grünen
+Punkt — der Bildschirm darf dunkel werden.
+
+Kiosk-Modus, empfohlen für ein dediziertes Gerät:
 
 ```
 chrome --kiosk --autoplay-policy=no-user-gesture-required "https://ihre-domain.de/praxisruf/lautsprecher.php"
@@ -252,5 +276,7 @@ Wenn Sie ganz ohne Namen auskommen möchten, lässt sich in `config.php`
 | Sprechtaste ist grau | Seite über `http://` statt `https://` geöffnet |
 | Kein Ton im Wartezimmer | „Ton freigeben" wurde nicht getippt, oder Lautstärke auf null |
 | Ansage bleibt nach einiger Zeit aus | Tablet gesperrt oder App gewechselt — Seite muss offen bleiben |
+| Aufrufe kommen am Empfangs-PC verspätet an | Fenster war minimiert oder ganz verdeckt — sichtbar in eine Ecke stellen |
+| Empfangs-PC verliert nachts die Verbindung | Ruhezustand für diesen PC in den Energieoptionen ausschalten |
 | Stimme klingt abgehackt | in `config.php` `'tempo' => 0.82` setzen |
 | „Anmeldung abgelaufen" | Seite neu laden und erneut anmelden |
