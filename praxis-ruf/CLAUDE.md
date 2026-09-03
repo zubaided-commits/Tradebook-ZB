@@ -44,6 +44,7 @@ Der Bildschirm öffnet eine EventSource **pro Quelle**. Deshalb erreichen beide
 | `ANLEITUNG.md` | Deutsche Einrichtungsanleitung für die Praxis. Bei Änderungen mitpflegen. |
 | `start-windows.bat` | Startet den Server unter Windows mit Konsolenfenster. Zeigt die fertigen Adressen an. |
 | `praxis-ruf-unsichtbar.vbs` | Startet den Server unter Windows ohne Konsolenfenster. |
+| `wartezimmer-starten.bat` | Öffnet `wartezimmer.html` auf einem vorhandenen PC (z. B. Empfang) als kleines Fenster, kein Vollbild. |
 
 ### Endpunkte
 
@@ -102,7 +103,11 @@ sie sind der Grund, warum die Praxis das System überhaupt einsetzt.
 * Windows-Firewall: nur „privates Netzwerk" freigegeben.
 * Autostart über eine Verknüpfung auf `praxis-ruf-unsichtbar.vbs` im
   Autostart-Ordner.
-* Wartezimmer-Bildschirme laufen im Chrome-Kiosk-Modus.
+* Wartezimmer-Gerät: entweder ein dedizierter Bildschirm/Tablet im
+  Chrome-Kiosk-Modus, oder ein bereits vorhandener PC (z. B. Empfang) mit
+  Bluetooth-Lautsprecher über `wartezimmer-starten.bat` — dort läuft die
+  Seite bewusst mit `&vollbild=nein` als kleines Fenster, nicht im
+  Vollbild, damit der PC weiter für anderes benutzt werden kann.
 
 ## Bekannte Schwachstellen
 
@@ -116,6 +121,15 @@ sie sind der Grund, warum die Praxis das System überhaupt einsetzt.
   Aufruf auslösen. Bisher als unkritisch bewertet.
 * MediaRecorder-Format ist browserabhängig (meist `audio/webm;codecs=opus`).
   Wird unverändert durchgereicht; Safari kann abweichen.
+* Läuft `wartezimmer.html` als Fenster/Tab auf einem PC, der auch für
+  anderes benutzt wird, und wird dieses Fenster minimiert oder lange
+  verdeckt, drosselt Chrome erwiesenermassen dessen `setInterval`-Zeitgeber
+  (Weckton, Uhr). Ob und wie stark ein `EventSource`-Aufruf (Namensaufruf)
+  in einem solchen Fenster verzögert wird, ist nicht abschliessend
+  getestet — verlässlich ist nur, das Fenster sichtbar zu lassen (nicht
+  minimiert, nicht vollständig verdeckt). Getestet wurde ausschliesslich
+  das reine Verstecken/Wiedereinblenden per `visibilitychange`, nicht ein
+  minutenlanges Verweilen im Hintergrund.
 
 ## Testen
 

@@ -15,12 +15,44 @@ Festplatte. Alles steht nur im Arbeitsspeicher und ist nach dem Beenden weg.
 ## Was Sie brauchen
 
 * Die beiden vorhandenen Sprechzimmer-PCs
-* Zwei Bildschirme oder Tablets mit Lautsprecher — einer je Wartezimmer
+* Ein Gerät je Wartezimmer, das die Anzeige zeigt und den Ton ausgibt
 * Alle Geräte im selben Praxisnetz
 * Node.js (kostenlos, von nodejs.org, LTS-Version) auf beiden Sprechzimmer-PCs
 
-Ein einfacher aktiver Lautsprecher genügt. Wichtiger als der Preis ist die
-Aufstellung: mittig im Raum, nicht in einer Ecke.
+**Für das Wartezimmer-Gerät ist keine neue Anschaffung nötig, wenn dort
+bereits ein PC steht** — zum Beispiel am Empfang. Ein Bluetooth-Lautsprecher
+zum Anschließen an die Steckdose genügt dann, siehe Schritt 6. Steht kein
+PC in Wartezimmernähe, funktionieren auch ein eigener Bildschirm/Tablet mit
+Lautsprecher genauso wie bisher.
+
+### Welcher Lautsprecher?
+
+Aufstellung ist wichtiger als der Preis: mittig im Raum, in Ohrhöhe, nicht in
+einer Ecke.
+
+**Ein gewöhnlicher Bluetooth-Lautsprecher genügt** — kein bestimmtes Modell
+nötig, auch ein normaler Musik-Lautsprecher funktioniert. Wichtig ist nur:
+**Strom aus der Steckdose**, nicht Akkubetrieb — ohne Akku entfällt das
+automatische Abschalten, das tragbare Lautsprecher zum Batteriesparen
+eingebaut haben.
+
+Eine Kleinigkeit bleibt trotzdem: Manche Bluetooth-Verstärker legen die
+**Funkstrecke selbst** nach einigen Minuten Stille schlafen — dann fehlt
+beim Aufwachen die erste Silbe. Dagegen läuft der eingebaute **Weckton**:
+alle 60 Sekunden ein sehr leiser, tiefer Ton (60 Hz), im Raum nicht hörbar,
+hält aber die Funkstrecke wach. Voreingestellt an, siehe „Einstellungen"
+weiter unten. Hängt der Lautsprecher stattdessen am Kabel (Kopfhörerausgang
+des PCs), kann `"wachton": false` gesetzt werden — dann wird nichts
+gebraucht.
+
+**Bitte einmal bewusst testen:** Aufruf auslösen, 30 Minuten nichts tun,
+erneut aufrufen. Kommt der zweite Aufruf sauber und vollständig an, passt
+der Lautsprecher.
+
+**Nicht geeignet: reine WLAN-Lautsprecher** (Sonos, Chromecast built-in,
+AirPlay und ähnliche). Der Bildschirm kann von sich aus keine Übertragung
+dorthin starten — das verlangt jedes Mal einen Handgriff. Solche Geräte
+würden die Aufrufe schlicht nicht abspielen.
 
 ---
 
@@ -112,23 +144,50 @@ auch, die Sprechtaste bleibt aber grau.
 
 ---
 
-## Schritt 6 — Wartezimmer-Bildschirme einrichten
+## Schritt 6 — Wartezimmer-Gerät einrichten
 
-Am Bildschirm im Wartezimmer die passende Adresse aus Schritt 4 öffnen und
-**„Anzeige starten"** antippen. Der eine Tipp ist nötig, damit der Browser Ton
-abspielen darf. Danach läuft alles allein: Vollbild, Bildschirm bleibt wach.
+Der Teil `&quellen=192.168.178.41:8080,192.168.178.42:8080` in der Adresse
+ist in jedem Fall entscheidend — dadurch hört das Gerät **beiden**
+Sprechzimmern zu. Fehlt er, hört es nur den PC, von dem die Seite geladen
+wurde.
 
-Der Teil `&quellen=192.168.178.41:8080,192.168.178.42:8080` ist entscheidend —
-dadurch hört der Bildschirm **beiden** Sprechzimmern zu. Fehlt er, hört er nur
-den PC, von dem die Seite geladen wurde.
-
-Der Punkt links oben zeigt den Zustand:
+Der Punkt links oben zeigt in beiden Fällen den Zustand:
 
 | Punkt | Bedeutung |
 |---|---|
 | grün | beide Sprechzimmer verbunden |
 | gelb | nur eines verbunden — das andere Programm läuft nicht |
 | rot | keine Verbindung |
+
+**Auf einem bereits vorhandenen PC, z. B. am Empfang (empfohlener Weg):**
+
+1. `wartezimmer-starten.bat` öffnen (Rechtsklick → Bearbeiten) und die
+   beiden Zeilen `RAUM=` und `QUELLEN=` anpassen — dieselben Adressen wie
+   aus Schritt 4, z. B.
+   `QUELLEN=192.168.178.41:8080,192.168.178.42:8080`. Speichern.
+2. Bluetooth-Lautsprecher an diesem PC koppeln (Windows: Einstellungen →
+   Bluetooth & Geräte → Gerät hinzufügen) und als Standard-Wiedergabegerät
+   festlegen.
+3. Doppelklick auf `wartezimmer-starten.bat` — ein kleines eigenes Fenster
+   öffnet sich und fragt nach dem Antippen von **„Anzeige starten"**.
+4. Fenster in eine Bildschirmecke schieben und dort **sichtbar** stehen
+   lassen — nicht minimieren, siehe Hinweis unten.
+5. Eine Verknüpfung zu `wartezimmer-starten.bat` in den Autostart-Ordner
+   legen (`Win + R` → `shell:startup`), damit es einen Neustart übersteht.
+   Der Tipp auf „Anzeige starten" ist dann nur noch einmal pro Neustart
+   nötig.
+
+Diese Datei öffnet die Anzeige bewusst **nicht** im Vollbild (Parameter
+`vollbild=nein`), damit an diesem PC weiterhin normal gearbeitet werden
+kann. Läuft die Seite als Fenster im Hintergrund oder minimiert, drosselt
+Windows/Chrome ihre Zeitgeber (Weckton, Uhr) nach einigen Minuten — deshalb
+sichtbar lassen, nicht minimieren.
+
+**Auf einem eigenen Bildschirm oder Tablet (Alternative):**
+
+Am Gerät im Wartezimmer die passende Adresse aus Schritt 4 öffnen und
+**„Anzeige starten"** antippen. Danach läuft alles allein: Vollbild,
+Bildschirm bleibt wach.
 
 **Kiosk-Modus (empfohlen), Windows.** Verknüpfung im Autostart-Ordner
 (`Win + R` → `shell:startup`):
@@ -165,7 +224,9 @@ abgespielt. Für Sätze wie: *„Der Praxisbetrieb verzögert sich um etwa
 
 ## Autostart ohne schwarzes Fenster
 
-Damit niemand das Konsolenfenster versehentlich schliesst:
+Für die beiden Sprechzimmer-PCs, damit niemand das Konsolenfenster
+versehentlich schliesst (für ein Wartezimmer-Gerät auf einem vorhandenen
+PC siehe stattdessen Schritt 6):
 
 1. Rechtsklick auf `praxis-ruf-unsichtbar.vbs` → Verknüpfung erstellen
 2. Die Verknüpfung in den Autostart-Ordner ziehen (`Win + R` → `shell:startup`)
@@ -174,7 +235,9 @@ Das Programm startet dann unsichtbar mit Windows. Beenden über den
 Task-Manager, Prozess „Node.js".
 
 Zusätzlich in den Energieoptionen den **Ruhezustand ausschalten** — Bildschirm
-aus ist in Ordnung, der PC selbst darf nicht schlafen.
+aus ist in Ordnung, der PC selbst darf nicht schlafen. Das gilt auch für
+einen PC, der als Wartezimmer-Gerät benutzt wird — sonst reißt dessen
+Verbindung ab, sobald Windows einschläft.
 
 ---
 
@@ -185,6 +248,9 @@ aus ist in Ordnung, der PC selbst darf nicht schlafen.
 "wiederholen": true           // Ansage zweimal
 "gong": true
 "anzeigeDauerSekunden": 45    // wie lange der Name stehen bleibt
+"wachton": true               // haelt einen Bluetooth-Lautsprecher wach
+"wachtonSekunden": 60         // auf 30 senken, falls er trotzdem einschlaeft
+"wachtonStaerke": 0.02        // 0.01, falls im Raum leise hoerbar
 "stimme": { "tempo": 0.88 }   // niedriger = deutlicher, 0.80–1.00 sinnvoll
 ```
 
@@ -221,6 +287,8 @@ Tempo auf `0.82`.
 | Sprechtaste ist grau | Seite wurde über die IP geöffnet statt über `http://localhost:8080` |
 | Aufruf kommt nur in einem Wartezimmer an | `&quellen=…` fehlt in der Adresse des Bildschirms |
 | Name erscheint, aber kein Ton | „Anzeige starten" wurde nicht angetippt, oder Lautstärke auf null |
+| Erste Silbe fehlt bei Bluetooth-Lautsprecher | `"wachtonSekunden"` in `config.json` auf `30` senken |
+| Wartezimmer-Gerät reagiert verspätet (Empfangs-PC) | Fenster war minimiert oder ganz verdeckt — sichtbar in eine Ecke stellen |
 | Stimme klingt abgehackt | `"tempo"` auf `0.82` senken |
 | Nach PC-Neustart geht nichts mehr | Feste IP fehlt, oder Autostart nicht eingerichtet |
 

@@ -32,7 +32,7 @@ rem --autoplay-policy=no-user-gesture-required   Ton darf sofort spielen
 rem --window-size / --window-position   klein, in eine Ecke — wichtig:
 rem   solange das Fenster sichtbar bleibt (nicht minimiert, nicht ganz
 rem   verdeckt), bremst Windows/Chrome das Nachfragen NICHT aus.
-start "" %CHROME% --app=%ADRESSE% --autoplay-policy=no-user-gesture-required ^
+start "" %CHROME% --app="%ADRESSE%" --autoplay-policy=no-user-gesture-required ^
   --user-data-dir="%PROFIL%" --window-size=380,340 --window-position=20,20
 
 endlocal

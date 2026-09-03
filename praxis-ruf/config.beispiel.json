@@ -23,6 +23,10 @@
   "wiederholen": true,
   "gong": true,
   "anzeigeDauerSekunden": 45,
+  "wachton": true,
+  "wachtonSekunden": 60,
+  "wachtonHertz": 60,
+  "wachtonStaerke": 0.02,
   "stimme": {
     "sprache": "de-DE",
     "bevorzugt": [

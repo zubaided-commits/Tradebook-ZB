@@ -159,6 +159,13 @@
     .split(',').map(s => s.trim()).filter(Boolean)
     .map(s => (s.startsWith('http') ? s : 'http://' + s));
 
+  // Läuft diese Seite auf einem dedizierten Bildschirm, ist Vollbild
+  // erwünscht (Voreinstellung). Läuft sie stattdessen als kleines Fenster
+  // auf einem PC, der auch für anderes benutzt wird (z. B. am Empfang),
+  // würde Vollbild die Arbeit an diesem PC unterbrechen — dort mit
+  // &vollbild=nein in der Adresse abschalten.
+  const vollbild = !['nein', 'false', '0'].includes((params.get('vollbild') || '').toLowerCase());
+
   let konfig = null, stimme = null, tonFrei = false, audioCtx = null, ausblendTimer = null;
   let sageUhren = [];                 // laufende Uhren fuer Ansage und Wiederholung
   const verbindungen = new Map();     // Quelle -> verbunden ja/nein
@@ -220,6 +227,41 @@
         osz.start(t); osz.stop(t + 1.2);
       }
     } catch (e) {}
+  }
+
+  /* ---------- Weckton fuer Bluetooth-Lautsprecher ---------- */
+  // Nutzt jemand statt eines festen Bildschirms den ohnehin vorhandenen
+  // Empfangs-PC mit einem Bluetooth-Lautsprecher, legt sich die Funkstrecke
+  // mancher Geraete nach einigen Minuten Stille schlafen — beim Aufwachen
+  // fehlt dann die erste Silbe. Ein sehr leiser, tiefer Ton alle 60 Sekunden
+  // haelt die Verbindung wach. Im Raum nicht zu hoeren, waehrend einer
+  // laufenden Ansage schweigt er. Ueber config.json abschaltbar.
+  let wachtonUhr = null;
+
+  function wachtonSpielen() {
+    if (!tonFrei || (konfig && konfig.wachton === false) || !audioCtx) return;
+    if (speechSynthesis.speaking) return;
+    try {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const t = audioCtx.currentTime;
+      const osz = audioCtx.createOscillator(), amp = audioCtx.createGain();
+      osz.type = 'sine';
+      osz.frequency.value = (konfig && konfig.wachtonHertz) || 60;
+      const staerke = Math.min(Math.max((konfig && konfig.wachtonStaerke) || 0.02, 0.001), 0.2);
+      amp.gain.setValueAtTime(0.0001, t);
+      amp.gain.exponentialRampToValueAtTime(staerke, t + 0.06);
+      amp.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      osz.connect(amp).connect(audioCtx.destination);
+      osz.start(t);
+      osz.stop(t + 0.55);
+    } catch (e) {}
+  }
+
+  function wachtonStarten() {
+    if (konfig && konfig.wachton === false) return;
+    clearInterval(wachtonUhr);
+    const abstand = Math.max(10, (konfig && konfig.wachtonSekunden) || 60) * 1000;
+    wachtonUhr = setInterval(wachtonSpielen, abstand);
   }
 
   /* ---------- Aufruf ---------- */
@@ -319,7 +361,8 @@
     } catch (e) {}
     $('freigabe').classList.add('weg');
     wachHalten();
-    if (document.documentElement.requestFullscreen) {
+    wachtonStarten();
+    if (vollbild && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
   });
