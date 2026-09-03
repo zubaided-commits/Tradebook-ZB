@@ -37,9 +37,50 @@ Ein ausgedientes Android-Tablet reicht völlig.
   Tablet gesperrt oder die App gewechselt, bremst Android die Seite aus und
   Aufrufe können ausbleiben.
 
-**Zum Lautsprecher.** Ein einfacher Aktivlautsprecher genügt. Wichtiger als
-der Preis ist die Aufstellung: mittig im Raum, in Ohrhöhe, nicht in einer
-Ecke und nicht hinter einer Pflanze.
+### Welcher Lautsprecher?
+
+Aufstellung ist wichtiger als der Preis: mittig im Raum, in Ohrhöhe, nicht in
+einer Ecke und nicht hinter einer Pflanze.
+
+**Am Kabel (empfohlen).** Ein Aktivlautsprecher am Kopfhörerausgang des
+Geräts. Nichts schläft ein, nichts muss gekoppelt werden, die ersten Silben
+werden nie abgeschnitten. In `config.php` dann `'wachton' => false`.
+
+**Per Bluetooth (JBL & ähnliche).** Funktioniert, aber mit zwei Tücken:
+
+* Die meisten tragbaren Funklautsprecher **schalten sich nach 10–20 Minuten
+  Stille selbst ab**. Im Praxisalltag sind die Pausen zwischen zwei Aufrufen
+  oft länger — der nächste Patient würde dann ins Leere gerufen.
+* Nach einer Pause braucht die Funkstrecke eine knappe Sekunde, bis Ton
+  kommt. Die ersten Silben fehlen.
+
+Beides fängt der **Weckton** ab: alle 60 Sekunden ein sehr leiser, tiefer Ton
+(60 Hz). Im Raum ist er nicht zu hören, der Lautsprecher sieht aber ein
+Signal und bleibt wach. Voreingestellt ist er an:
+
+```php
+'wachton'         => true,
+'wachtonSekunden' => 60,
+'wachtonHertz'    => 60,
+'wachtonStaerke'  => 0.02,
+```
+
+Schaltet sich Ihr Lautsprecher trotzdem ab, `'wachtonSekunden' => 30` und
+notfalls `'wachtonStaerke' => 0.05` setzen. Ist der Weckton im ruhigen
+Wartezimmer leise hörbar, `0.01` versuchen.
+
+**Bitte testen Sie das einmal bewusst:** Aufruf auslösen, dann 30 Minuten
+nichts tun, dann erneut aufrufen. Kommt der zweite Aufruf sauber und
+vollständig, ist der Lautsprecher geeignet.
+
+Weitere Hinweise zu Bluetooth: Lautsprecher **am Ladekabel lassen**, im
+Gerät als Standard-Wiedergabegerät festlegen, und die Lautstärke am
+Lautsprecher selbst auf etwa drei Viertel stellen.
+
+**Nicht geeignet: reine WLAN-Lautsprecher** (Sonos, Chromecast built-in,
+AirPlay, JBL Authentics und ähnliche). Eine Internetseite kann von sich aus
+keine Übertragung dorthin starten — das verlangt jedes Mal einen Handgriff.
+Solche Geräte würden die Aufrufe schlicht nicht abspielen.
 
 ---
 

@@ -27,6 +27,17 @@ return [
     'anzeigeDauerSekunden' => 45,     // solange gilt ein Aufruf als aktuell
     'verlaufDauerMinuten'  => 10,     // danach verschwinden die Namen von selbst
 
+    // Haelt Bluetooth-Lautsprecher wach. Viele Funklautsprecher (JBL & Co.)
+    // schalten sich nach 10-20 Minuten Stille selbst ab; dann wird der naechste
+    // Aufruf nicht mehr gehoert. Ein sehr leiser, tiefer Ton alle 60 Sekunden
+    // verhindert das und haelt zugleich die Funkstrecke wach, damit die ersten
+    // Silben nicht abgeschnitten werden.
+    // Bei einem Lautsprecher am Kabel wird das nicht gebraucht: false.
+    'wachton'         => true,
+    'wachtonSekunden' => 60,     // Abstand zwischen zwei Wecktoenen
+    'wachtonHertz'    => 60,     // tief genug, um nicht zu stoeren
+    'wachtonStaerke'  => 0.02,   // 0.01-0.05; hoeher nur, wenn es nicht reicht
+
     'stimme' => [
         'sprache'     => 'de-DE',
         'bevorzugt'   => ['Google Deutsch', 'Microsoft Katja', 'Microsoft Hedda', 'Anna'],

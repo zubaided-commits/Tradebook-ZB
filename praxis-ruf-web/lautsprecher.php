@@ -89,9 +89,13 @@ $k = konfig();
   'use strict';
   const $ = (id) => document.getElementById(id);
   const konfig = <?= json_encode([
-      'wartezimmer' => $k['wartezimmer'],
-      'gong'        => (bool) $k['gong'],
-      'stimme'      => $k['stimme'],
+      'wartezimmer'     => $k['wartezimmer'],
+      'gong'            => (bool) $k['gong'],
+      'stimme'          => $k['stimme'],
+      'wachton'         => (bool) $k['wachton'],
+      'wachtonSekunden' => (int) $k['wachtonSekunden'],
+      'wachtonHertz'    => (float) $k['wachtonHertz'],
+      'wachtonStaerke'  => (float) $k['wachtonStaerke'],
   ], JSON_UNESCAPED_UNICODE) ?>;
 
   const TAKT_MS = 2000;          // so oft wird nachgefragt
@@ -167,6 +171,40 @@ $k = konfig();
         osz.start(t); osz.stop(t + 1.2);
       }
     } catch (e) {}
+  }
+
+  /* ---------- Weckton fuer Funklautsprecher ---------- */
+  // Viele Bluetooth-Lautsprecher schalten sich nach einigen Minuten Stille ab
+  // und schneiden nach dem Aufwachen die ersten Silben ab. Ein sehr leiser,
+  // tiefer Ton haelt Verstaerker und Funkstrecke wach. Er ist im Raum nicht
+  // zu hoeren, der Lautsprecher sieht aber ein Signal.
+  let wachtonUhr = null;
+
+  function wachtonSpielen() {
+    if (!tonFrei || !konfig.wachton || !audioCtx) return;
+    // Waehrend einer Ansage nicht dazwischenfunken.
+    if (speechSynthesis.speaking) return;
+    try {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const t = audioCtx.currentTime;
+      const osz = audioCtx.createOscillator(), amp = audioCtx.createGain();
+      osz.type = 'sine';
+      osz.frequency.value = konfig.wachtonHertz || 60;
+      const staerke = Math.min(Math.max(konfig.wachtonStaerke || 0.02, 0.001), 0.2);
+      amp.gain.setValueAtTime(0.0001, t);
+      amp.gain.exponentialRampToValueAtTime(staerke, t + 0.06);
+      amp.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      osz.connect(amp).connect(audioCtx.destination);
+      osz.start(t);
+      osz.stop(t + 0.55);
+    } catch (e) {}
+  }
+
+  function wachtonStarten() {
+    if (!konfig.wachton) return;
+    clearInterval(wachtonUhr);
+    const abstand = Math.max(10, konfig.wachtonSekunden || 60) * 1000;
+    wachtonUhr = setInterval(wachtonSpielen, abstand);
   }
 
   /* ---------- Aufruf und Durchsage ---------- */
@@ -271,6 +309,7 @@ $k = konfig();
     $('betrieb').classList.remove('weg');
 
     wachHalten();
+    wachtonStarten();
     gong();                         // kurze Probe: der Lautsprecher ist zu hören
     nachfragen();
     setInterval(nachfragen, TAKT_MS);

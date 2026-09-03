@@ -4,7 +4,9 @@ Patientenaufruf über das Internet, für gewöhnliches PHP-Webhosting (IONOS).
 Schwesterfassung zu `../praxis-ruf`, die im Praxisnetz läuft.
 
 **Im Wartezimmer wird kein Bildschirm gebraucht — nur ein Lautsprecher an
-einem kleinen Gerät, das die Seite geöffnet hält.**
+einem kleinen Gerät, das die Seite geöffnet hält.** Für Bluetooth-Lautsprecher
+hält ein leiser Weckton das Gerät wach; reine WLAN-Lautsprecher (Sonos,
+Chromecast, AirPlay) sind nicht geeignet — siehe ANLEITUNG-WEB.md.
 
 - **Einrichtung, Bedienung und Datenschutz:** [ANLEITUNG-WEB.md](ANLEITUNG-WEB.md)
 
