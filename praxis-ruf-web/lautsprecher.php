@@ -197,11 +197,20 @@ $k = konfig();
       const eigene = deutsch.find((v) => v.name === gewuenscht);
       if (eigene) { stimme = eigene; return; }
     }
+    // Bei gleichem Namen hat die oertliche Stimme Vorrang: Stimmen, die
+    // erst im Netz erzeugt werden, schicken den Namen der Patientin zum
+    // Hersteller. Das soll niemand versehentlich bekommen — wer eine
+    // solche Stimme will, waehlt sie unten ausdruecklich aus.
+    const oertlich = deutsch.filter((v) => v.localService !== false);
     for (const w of (konfig.stimme.bevorzugt || [])) {
-      const t = deutsch.find((v) => v.name.toLowerCase().includes(String(w).toLowerCase()));
+      const passt = (v) => v.name.toLowerCase().includes(String(w).toLowerCase());
+      const t = oertlich.find(passt) || deutsch.find(passt);
       if (t) { stimme = t; return; }
     }
-    stimme = deutsch.find((v) => v.lang.replace('_', '-') === 'de-DE') || deutsch[0];
+    stimme = oertlich.find((v) => v.lang.replace('_', '-') === 'de-DE')
+          || oertlich[0]
+          || deutsch.find((v) => v.lang.replace('_', '-') === 'de-DE')
+          || deutsch[0];
   }
 
   function stimmenAnbieten() {
@@ -213,7 +222,11 @@ $k = konfig();
     const gewuenscht = gewuenschteStimme();
     feld.innerHTML = '<option value="">Stimme: automatisch</option>'
       + deutsch.map((v) => '<option value="' + v.name.replace(/"/g, '&quot;') + '">'
-          + v.name.replace(/</g, '&lt;') + '</option>').join('');
+          + v.name.replace(/</g, '&lt;')
+          // Deutlich machen, welche Stimme den Namen aus der Praxis
+          // hinaus zum Hersteller schickt.
+          + (v.localService === false ? ' — über Internet' : '')
+          + '</option>').join('');
     feld.value = deutsch.some((v) => v.name === gewuenscht) ? gewuenscht : '';
   }
 

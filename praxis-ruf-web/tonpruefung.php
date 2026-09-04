@@ -335,8 +335,9 @@ $k = konfig();
       'Browser: ' + navigator.userAgent,
       'speechSynthesis vorhanden: ' + ('speechSynthesis' in window ? 'ja' : 'NEIN'),
       'Stimmen insgesamt: ' + alle.length,
-      'davon deutsch: ' + deutsche.length
-        + (deutsche.length ? ' — ' + deutsche.map((v) => v.name + ' (' + v.lang + ')').join(', ') : ''),
+      'davon deutsch: ' + deutsche.length,
+      ...deutsche.map((v) => '   • ' + v.name + '  [' + v.lang + ']'
+          + (v.localService === false ? '  — über Internet' : '  — auf diesem PC')),
       'gewählte Stimme: ' + (gewaehlteStimme
         ? gewaehlteStimme.name + ' (' + gewaehlteStimme.lang + ')' : 'keine'),
       'AudioContext: ' + (audioCtx ? audioCtx.state : 'noch nicht erstellt'),

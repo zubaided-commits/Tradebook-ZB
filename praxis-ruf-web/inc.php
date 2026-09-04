@@ -30,7 +30,7 @@ const AUTH_TAGE     = 30;       // wie lange eine Anmeldung gilt
 // Sichtbar auf jeder Seite unten. Nach dem Hochladen einer neuen Fassung
 // laesst sich damit auf einen Blick pruefen, ob der Browser wirklich die
 // neue Datei zeigt und nicht eine zwischengespeicherte alte.
-const FASSUNG       = '2026-09-04-e';
+const FASSUNG       = '2026-09-04-f';
 
 /* ------------------------------------------------------------------ *
  * Konfiguration
@@ -73,11 +73,17 @@ function konfig(): array
         // Ruhig, klar und etwas langsamer als ein Gespraech.
         'stimme'               => ['sprache' => 'de-DE', 'tempo' => 0.82,
                                    'tonhoehe' => 1.04, 'lautstaerke' => 1.0,
+                                   // Windows zuerst: Katja ist die beste
+                                   // weibliche deutsche Stimme, die oertlich
+                                   // auf dem Rechner laeuft. Stimmen, die
+                                   // ueber das Internet erzeugt werden,
+                                   // stehen hier bewusst NICHT — sie werden
+                                   // nur genommen, wenn jemand sie am
+                                   // Lautsprecher von Hand auswaehlt.
                                    'bevorzugt' => [
-                                       'Anna (Premium)', 'Anna (Erweitert)',
-                                       'Anna (Enhanced)', 'Helena', 'Katja',
-                                       'Anna', 'Petra', 'Marlene', 'Martina',
-                                       'Google Deutsch', 'Hedda',
+                                       'Katja', 'Hedda', 'Marlene',
+                                       'Anna', 'Helena', 'Petra',
+                                       'Google Deutsch',
                                    ]],
         // Eigene Aussprache-Eintraege der Praxis: 'Name' => 'so vorlesen'.
         // Ergaenzt und ueberschreibt das mitgelieferte Woerterbuch.

@@ -10,18 +10,24 @@ rem ---- HIER ANPASSEN ------------------------------------------------
 set ADRESSE=https://ihre-domain.de/praxisruf/lautsprecher.php
 rem --------------------------------------------------------------------
 
-rem Eigenes Chrome-Profil, getrennt vom normalen Empfangs-Profil. Darin
+rem Eigenes Browser-Profil, getrennt vom normalen Empfangs-Profil. Darin
 rem bleibt die Anmeldung ueber Neustarts hinweg erhalten (Sitzung 30 Tage).
-set PROFIL=%LOCALAPPDATA%\PraxisRufChrome
+set PROFIL=%LOCALAPPDATA%\PraxisRufBrowser
 
-set CHROME="%ProgramFiles%\Google\Chrome\Application\chrome.exe"
-if not exist %CHROME% set CHROME="%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
-if not exist %CHROME% set CHROME="%LocalAppData%\Google\Chrome\Application\chrome.exe"
+rem Erst Chrome suchen, sonst Edge: Edge ist auf jedem Windows-Rechner
+rem bereits vorhanden, Chrome nicht unbedingt. Beide verstehen dieselben
+rem Schalter. Edge bringt zusaetzlich sehr natuerlich klingende Stimmen mit
+rem - die werden allerdings ueber das Internet erzeugt, siehe ANLEITUNG-WEB.md.
+set BROWSER="%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+if not exist %BROWSER% set BROWSER="%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+if not exist %BROWSER% set BROWSER="%LocalAppData%\Google\Chrome\Application\chrome.exe"
+if not exist %BROWSER% set BROWSER="%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
+if not exist %BROWSER% set BROWSER="%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
 
-if not exist %CHROME% (
+if not exist %BROWSER% (
   echo.
-  echo   Chrome wurde nicht gefunden. Bitte den Pfad in dieser Datei von
-  echo   Hand eintragen, oder Chrome installieren.
+  echo   Weder Chrome noch Edge gefunden. Bitte den Pfad in dieser Datei
+  echo   von Hand eintragen.
   echo.
   pause
   exit /b 1
@@ -32,7 +38,7 @@ rem --autoplay-policy=no-user-gesture-required   Ton darf sofort spielen
 rem --window-size / --window-position   klein, in eine Ecke — wichtig:
 rem   solange das Fenster sichtbar bleibt (nicht minimiert, nicht ganz
 rem   verdeckt), bremst Windows/Chrome das Nachfragen NICHT aus.
-start "" %CHROME% --app="%ADRESSE%" --autoplay-policy=no-user-gesture-required ^
+start "" %BROWSER% --app="%ADRESSE%" --autoplay-policy=no-user-gesture-required ^
   --user-data-dir="%PROFIL%" --window-size=380,340 --window-position=20,20
 
 endlocal

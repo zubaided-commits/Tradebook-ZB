@@ -64,14 +64,33 @@ erklingt derselbe Gong. Alle drei Werte stehen in `config.php`
 
 ## Stimme und Aussprache
 
-Welche Stimmen zur Verfügung stehen, entscheidet allein das Gerät — eine
+Welche Stimmen zur Verfügung stehen, entscheidet allein der Rechner — eine
 Webseite kann keine mitbringen oder nachladen. Eine bestimmte Studiostimme
 (Mila, Elevenlabs und Ähnliches) lässt sich deshalb nicht einbauen, ohne
 jeden Patientennamen zur Vertonung an einen externen Dienst zu senden — das
 wäre bei Gesundheitsdaten nach Art. 9 DSGVO ein eigener Auftragsverarbeiter
-mit allem, was dazugehört. Gewählt wird darum unter den Stimmen des Geräts,
-und die Ansage ist auf ruhig, klar und etwas langsamer als ein Gespräch
-eingestellt (`tempo` 0.82, `tonhoehe` 1.04). Auf dem Startbildschirm des
+mit allem, was dazugehört. Die Ansage ist darum auf ruhig, klar und etwas
+langsamer als ein Gespräch eingestellt (`tempo` 0.82, `tonhoehe` 1.04).
+
+Unter Windows stehen zwei Arten von Stimmen zur Auswahl, und der Unterschied
+ist nicht nur die Tonqualität:
+
+| | Beispiel | Klang | Wo entsteht der Ton? |
+|---|---|---|---|
+| **örtlich** | Microsoft Katja, Hedda | brauchbar | auf dem Praxis-PC |
+| **über Internet** | Microsoft … Online (Natural) | deutlich natürlicher | beim Hersteller |
+
+Von selbst wird **immer eine örtliche Stimme** genommen: Eine Netzstimme
+schickt den Namen der Patientin zum Hersteller, und das soll niemand
+versehentlich bekommen. Im Auswahlfeld am Lautsprecher sind solche Stimmen
+mit „— über Internet" gekennzeichnet und lassen sich bewusst wählen — vor dem
+Echtbetrieb gehört dann aber derselbe Auftragsverarbeitungsvertrag dazu wie
+beim Hosting.
+
+Mehr örtliche Stimmen lassen sich in Windows nachinstallieren:
+*Einstellungen → Zeit und Sprache → Sprache und Region → Deutsch → drei Punkte
+→ Sprachoptionen → Sprache (Text-zu-Sprache)*. Nach einem Neustart des
+Browsers stehen sie im Auswahlfeld. Auf dem Startbildschirm des
 Lautsprechers lässt sich unter den vorhandenen deutschen Stimmen auswählen;
 die Auswahl wird sofort vorgehört und auf dem Gerät gemerkt. Auf iPad und
 iPhone bringt es hörbar am meisten, unter *Einstellungen → Bedienungshilfen →
@@ -93,8 +112,9 @@ die drei Wege einzeln durch, auf denen der Lautsprecher Ton erzeugt — Gong
 (Web Audio), Sprachausgabe und Tondatei — jeweils einmal direkt auf
 Tastendruck und einmal drei Sekunden später, denn iOS behandelt beides
 unterschiedlich streng. Jeder Schritt wird sichtbar mitgeschrieben, samt
-Fehlermeldung und den auf dem Gerät vorhandenen Stimmen. Auf einem iPad gibt
-es keine Entwicklerwerkzeuge; ohne diese Seite bliebe nur Raten.
+Fehlermeldung und den auf dem Rechner vorhandenen Stimmen — jede einzeln
+aufgeführt und mit dem Vermerk, ob sie auf dem PC läuft oder über das
+Internet. Damit lässt sich vor Ort entscheiden, welche Stimme genommen wird.
 
 Unten auf jeder Seite steht die Fassungsnummer. Nach dem Hochladen einer
 neuen Datei lässt sich damit prüfen, ob der Browser wirklich die neue Fassung
