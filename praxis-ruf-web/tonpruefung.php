@@ -86,6 +86,14 @@ $k = konfig();
 </div>
 
 <div class="karte">
+  <h2>Schritt 4 — Ton vom Server</h2>
+  <p class="unter" style="margin-bottom:11px">Genau der Weg, den eine
+     gesprochene Durchsage nimmt: hochladen, dann vom Server zurückholen und
+     abspielen. Safari holt solchen Ton stückweise — das wird hier mitgeprüft.</p>
+  <button type="button" class="spaet" id="k7">7 · Durchsage hoch- und wieder abspielen</button>
+</div>
+
+<div class="karte">
   <h2>Bericht</h2>
   <div id="bericht"></div>
   <button type="button" class="neben" id="k6" style="margin-top:10px">Bericht leeren</button>
@@ -244,6 +252,47 @@ $k = konfig();
   $('k5').addEventListener('click', () => {
     melde('6 · Tondatei nach 3 Sekunden — angetippt, warte …');
     setTimeout(() => { melde('   3 Sekunden um:'); tondatei('Tondatei spät'); }, 3000);
+  });
+
+  /* ---------- 7 · Durchsage ueber den Server ---------- */
+  // Laedt denselben Piepton als Durchsage hoch und spielt ihn vom Server
+  // zurueck — der vollstaendige Weg einer Sprachdurchsage, samt der
+  // stueckweisen Abholung, die Safari dabei verlangt.
+  $('k7').addEventListener('click', async () => {
+    melde('7 · Durchsage über den Server — angetippt');
+    try {
+      const roh = atob(PIEP.split(',')[1]);
+      const felder = new Uint8Array(roh.length);
+      for (let i = 0; i < roh.length; i++) felder[i] = roh.charCodeAt(i);
+      const brocken = new Blob([felder], { type: 'audio/wav' });
+
+      melde('   lade ' + brocken.size + ' Bytes hoch …');
+      const antwort = await fetch('api.php?was=durchsage&ziel=alle',
+        { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: brocken });
+      const d = await antwort.json();
+      if (!antwort.ok || !d.id) {
+        melde('   Hochladen FEHLGESCHLAGEN: ' + antwort.status + ' '
+            + JSON.stringify(d), 'schlecht');
+        return;
+      }
+      melde('   hochgeladen, Kennung ' + d.id, 'gut');
+
+      // Erst so pruefen, wie Safari es tut: ein winziger Ausschnitt.
+      const probe = await fetch('api.php?was=ton&id=' + encodeURIComponent(d.id),
+        { headers: { 'Range': 'bytes=0-1' } });
+      melde('   Ausschnitt-Anfrage beantwortet mit ' + probe.status
+          + (probe.status === 206 ? ' (206 — richtig)' : ' (erwartet wäre 206)'),
+        probe.status === 206 ? 'gut' : 'schlecht');
+
+      tonElement.src = 'api.php?was=ton&id=' + encodeURIComponent(d.id);
+      tonElement.load();
+      const v = tonElement.play();
+      if (v && v.then) {
+        v.then(() => melde('   Serverton: play() angenommen', 'gut'))
+         .catch((f) => melde('   Serverton: play() ABGELEHNT — ' + f.name
+                           + ': ' + f.message, 'schlecht'));
+      }
+    } catch (f) { melde('   Ausnahme: ' + f.message, 'schlecht'); }
   });
 
   /* ---------- Stimmen und Gerät ---------- */

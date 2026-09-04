@@ -100,9 +100,16 @@ switch ($was) {
             }
         }
 
+        $gezeigt = $k['nurNachname'] ? nurNachname($name) : $name;
+
         $aufruf = [
             'id'           => kennung(),
-            'name'         => $k['nurNachname'] ? nurNachname($name) : $name,
+            'name'         => $gezeigt,
+            // Fuer die Stimme in deutsche Rechtschreibung umgeschrieben, damit
+            // eine deutsche Stimme auch persische, Dari-, Paschto- und
+            // arabische Namen richtig ausspricht. Angezeigt wird weiterhin
+            // 'name' — der echte Name, unveraendert.
+            'ansage'       => fuerAussprache($gezeigt, $k['aussprache']),
             'anrede'       => $anrede,
             'sprechzimmer' => $zimmerName,
             'kurz'         => $kurz,
@@ -198,14 +205,63 @@ switch ($was) {
              ? ($stand['durchsage']['typ'] ?? 'audio/webm') : 'audio/webm';
 
         // Den Schutzvorspann beim Ausliefern ueberspringen.
-        $laenge = (int) filesize($datei) - strlen(SCHUTZ_VORSPANN);
+        $vorspann = strlen(SCHUTZ_VORSPANN);
+        $laenge   = max(0, (int) filesize($datei) - $vorspann);
+
         header('Content-Type: ' . $typ);
-        header('Content-Length: ' . (string) max(0, $laenge));
         header('Cache-Control: no-store');
+
+        // Safari auf iPhone und iPad laedt Ton in einem <audio>-Element nicht
+        // am Stueck, sondern fragt zuerst mit "Range" einen kleinen Ausschnitt
+        // an. Antwortet der Server darauf mit 200 und der ganzen Datei, statt
+        // mit 206 und genau dem Ausschnitt, bricht Safari ab und spielt gar
+        // nichts — ohne Fehlermeldung. Darum wird "Range" hier bedient.
+        header('Accept-Ranges: bytes');
+
+        $von = 0;
+        $bis = $laenge - 1;
+        $roh = (string) ($_SERVER['HTTP_RANGE'] ?? '');
+        $teilweise = false;
+
+        if ($laenge > 0 && preg_match('/^bytes=(\d*)-(\d*)$/', trim($roh), $t)) {
+            if ($t[1] === '' && $t[2] === '') {
+                antwortAufKaputtenBereich($laenge);
+            }
+            if ($t[1] === '') {
+                // "bytes=-500" — die letzten 500 Bytes.
+                $von = max(0, $laenge - (int) $t[2]);
+            } else {
+                $von = (int) $t[1];
+                if ($t[2] !== '') {
+                    $bis = (int) $t[2];
+                }
+            }
+            $bis = min($bis, $laenge - 1);
+            if ($von > $bis) {
+                antwortAufKaputtenBereich($laenge);
+            }
+            $teilweise = true;
+        }
+
+        $menge = $bis - $von + 1;
+        if ($teilweise) {
+            http_response_code(206);
+            header('Content-Range: bytes ' . $von . '-' . $bis . '/' . $laenge);
+        }
+        header('Content-Length: ' . (string) $menge);
+
         $griff = fopen($datei, 'rb');
         if ($griff) {
-            fseek($griff, strlen(SCHUTZ_VORSPANN));
-            fpassthru($griff);
+            fseek($griff, $vorspann + $von);
+            $offen = $menge;
+            while ($offen > 0 && !feof($griff)) {
+                $stueck = fread($griff, (int) min(65536, $offen));
+                if ($stueck === false || $stueck === '') {
+                    break;
+                }
+                echo $stueck;
+                $offen -= strlen($stueck);
+            }
             fclose($griff);
         }
         exit;

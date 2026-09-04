@@ -38,11 +38,37 @@ return [
     'wachtonHertz'    => 60,     // tief genug, um nicht zu stoeren
     'wachtonStaerke'  => 0.02,   // 0.01-0.05; hoeher nur, wenn es nicht reicht
 
+    // Welche Stimmen zur Verfuegung stehen, entscheidet allein das Geraet:
+    // Eine Webseite kann keine Stimme mitbringen oder nachladen. Hier steht
+    // nur, welche bevorzugt genommen wird, wenn es sie gibt — von der besten
+    // zur einfachsten. Am Lautsprecher laesst sich zusaetzlich von Hand
+    // auswaehlen und sofort vorhoeren.
+    //
+    // Auf iPad und iPhone lohnt sich der Weg
+    //   Einstellungen > Bedienungshilfen > Gesprochene Inhalte > Stimmen >
+    //   Deutsch
+    // und dort eine Stimme in "Premium" laden. Das ist der groesste
+    // hoerbare Unterschied und kostet nichts.
     'stimme' => [
         'sprache'     => 'de-DE',
-        'bevorzugt'   => ['Google Deutsch', 'Microsoft Katja', 'Microsoft Hedda', 'Anna'],
-        'tempo'       => 0.88,        // niedriger = deutlicher
-        'tonhoehe'    => 1.0,
+        'bevorzugt'   => [
+            'Anna (Premium)', 'Anna (Erweitert)', 'Anna (Enhanced)',
+            'Helena', 'Katja', 'Anna', 'Petra', 'Marlene', 'Martina',
+            'Google Deutsch', 'Hedda',
+        ],
+        'tempo'       => 0.9,         // niedriger = deutlicher
+        'tonhoehe'    => 1.0,         // 0.9 tiefer, 1.1 heller
         'lautstaerke' => 1.0,
     ],
+
+    // Eigene Aussprache: links der Name, rechts die Schreibweise, die eine
+    // deutsche Stimme richtig vorliest. Ein mitgeliefertes Woerterbuch deckt
+    // die haeufigen afghanischen und persischen Namen bereits ab (siehe
+    // aussprache.php); hier kommen nur die Namen dazu, die noch fehlen oder
+    // anders klingen sollen.
+    //
+    //   'Zubaida' => 'Subaida'     (deutsches Z klaenge "Ts")
+    //   'Najib'   => 'Nadschib'    (deutsches J klaenge "J" wie in "ja")
+    //   'Shirin'  => 'Schirin'
+    'aussprache' => [],
 ];

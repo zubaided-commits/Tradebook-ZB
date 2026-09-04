@@ -69,6 +69,7 @@ $k = konfig();
         <option value="<?= h($w['id']) ?>"><?= h($w['name']) ?></option>
       <?php endforeach; ?>
     </select><br>
+    <select id="stimmWahl" aria-label="Stimme"><option value="">Stimme: automatisch</option></select><br>
     <button type="button" id="startKnopf">Ton freigeben und starten</button>
   </div>
 </div>
@@ -162,24 +163,75 @@ $k = konfig();
   }
 
   /* ---------- Sprachausgabe ---------- */
+  // Welche Stimmen es gibt, bestimmt allein das Geraet — eine Webseite kann
+  // keine mitbringen oder nachladen. Gewaehlt wird darum unter dem, was da
+  // ist: erst die in config.php bevorzugten, sonst irgendeine deutsche. Wer
+  // eine andere will, waehlt sie im Startbildschirm aus; die Wahl bleibt auf
+  // diesem Geraet gespeichert.
+  function deutscheStimmen() {
+    let alle = [];
+    try { alle = speechSynthesis.getVoices() || []; } catch (e) {}
+    return alle.filter((v) => v.lang && v.lang.replace('_', '-').toLowerCase().startsWith('de'));
+  }
+
+  function gewuenschteStimme() {
+    try { return localStorage.getItem('praxisruf-stimme') || ''; } catch (e) { return ''; }
+  }
+
   function stimmeWaehlen() {
-    const alle = speechSynthesis.getVoices();
-    if (!alle.length) return;
+    const deutsch = deutscheStimmen();
+    if (!deutsch.length) { stimme = null; return; }
+
+    const gewuenscht = gewuenschteStimme();
+    if (gewuenscht) {
+      const eigene = deutsch.find((v) => v.name === gewuenscht);
+      if (eigene) { stimme = eigene; return; }
+    }
     for (const w of (konfig.stimme.bevorzugt || [])) {
-      const t = alle.find((v) => v.name.toLowerCase().includes(w.toLowerCase()));
+      const t = deutsch.find((v) => v.name.toLowerCase().includes(String(w).toLowerCase()));
       if (t) { stimme = t; return; }
     }
-    stimme = alle.find((v) => v.lang === 'de-DE')
-          || alle.find((v) => v.lang && v.lang.startsWith('de')) || null;
+    stimme = deutsch.find((v) => v.lang.replace('_', '-') === 'de-DE') || deutsch[0];
   }
-  speechSynthesis.onvoiceschanged = stimmeWaehlen;
+
+  function stimmenAnbieten() {
+    const feld = $('stimmWahl');
+    if (!feld) return;
+    const deutsch = deutscheStimmen();
+    if (!deutsch.length) { feld.style.display = 'none'; return; }
+    feld.style.display = '';
+    const gewuenscht = gewuenschteStimme();
+    feld.innerHTML = '<option value="">Stimme: automatisch</option>'
+      + deutsch.map((v) => '<option value="' + v.name.replace(/"/g, '&quot;') + '">'
+          + v.name.replace(/</g, '&lt;') + '</option>').join('');
+    feld.value = deutsch.some((v) => v.name === gewuenscht) ? gewuenscht : '';
+  }
+
+  speechSynthesis.onvoiceschanged = () => { stimmeWaehlen(); stimmenAnbieten(); };
   stimmeWaehlen();
+  stimmenAnbieten();
+  // Manche Geraete melden ihre Stimmen erst kurz nach dem Laden nach.
+  setTimeout(() => { stimmeWaehlen(); stimmenAnbieten(); }, 900);
+
+  if ($('stimmWahl')) {
+    $('stimmWahl').addEventListener('change', () => {
+      try { localStorage.setItem('praxisruf-stimme', $('stimmWahl').value); } catch (e) {}
+      stimmeWaehlen();
+      // Sofort vorhoeren — das Antippen des Auswahlfelds gilt als Geste.
+      tonFrei = true;
+      sprechen('Frau Subaida Jar, bitte in Sprechzimmer eins.');
+    });
+  }
 
   function sprechen(text) {
     if (!tonFrei) return;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = konfig.stimme.sprache || 'de-DE';
-    if (stimme) u.voice = stimme;
+    // Eine einmal gemerkte Stimme kann ungueltig werden, sobald das Geraet
+    // seine Stimmenliste neu aufbaut — dann wirft das Zuweisen. Ohne
+    // Absicherung ginge daran die ganze Ansage verloren; so faellt sie nur
+    // auf die Standardstimme des Geraets zurueck.
+    try { if (stimme) u.voice = stimme; } catch (e) { stimme = null; }
     u.rate = konfig.stimme.tempo || 0.88;
     u.pitch = konfig.stimme.tonhoehe || 1.0;
     u.volume = konfig.stimme.lautstaerke || 1.0;
@@ -261,7 +313,12 @@ $k = konfig();
 
     ansageAbbrechen();
     gong();
-    const satz = voll + ', bitte in ' + a.sprechzimmer + '.';
+    // Angezeigt wird der echte Name, gesprochen die fuer eine deutsche
+    // Stimme umgeschriebene Fassung (aus 'Zubaida' wird 'Subaida'). Fehlt
+    // sie — etwa bei einem Aufruf aus einer aelteren Fassung —, wird der
+    // Name genommen, wie er ist.
+    const gesprochen = ((a.anrede ? a.anrede + ' ' : '') + (a.ansage || a.name)).trim();
+    const satz = gesprochen + ', bitte in ' + a.sprechzimmer + '.';
     sageUhren.push(setTimeout(() => sprechen(satz), 1250));
     if (a.wiederholen !== false) sageUhren.push(setTimeout(() => sprechen(satz), 5200));
     sageUhren.push(setTimeout(() => lampe(''), 8000));

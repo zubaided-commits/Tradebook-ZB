@@ -16,6 +16,8 @@ declare(strict_types=1);
 // Die Dateien tragen die Endung .php und beginnen mit einem Schutzvorspann.
 // Selbst wenn der Webserver den Ordner daten/ ausliefert — etwa weil .htaccess
 // nicht gilt — fuehrt er die Datei aus und gibt nichts preis.
+require __DIR__ . '/aussprache.php';
+
 const SCHUTZ_VORSPANN = "<?php exit; ?>\n";
 const STAND_DATEI   = __DIR__ . '/daten/stand.php';
 const TON_ORDNER    = __DIR__ . '/daten/ton';
@@ -28,7 +30,7 @@ const AUTH_TAGE     = 30;       // wie lange eine Anmeldung gilt
 // Sichtbar auf jeder Seite unten. Nach dem Hochladen einer neuen Fassung
 // laesst sich damit auf einen Blick pruefen, ob der Browser wirklich die
 // neue Datei zeigt und nicht eine zwischengespeicherte alte.
-const FASSUNG       = '2026-09-04-c';
+const FASSUNG       = '2026-09-04-d';
 
 /* ------------------------------------------------------------------ *
  * Konfiguration
@@ -61,9 +63,21 @@ function konfig(): array
         'wachtonSekunden'      => 60,
         'wachtonHertz'         => 60,
         'wachtonStaerke'       => 0.02,
-        'stimme'               => ['sprache' => 'de-DE', 'tempo' => 0.88,
+        // Bevorzugt werden weibliche deutsche Stimmen, die es auf den
+        // jeweiligen Geraeten wirklich gibt — von der besten zur einfachsten.
+        // Welche vorhanden sind, entscheidet allein das Geraet; auf der
+        // Lautsprecherseite laesst sich unter den vorhandenen auswaehlen.
+        'stimme'               => ['sprache' => 'de-DE', 'tempo' => 0.9,
                                    'tonhoehe' => 1.0, 'lautstaerke' => 1.0,
-                                   'bevorzugt' => ['Google Deutsch', 'Microsoft Katja']],
+                                   'bevorzugt' => [
+                                       'Anna (Premium)', 'Anna (Erweitert)',
+                                       'Anna (Enhanced)', 'Helena', 'Katja',
+                                       'Anna', 'Petra', 'Marlene', 'Martina',
+                                       'Google Deutsch', 'Hedda',
+                                   ]],
+        // Eigene Aussprache-Eintraege der Praxis: 'Name' => 'so vorlesen'.
+        // Ergaenzt und ueberschreibt das mitgelieferte Woerterbuch.
+        'aussprache'           => [],
     ], $roh);
 
     if ($k['passwort'] === '') {
@@ -388,6 +402,14 @@ function koerperBegrenztLesen(int $maxBytes): string|false
     }
     fclose($griff);
     return $daten;
+}
+
+/** Ein unerfuellbarer Range-Wunsch: 416 mit der wahren Laenge. */
+function antwortAufKaputtenBereich(int $laenge): void
+{
+    http_response_code(416);
+    header('Content-Range: bytes */' . $laenge);
+    exit;
 }
 
 function antwort(array $daten, int $code = 200): void

@@ -41,9 +41,28 @@ ungültig — der eigentliche Weg für einen Personalwechsel.
 | `ruf.php` | Bedienseite der Ärztin, gemeinsame Sicht beider Sprechzimmer |
 | `lautsprecher.php` | Gerät im Wartezimmer, reine Tonausgabe |
 | `tonpruefung.php` | Diagnoseseite: prüft Gong, Sprachausgabe und Tondatei einzeln |
+| `aussprache.php` | Schreibt Namen für die Stimme in deutsche Rechtschreibung um |
 | `anmelden.php` / `abmelden.php` | Zugang per gemeinsamem Passwort, 30 Tage gültig |
 | `config.beispiel.php` | Vorlage für `config.php` (nicht im Repository) |
 | `lautsprecher-starten.bat` | Startet `lautsprecher.php` am Empfangs-PC in einem eigenen Fenster |
+
+## Stimme und Aussprache
+
+Welche Stimmen zur Verfügung stehen, entscheidet allein das Gerät — eine
+Webseite kann keine mitbringen oder nachladen. Auf dem Startbildschirm des
+Lautsprechers lässt sich unter den vorhandenen deutschen Stimmen auswählen;
+die Auswahl wird sofort vorgehört und auf dem Gerät gemerkt. Auf iPad und
+iPhone bringt es hörbar am meisten, unter *Einstellungen → Bedienungshilfen →
+Gesprochene Inhalte → Stimmen → Deutsch* eine Stimme in „Premium" zu laden.
+
+Eine deutsche Stimme liest deutsche Rechtschreibung — bei Namen aus dem
+Persischen, Dari, Paschto und Arabischen geht das schief: `Z` klingt wie
+„ts", `J` wie in „ja", `sh` und `q` kennt das Deutsche so nicht. `aussprache.php`
+schreibt solche Namen für die Ansage um (aus *Zubaida* wird *Subaida*, aus
+*Najib* wird *Nadschib*); **angezeigt und gespeichert bleibt immer der echte
+Name.** Deutsche Namen bleiben unangetastet — bewusst wörterbuchgestützt,
+denn eine Regel wie „Z wird S" würde aus *Zimmermann* ein *Simmermann* machen.
+Eigene Namen kommen in `config.php` unter `aussprache` dazu.
 
 ## Wenn kein Ton kommt
 
