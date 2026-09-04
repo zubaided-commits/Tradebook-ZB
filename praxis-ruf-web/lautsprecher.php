@@ -97,9 +97,16 @@ $k = konfig();
       'wachtonSekunden' => (int) $k['wachtonSekunden'],
       'wachtonHertz'    => (float) $k['wachtonHertz'],
       'wachtonStaerke'  => (float) $k['wachtonStaerke'],
+      'gongStaerke'     => (float) $k['gongStaerke'],
+      'gongPause'       => (float) $k['gongPauseSekunden'],
+      'wiederholPause'  => (float) $k['wiederholPauseSekunden'],
   ], JSON_UNESCAPED_UNICODE) ?>;
 
   const TAKT_MS = 2000;          // so oft wird nachgefragt
+  // Der Gong klingt aus, bevor der Name faellt; die Wiederholung setzt
+  // erst nach einer Atempause ein. Beide Werte stehen in config.php.
+  const GONGPAUSE_MS      = Math.round(Math.max(0, konfig.gongPause || 2) * 1000);
+  const WIEDERHOLPAUSE_MS = Math.round(Math.max(0, konfig.wiederholPause || 2) * 1000);
   let raum = null, tonFrei = false, audioCtx = null, stimme = null;
   let letzteAufrufId = null, letzteDurchsageId = null;
   let fehlerZaehler = 0, sageUhren = [];
@@ -111,6 +118,9 @@ $k = konfig();
   // ausgeloest, es kommt nur einfach kein Ton. Diese Variable haelt die
   // jeweils aktuelle Ansage fest, bis sie fertig gesprochen ist.
   let aktiveAnsage = null;
+  // Waehrend einer laufenden Ansage — auch in den Pausen zwischen Gong,
+  // Name und Wiederholung — darf der Weckton nicht dazwischenfunken.
+  let ansageLaeuft = false;
   // Beim allerersten Nachfragen wird der vorgefundene Stand nur uebernommen,
   // nicht angesagt — sonst wiederholt ein neu gestartetes Geraet einen alten
   // Aufruf. Danach wird jeder neue Aufruf angesagt, auch der erste echte.
@@ -151,8 +161,8 @@ $k = konfig();
   // im Klick freigegeben und danach fuer jede Durchsage wiederverwendet.
   const tonElement = new Audio();
   tonElement.preload = 'auto';
-  tonElement.addEventListener('ended', () => lampe(''));
-  tonElement.addEventListener('error', () => lampe(''));
+  tonElement.addEventListener('ended', () => tonFertig());
+  tonElement.addEventListener('error', () => tonFertig());
 
   function tonFreigeben() {
     try {
@@ -223,8 +233,8 @@ $k = konfig();
     });
   }
 
-  function sprechen(text) {
-    if (!tonFrei) return;
+  function sprechen(text, fertig) {
+    if (!tonFrei) { if (typeof fertig === 'function') fertig(); return; }
     const u = new SpeechSynthesisUtterance(text);
     u.lang = konfig.stimme.sprache || 'de-DE';
     // Eine einmal gemerkte Stimme kann ungueltig werden, sobald das Geraet
@@ -235,7 +245,23 @@ $k = konfig();
     u.rate = konfig.stimme.tempo || 0.88;
     u.pitch = konfig.stimme.tonhoehe || 1.0;
     u.volume = konfig.stimme.lautstaerke || 1.0;
-    u.onend = u.onerror = () => { if (aktiveAnsage === u) aktiveAnsage = null; };
+    // Nach dem Ende geht es weiter (Wiederholung, Lampe aus). Damit das
+    // auch dann geschieht, wenn ein Geraet gar kein Ende meldet — das kommt
+    // vor —, laeuft zusaetzlich eine Uhr mit reichlich Vorlauf. Was zuerst
+    // eintrifft, gewinnt; der zweite Weg tut dann nichts mehr.
+    let erledigt = false;
+    const abschluss = () => {
+      if (erledigt) return;
+      erledigt = true;
+      if (aktiveAnsage === u) aktiveAnsage = null;
+      if (typeof fertig === 'function') fertig();
+    };
+    u.onend = abschluss;
+    u.onerror = abschluss;
+    // Grobe Schaetzung der Sprechdauer, grosszuegig bemessen.
+    const geschaetzt = 1500 + text.length * 110 / (u.rate || 1);
+    sageUhren.push(setTimeout(abschluss, geschaetzt));
+
     aktiveAnsage = u;   // Referenz halten, siehe Erklaerung oben
     speechSynthesis.speak(u);
   }
@@ -245,6 +271,8 @@ $k = konfig();
   function ansageAbbrechen() {
     sageUhren.forEach(clearTimeout);
     sageUhren = [];
+    ansageLaeuft = false;
+    try { tonElement.pause(); } catch (e) {}
     // cancel() nur, wenn tatsaechlich etwas laeuft oder ansteht. Ein
     // cancel() im Leerlauf bringt Safaris Sprachausgabe durcheinander —
     // der naechste speak()-Aufruf bleibt dann ohne Fehlermeldung stumm.
@@ -253,21 +281,37 @@ $k = konfig();
     } catch (e) {}
   }
 
+  // Ein einzelner Ton klingt nach Piepser. Gespielt wird darum ein Grundton
+  // mit zwei leisen Obertoenen — das ergibt einen vollen, weichen Klang wie
+  // bei einem Glockenspiel. Der Einsatz ist bewusst weich (kein Knacken),
+  // das Ausklingen lang.
+  function klangGeben(t, hz, dauer, staerke) {
+    for (const [faktor, anteil] of [[1, 1], [2, 0.17], [3, 0.05]]) {
+      const osz = audioCtx.createOscillator(), amp = audioCtx.createGain();
+      osz.type = 'sine';
+      osz.frequency.value = hz * faktor;
+      const spitze = Math.max(0.0002, staerke * anteil);
+      amp.gain.setValueAtTime(0.0001, t);
+      amp.gain.exponentialRampToValueAtTime(spitze, t + 0.05);      // weicher Einsatz
+      amp.gain.exponentialRampToValueAtTime(0.0001, t + dauer);     // langes Ausklingen
+      osz.connect(amp).connect(audioCtx.destination);
+      osz.start(t);
+      osz.stop(t + dauer + 0.05);
+    }
+  }
+
+  // Zwei Toene im Abstand einer Quarte, aufsteigend und ineinander
+  // ausklingend: ruhig und freundlich statt alarmierend — ein Klang, den
+  // man den ganzen Tag ueber immer wieder hoeren kann.
   function gong() {
     if (!tonFrei || !konfig.gong) return;
     try {
       audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
-      for (const [hz, versatz] of [[784, 0], [1046.5, 0.16]]) {
-        const t = audioCtx.currentTime + versatz;
-        const osz = audioCtx.createOscillator(), amp = audioCtx.createGain();
-        osz.type = 'sine'; osz.frequency.value = hz;
-        amp.gain.setValueAtTime(0.0001, t);
-        amp.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
-        amp.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
-        osz.connect(amp).connect(audioCtx.destination);
-        osz.start(t); osz.stop(t + 1.2);
-      }
+      const jetzt = audioCtx.currentTime;
+      const staerke = Math.min(Math.max(konfig.gongStaerke || 0.16, 0.01), 0.5);
+      klangGeben(jetzt,        523.25, 2.0, staerke);          // C5
+      klangGeben(jetzt + 0.40, 698.46, 2.4, staerke * 0.92);   // F5
     } catch (e) {}
   }
 
@@ -280,8 +324,9 @@ $k = konfig();
 
   function wachtonSpielen() {
     if (!tonFrei || !konfig.wachton || !audioCtx) return;
-    // Waehrend einer Ansage nicht dazwischenfunken.
-    if (speechSynthesis.speaking) return;
+    // Waehrend einer Ansage nicht dazwischenfunken — auch nicht in den
+    // stillen Pausen zwischen Gong, Name und Wiederholung.
+    if (ansageLaeuft || speechSynthesis.speaking) return;
     try {
       if (audioCtx.state === 'suspended') audioCtx.resume();
       const t = audioCtx.currentTime;
@@ -312,29 +357,50 @@ $k = konfig();
     lampe('spricht');
 
     ansageAbbrechen();
+    ansageLaeuft = true;
     gong();
+
     // Angezeigt wird der echte Name, gesprochen die fuer eine deutsche
     // Stimme umgeschriebene Fassung (aus 'Zubaida' wird 'Subaida'). Fehlt
     // sie — etwa bei einem Aufruf aus einer aelteren Fassung —, wird der
     // Name genommen, wie er ist.
     const gesprochen = ((a.anrede ? a.anrede + ' ' : '') + (a.ansage || a.name)).trim();
     const satz = gesprochen + ', bitte in ' + a.sprechzimmer + '.';
-    sageUhren.push(setTimeout(() => sprechen(satz), 1250));
-    if (a.wiederholen !== false) sageUhren.push(setTimeout(() => sprechen(satz), 5200));
-    sageUhren.push(setTimeout(() => lampe(''), 8000));
+
+    const schluss = () => { ansageLaeuft = false; lampe(''); };
+
+    // Der Gong klingt aus, dann folgt die Ansage — nicht uebereinander.
+    sageUhren.push(setTimeout(() => {
+      sprechen(satz, () => {
+        if (a.wiederholen === false) { schluss(); return; }
+        // Die Wiederholung setzt erst nach einer Atempause ein, gemessen
+        // ab dem Ende der ersten Ansage — nicht nach fester Uhr. So bleibt
+        // der Abstand gleich, ob der Name kurz oder lang ist.
+        sageUhren.push(setTimeout(() => sprechen(satz, schluss), WIEDERHOLPAUSE_MS));
+      });
+    }, GONGPAUSE_MS));
   }
 
+  // Auch vor einer gesprochenen Durchsage geht der Gong voran: Wer im
+  // Wartezimmer sitzt, wird erst aufmerksam und hoert dann die Ansage von
+  // Anfang an, statt die ersten Worte zu verpassen.
   function durchsageSpielen(id) {
     if (!tonFrei) return;
     ansageAbbrechen();
+    ansageLaeuft = true;
     lampe('spricht');
-    try {
-      tonElement.src = 'api.php?was=ton&id=' + encodeURIComponent(id);
-      tonElement.load();
-      const versprechen = tonElement.play();
-      if (versprechen && versprechen.catch) versprechen.catch(() => lampe(''));
-    } catch (e) { lampe(''); }
+    gong();
+    sageUhren.push(setTimeout(() => {
+      try {
+        tonElement.src = 'api.php?was=ton&id=' + encodeURIComponent(id);
+        tonElement.load();
+        const versprechen = tonElement.play();
+        if (versprechen && versprechen.catch) versprechen.catch(tonFertig);
+      } catch (e) { tonFertig(); }
+    }, GONGPAUSE_MS));
   }
+
+  function tonFertig() { ansageLaeuft = false; lampe(''); }
 
   function lampe(art) {
     $('lampe').className = 'lampe' + (art ? ' ' + art : '');

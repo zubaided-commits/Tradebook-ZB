@@ -30,7 +30,7 @@ const AUTH_TAGE     = 30;       // wie lange eine Anmeldung gilt
 // Sichtbar auf jeder Seite unten. Nach dem Hochladen einer neuen Fassung
 // laesst sich damit auf einen Blick pruefen, ob der Browser wirklich die
 // neue Datei zeigt und nicht eine zwischengespeicherte alte.
-const FASSUNG       = '2026-09-04-d';
+const FASSUNG       = '2026-09-04-e';
 
 /* ------------------------------------------------------------------ *
  * Konfiguration
@@ -63,12 +63,16 @@ function konfig(): array
         'wachtonSekunden'      => 60,
         'wachtonHertz'         => 60,
         'wachtonStaerke'       => 0.02,
+        'gongStaerke'          => 0.16,   // leiser und weicher als ein Signalton
+        'gongPauseSekunden'    => 2,      // Gong klingt aus, dann der Name
+        'wiederholPauseSekunden' => 2,    // Atempause vor der Wiederholung
         // Bevorzugt werden weibliche deutsche Stimmen, die es auf den
         // jeweiligen Geraeten wirklich gibt — von der besten zur einfachsten.
         // Welche vorhanden sind, entscheidet allein das Geraet; auf der
         // Lautsprecherseite laesst sich unter den vorhandenen auswaehlen.
-        'stimme'               => ['sprache' => 'de-DE', 'tempo' => 0.9,
-                                   'tonhoehe' => 1.0, 'lautstaerke' => 1.0,
+        // Ruhig, klar und etwas langsamer als ein Gespraech.
+        'stimme'               => ['sprache' => 'de-DE', 'tempo' => 0.82,
+                                   'tonhoehe' => 1.04, 'lautstaerke' => 1.0,
                                    'bevorzugt' => [
                                        'Anna (Premium)', 'Anna (Erweitert)',
                                        'Anna (Enhanced)', 'Helena', 'Katja',

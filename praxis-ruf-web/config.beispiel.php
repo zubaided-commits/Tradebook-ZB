@@ -38,6 +38,13 @@ return [
     'wachtonHertz'    => 60,     // tief genug, um nicht zu stoeren
     'wachtonStaerke'  => 0.02,   // 0.01-0.05; hoeher nur, wenn es nicht reicht
 
+    // Der Gong: ein weicher Zweiklang, kein Signalton. Danach klingt er aus,
+    // bevor der Name faellt — wer im Wartezimmer sitzt, wird erst aufmerksam
+    // und hoert den Namen dann von Anfang an.
+    'gongStaerke'            => 0.16,  // 0.10 dezenter, 0.25 deutlicher
+    'gongPauseSekunden'      => 2,     // zwischen Gong und Name
+    'wiederholPauseSekunden' => 2,     // Atempause vor der Wiederholung
+
     // Welche Stimmen zur Verfuegung stehen, entscheidet allein das Geraet:
     // Eine Webseite kann keine Stimme mitbringen oder nachladen. Hier steht
     // nur, welche bevorzugt genommen wird, wenn es sie gibt — von der besten
@@ -49,6 +56,8 @@ return [
     //   Deutsch
     // und dort eine Stimme in "Premium" laden. Das ist der groesste
     // hoerbare Unterschied und kostet nichts.
+    // Die Ansage soll ruhig, klar und eine Spur langsamer als ein Gespraech
+    // klingen — angenehm auch beim zwanzigsten Mal am Tag.
     'stimme' => [
         'sprache'     => 'de-DE',
         'bevorzugt'   => [
@@ -56,8 +65,8 @@ return [
             'Helena', 'Katja', 'Anna', 'Petra', 'Marlene', 'Martina',
             'Google Deutsch', 'Hedda',
         ],
-        'tempo'       => 0.9,         // niedriger = deutlicher
-        'tonhoehe'    => 1.0,         // 0.9 tiefer, 1.1 heller
+        'tempo'       => 0.82,        // ruhig; 0.75 sehr langsam, 0.95 zuegig
+        'tonhoehe'    => 1.04,        // 0.95 dunkler, 1.10 heller
         'lautstaerke' => 1.0,
     ],
 

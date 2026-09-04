@@ -171,14 +171,22 @@ $k = konfig();
       audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
       melde('   AudioContext: ' + audioCtx.state, audioCtx.state === 'running' ? 'gut' : 'schlecht');
-      const t = audioCtx.currentTime;
-      const osz = audioCtx.createOscillator(), amp = audioCtx.createGain();
-      osz.type = 'sine'; osz.frequency.value = 784;
-      amp.gain.setValueAtTime(0.0001, t);
-      amp.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
-      amp.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
-      osz.connect(amp).connect(audioCtx.destination);
-      osz.start(t); osz.stop(t + 1.1);
+      // Derselbe weiche Zweiklang wie auf der Lautsprecherseite.
+      const jetzt = audioCtx.currentTime;
+      const klang = (t, hz, dauer, staerke) => {
+        for (const [faktor, anteil] of [[1, 1], [2, 0.17], [3, 0.05]]) {
+          const osz = audioCtx.createOscillator(), amp = audioCtx.createGain();
+          osz.type = 'sine';
+          osz.frequency.value = hz * faktor;
+          amp.gain.setValueAtTime(0.0001, t);
+          amp.gain.exponentialRampToValueAtTime(Math.max(0.0002, staerke * anteil), t + 0.05);
+          amp.gain.exponentialRampToValueAtTime(0.0001, t + dauer);
+          osz.connect(amp).connect(audioCtx.destination);
+          osz.start(t); osz.stop(t + dauer + 0.05);
+        }
+      };
+      klang(jetzt, 523.25, 2.0, 0.16);
+      klang(jetzt + 0.40, 698.46, 2.4, 0.147);
       melde('   Gong gestartet — jetzt müsste es klingen', 'gut');
     } catch (f) { melde('   Gong-Ausnahme: ' + f.message, 'schlecht'); }
   }

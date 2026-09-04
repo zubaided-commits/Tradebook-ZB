@@ -46,10 +46,32 @@ ungültig — der eigentliche Weg für einen Personalwechsel.
 | `config.beispiel.php` | Vorlage für `config.php` (nicht im Repository) |
 | `lautsprecher-starten.bat` | Startet `lautsprecher.php` am Empfangs-PC in einem eigenen Fenster |
 
+## Ablauf einer Ansage
+
+```
+Gong (weicher Zweiklang)  ──2 s──  Name  ──2 s──  Name (Wiederholung)
+```
+
+Der Gong ist ein Grundton mit zwei leisen Obertönen, zwei Töne im Abstand
+einer Quarte, weich einsetzend und lang ausklingend — freundlich statt
+alarmierend, auch beim zwanzigsten Mal am Tag. Er klingt aus, bevor der Name
+fällt: Wer im Wartezimmer sitzt, wird erst aufmerksam und hört den Namen dann
+von Anfang an. Die Wiederholung setzt zwei Sekunden nach dem **Ende** der
+ersten Ansage ein, nicht nach fester Uhr — der Abstand bleibt damit gleich,
+ob der Name kurz oder lang ist. Vor einer aufgenommenen Sprachdurchsage
+erklingt derselbe Gong. Alle drei Werte stehen in `config.php`
+(`gongStaerke`, `gongPauseSekunden`, `wiederholPauseSekunden`).
+
 ## Stimme und Aussprache
 
 Welche Stimmen zur Verfügung stehen, entscheidet allein das Gerät — eine
-Webseite kann keine mitbringen oder nachladen. Auf dem Startbildschirm des
+Webseite kann keine mitbringen oder nachladen. Eine bestimmte Studiostimme
+(Mila, Elevenlabs und Ähnliches) lässt sich deshalb nicht einbauen, ohne
+jeden Patientennamen zur Vertonung an einen externen Dienst zu senden — das
+wäre bei Gesundheitsdaten nach Art. 9 DSGVO ein eigener Auftragsverarbeiter
+mit allem, was dazugehört. Gewählt wird darum unter den Stimmen des Geräts,
+und die Ansage ist auf ruhig, klar und etwas langsamer als ein Gespräch
+eingestellt (`tempo` 0.82, `tonhoehe` 1.04). Auf dem Startbildschirm des
 Lautsprechers lässt sich unter den vorhandenen deutschen Stimmen auswählen;
 die Auswahl wird sofort vorgehört und auf dem Gerät gemerkt. Auf iPad und
 iPhone bringt es hörbar am meisten, unter *Einstellungen → Bedienungshilfen →
