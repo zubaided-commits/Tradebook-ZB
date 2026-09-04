@@ -103,6 +103,14 @@ $k = konfig();
   let letzteAufrufId = null, letzteDurchsageId = null;
   let fehlerZaehler = 0, sageUhren = [];
   let entriegelungsAudio = null;
+  // Safari kann eine SpeechSynthesisUtterance mitten im Sprechen (oder
+  // sogar davor) unbemerkt aus dem Speicher raeumen, wenn nirgendwo eine
+  // Referenz darauf gehalten wird — speak() kehrt sofort zurueck, und eine
+  // rein lokale Variable in der aufrufenden Funktion ist danach nichts
+  // mehr, das den Garbage Collector aufhaelt. Es wird kein Fehler
+  // ausgeloest, es kommt nur einfach kein Ton. Diese Variable haelt die
+  // jeweils aktuelle Ansage fest, bis sie fertig gesprochen ist.
+  let aktiveAnsage = null;
   // Beim allerersten Nachfragen wird der vorgefundene Stand nur uebernommen,
   // nicht angesagt — sonst wiederholt ein neu gestartetes Geraet einen alten
   // Aufruf. Danach wird jeder neue Aufruf angesagt, auch der erste echte.
@@ -164,6 +172,8 @@ $k = konfig();
     u.rate = konfig.stimme.tempo || 0.88;
     u.pitch = konfig.stimme.tonhoehe || 1.0;
     u.volume = konfig.stimme.lautstaerke || 1.0;
+    u.onend = u.onerror = () => { if (aktiveAnsage === u) aktiveAnsage = null; };
+    aktiveAnsage = u;   // Referenz halten, siehe Erklaerung oben
     speechSynthesis.speak(u);
   }
 
@@ -321,9 +331,9 @@ $k = konfig();
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       await audioCtx.resume();
-      const stumm = new SpeechSynthesisUtterance(' ');
-      stumm.volume = 0;
-      speechSynthesis.speak(stumm);
+      aktiveAnsage = new SpeechSynthesisUtterance(' ');
+      aktiveAnsage.volume = 0;
+      speechSynthesis.speak(aktiveAnsage);
     } catch (e) {}
 
     const w = konfig.wartezimmer.find((x) => x.id === raum);
