@@ -102,6 +102,7 @@ $k = konfig();
   let raum = null, tonFrei = false, audioCtx = null, stimme = null;
   let letzteAufrufId = null, letzteDurchsageId = null;
   let fehlerZaehler = 0, sageUhren = [];
+  let entriegelungsAudio = null;
   // Beim allerersten Nachfragen wird der vorgefundene Stand nur uebernommen,
   // nicht angesagt — sonst wiederholt ein neu gestartetes Geraet einen alten
   // Aufruf. Danach wird jeder neue Aufruf angesagt, auch der erste echte.
@@ -121,6 +122,25 @@ $k = konfig();
     const gemerkt = localStorage.getItem('praxisruf-raum');
     if (gemerkt) $('raumWahl').value = gemerkt;
   } catch (e) {}
+
+  /* ---------- Stummschalter umgehen (iOS/Safari) ---------- */
+  // Safari behandelt selbst erzeugten Ton (Web Audio API, Sprachausgabe)
+  // manchmal als "Umgebungsklang" und unterdrueckt ihn beim seitlichen
+  // Stummschalter des iPad/iPhone — obwohl echte Medienwiedergabe (ein
+  // <audio>-Element) davon unberuehrt bleibt. Ein kurzes, lautloses
+  // <audio>-Element wird darum genau im Klick — also innerhalb der vom
+  // Nutzer ausgeloesten Geste — abgespielt. Das stellt bei Safari auf die
+  // Kategorie "Wiedergabe" um, die den Stummschalter ignoriert; alle
+  // danach erzeugten Toene (Gong, Weckton, Sprachausgabe) profitieren
+  // davon mit.
+  const STUMM_WAV = 'data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
+
+  function stummschalterUmgehen() {
+    try {
+      entriegelungsAudio = entriegelungsAudio || new Audio(STUMM_WAV);
+      entriegelungsAudio.play().catch(() => {});
+    } catch (e) {}
+  }
 
   /* ---------- Sprachausgabe ---------- */
   function stimmeWaehlen() {
@@ -289,6 +309,11 @@ $k = konfig();
 
   /* ---------- Start ---------- */
   $('startKnopf').addEventListener('click', async () => {
+    // Als aller erste Handlung, noch synchron innerhalb der Klick-Geste —
+    // das ist bei Safari entscheidend, ein spaeterer Aufruf (z. B. nach
+    // einem await) wirkt nicht mehr zuverlaessig.
+    stummschalterUmgehen();
+
     raum = $('raumWahl').value;
     try { localStorage.setItem('praxisruf-raum', raum); } catch (e) {}
 
