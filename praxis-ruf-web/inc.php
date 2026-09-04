@@ -25,6 +25,11 @@ const TON_MAX_BYTES = 5242880;  // 5 MB je Durchsage
 const AUTH_COOKIE   = 'praxisruf_auth';
 const AUTH_TAGE     = 30;       // wie lange eine Anmeldung gilt
 
+// Sichtbar auf jeder Seite unten. Nach dem Hochladen einer neuen Fassung
+// laesst sich damit auf einen Blick pruefen, ob der Browser wirklich die
+// neue Datei zeigt und nicht eine zwischengespeicherte alte.
+const FASSUNG       = '2026-09-04-c';
+
 /* ------------------------------------------------------------------ *
  * Konfiguration
  * ------------------------------------------------------------------ */
@@ -160,6 +165,15 @@ function angemeldet(): bool
 
 function anmeldungVerlangen(): void
 {
+    // Angemeldete Seiten duerfen nirgends zwischengespeichert werden: nicht
+    // im Browser, nicht in einem Zwischenspeicher des Hosters. Sonst zeigt
+    // Safari nach dem Hochladen einer neuen Fassung weiter die alte — und
+    // nebenbei haetten Patientennamen nichts in einem Zwischenspeicher zu
+    // suchen.
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
     if (!angemeldet()) {
         header('Location: anmelden.php');
         exit;

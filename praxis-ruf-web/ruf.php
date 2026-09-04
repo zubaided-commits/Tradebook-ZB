@@ -148,6 +148,10 @@ $k = konfig();
   </div>
 </main>
 
+<p style="text-align:center;font-size:11px;opacity:.35;margin:14px 0 22px">
+  Fassung <?= h(FASSUNG) ?>
+</p>
+
 <div class="toast" id="toast"></div>
 
 <script>

@@ -82,7 +82,7 @@ $k = konfig();
   </div>
 </div>
 
-<div class="hinweis">Diese Seite geöffnet lassen. Zum Ändern des Wartezimmers die Seite neu laden.</div>
+<div class="hinweis">Diese Seite geöffnet lassen. Zum Ändern des Wartezimmers die Seite neu laden. &nbsp;·&nbsp; Fassung <?= h(FASSUNG) ?></div>
 
 <script>
 (() => {
@@ -102,7 +102,6 @@ $k = konfig();
   let raum = null, tonFrei = false, audioCtx = null, stimme = null;
   let letzteAufrufId = null, letzteDurchsageId = null;
   let fehlerZaehler = 0, sageUhren = [];
-  let entriegelungsAudio = null;
   // Safari kann eine SpeechSynthesisUtterance mitten im Sprechen (oder
   // sogar davor) unbemerkt aus dem Speicher raeumen, wenn nirgendwo eine
   // Referenz darauf gehalten wird — speak() kehrt sofort zurueck, und eine
@@ -143,10 +142,22 @@ $k = konfig();
   // davon mit.
   const STUMM_WAV = 'data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
 
-  function stummschalterUmgehen() {
+  // EIN einziges Element fuer alles, was ueber <audio> laeuft. iOS/Safari
+  // erteilt die Erlaubnis zum Abspielen naemlich dem Element, das waehrend
+  // der Nutzergeste gelaufen ist — nicht der Seite als Ganzes. Ein spaeter
+  // mit new Audio() erzeugtes Objekt darf ohne neue Geste nicht abspielen,
+  // sein play() wird stillschweigend abgelehnt. Darum wird dieses Element
+  // im Klick freigegeben und danach fuer jede Durchsage wiederverwendet.
+  const tonElement = new Audio();
+  tonElement.preload = 'auto';
+  tonElement.addEventListener('ended', () => lampe(''));
+  tonElement.addEventListener('error', () => lampe(''));
+
+  function tonFreigeben() {
     try {
-      entriegelungsAudio = entriegelungsAudio || new Audio(STUMM_WAV);
-      entriegelungsAudio.play().catch(() => {});
+      tonElement.src = STUMM_WAV;
+      const versprechen = tonElement.play();
+      if (versprechen && versprechen.catch) versprechen.catch(() => {});
     } catch (e) {}
   }
 
@@ -182,7 +193,12 @@ $k = konfig();
   function ansageAbbrechen() {
     sageUhren.forEach(clearTimeout);
     sageUhren = [];
-    try { speechSynthesis.cancel(); } catch (e) {}
+    // cancel() nur, wenn tatsaechlich etwas laeuft oder ansteht. Ein
+    // cancel() im Leerlauf bringt Safaris Sprachausgabe durcheinander —
+    // der naechste speak()-Aufruf bleibt dann ohne Fehlermeldung stumm.
+    try {
+      if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+    } catch (e) {}
   }
 
   function gong() {
@@ -255,10 +271,12 @@ $k = konfig();
     if (!tonFrei) return;
     ansageAbbrechen();
     lampe('spricht');
-    const ton = new Audio('api.php?was=ton&id=' + encodeURIComponent(id));
-    ton.addEventListener('ended', () => lampe(''));
-    ton.addEventListener('error', () => lampe(''));
-    ton.play().catch(() => lampe(''));
+    try {
+      tonElement.src = 'api.php?was=ton&id=' + encodeURIComponent(id);
+      tonElement.load();
+      const versprechen = tonElement.play();
+      if (versprechen && versprechen.catch) versprechen.catch(() => lampe(''));
+    } catch (e) { lampe(''); }
   }
 
   function lampe(art) {
@@ -322,21 +340,28 @@ $k = konfig();
     // Als aller erste Handlung, noch synchron innerhalb der Klick-Geste —
     // das ist bei Safari entscheidend, ein spaeterer Aufruf (z. B. nach
     // einem await) wirkt nicht mehr zuverlaessig.
-    stummschalterUmgehen();
+    tonFreigeben();
 
     raum = $('raumWahl').value;
     try { localStorage.setItem('praxisruf-raum', raum); } catch (e) {}
 
     tonFrei = true;
+    const w = konfig.wartezimmer.find((x) => x.id === raum);
+
+    // Die Bereitmeldung wird laut und mit echtem Text gesprochen, noch
+    // waehrend die Nutzergeste gilt. Das ist der zuverlaessigste Zeitpunkt,
+    // zu dem iOS eine Sprachausgabe zulaesst — und zugleich die Probe fuers
+    // Personal: Wer den Gong hoert, aber diesen Satz nicht, weiss sofort,
+    // dass auf diesem Geraet die Sprachausgabe fehlt. Eine lautlose
+    // Probe-Ansage taugt dafuer nicht: Safari behandelt sie teils als
+    // ueberhaupt keine Ansage, und der Ton bliebe spaeter stumm.
+    sprechen('Lautsprecher ' + (w ? w.name : '') + ' ist bereit.');
+
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       await audioCtx.resume();
-      aktiveAnsage = new SpeechSynthesisUtterance(' ');
-      aktiveAnsage.volume = 0;
-      speechSynthesis.speak(aktiveAnsage);
     } catch (e) {}
 
-    const w = konfig.wartezimmer.find((x) => x.id === raum);
     $('raumName').textContent = w ? w.name : raum;
     document.title = (w ? w.name : 'Lautsprecher') + ' — Praxis-Ruf';
 

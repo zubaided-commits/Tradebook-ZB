@@ -40,9 +40,24 @@ ungültig — der eigentliche Weg für einen Personalwechsel.
 | `api.php` | Schnittstelle: `stand`, `aufruf`, `durchsage`, `ton`, `leeren` |
 | `ruf.php` | Bedienseite der Ärztin, gemeinsame Sicht beider Sprechzimmer |
 | `lautsprecher.php` | Gerät im Wartezimmer, reine Tonausgabe |
+| `tonpruefung.php` | Diagnoseseite: prüft Gong, Sprachausgabe und Tondatei einzeln |
 | `anmelden.php` / `abmelden.php` | Zugang per gemeinsamem Passwort, 30 Tage gültig |
 | `config.beispiel.php` | Vorlage für `config.php` (nicht im Repository) |
 | `lautsprecher-starten.bat` | Startet `lautsprecher.php` am Empfangs-PC in einem eigenen Fenster |
+
+## Wenn kein Ton kommt
+
+`tonpruefung.php` im Browser des betroffenen Geräts öffnen. Die Seite probiert
+die drei Wege einzeln durch, auf denen der Lautsprecher Ton erzeugt — Gong
+(Web Audio), Sprachausgabe und Tondatei — jeweils einmal direkt auf
+Tastendruck und einmal drei Sekunden später, denn iOS behandelt beides
+unterschiedlich streng. Jeder Schritt wird sichtbar mitgeschrieben, samt
+Fehlermeldung und den auf dem Gerät vorhandenen Stimmen. Auf einem iPad gibt
+es keine Entwicklerwerkzeuge; ohne diese Seite bliebe nur Raten.
+
+Unten auf jeder Seite steht die Fassungsnummer. Nach dem Hochladen einer
+neuen Datei lässt sich damit prüfen, ob der Browser wirklich die neue Fassung
+zeigt und nicht eine zwischengespeicherte alte.
 
 ## Datenschutz in Kürze
 
