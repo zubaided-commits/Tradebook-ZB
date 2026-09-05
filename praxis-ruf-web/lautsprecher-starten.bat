@@ -7,7 +7,11 @@ rem Diese Datei per Verknuepfung in den Autostart-Ordner legen
 rem (Win + R, dann "shell:startup" eingeben).
 
 rem ---- HIER ANPASSEN ------------------------------------------------
-set ADRESSE=https://ihre-domain.de/praxisruf/lautsprecher.php
+rem  Domain und Ordnernamen durch die echten ersetzen.
+rem
+rem  GROSS- UND KLEINSCHREIBUNG BEACHTEN: Der Webserver unterscheidet sie.
+rem  Heisst der Ordner "Praxis-Ruf-web", fuehrt "praxis-ruf-web" ins Leere.
+set ADRESSE=https://IHRE-DOMAIN.de/ORDNERNAME/lautsprecher.php
 rem --------------------------------------------------------------------
 
 rem Eigenes Browser-Profil, getrennt vom normalen Empfangs-Profil. Darin

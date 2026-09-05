@@ -30,7 +30,7 @@ const AUTH_TAGE     = 30;       // wie lange eine Anmeldung gilt
 // Sichtbar auf jeder Seite unten. Nach dem Hochladen einer neuen Fassung
 // laesst sich damit auf einen Blick pruefen, ob der Browser wirklich die
 // neue Datei zeigt und nicht eine zwischengespeicherte alte.
-const FASSUNG       = '2026-09-05-e';
+const FASSUNG       = '2026-09-05-f';
 
 /* ------------------------------------------------------------------ *
  * Konfiguration
@@ -250,6 +250,25 @@ function istHttps(): bool
     return (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
 }
 
+/**
+ * Fuer welchen Pfad gilt das Anmelde-Cookie?
+ *
+ * Bisher stand dort '/' — die Anmeldung galt damit fuer die ganze Domain und
+ * wurde bei jedem Aufruf auch an die Praxis-Website mitgeschickt, die damit
+ * nichts zu tun hat. Ein Cookie ist ein Ausweis; er gehoert nur dorthin, wo
+ * er gebraucht wird. Der Pfad wird deshalb aus dem laufenden Skript
+ * abgeleitet und passt sich dem Ordner an, in dem das System liegt — egal
+ * wie er heisst.
+ */
+function keksPfad(): string
+{
+    $pfad = str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/')));
+    if ($pfad === '' || $pfad === '.' || $pfad[0] !== '/') {
+        return '/';
+    }
+    return rtrim($pfad, '/') . '/';
+}
+
 function authSignatur(string $wert): string
 {
     return hash_hmac('sha256', $wert, (string) konfig()['passwort']);
@@ -265,7 +284,7 @@ function anmelden(string $rolle): void
 
     setcookie(AUTH_COOKIE, $wert, [
         'expires'  => $ablauf,
-        'path'     => '/',
+        'path'     => keksPfad(),
         'secure'   => istHttps(),
         'httponly' => true,
         'samesite' => 'Lax',
@@ -276,7 +295,7 @@ function anmelden(string $rolle): void
 function abmelden(): void
 {
     setcookie(AUTH_COOKIE, '', [
-        'expires' => time() - 3600, 'path' => '/',
+        'expires' => time() - 3600, 'path' => keksPfad(),
         'secure' => istHttps(), 'httponly' => true, 'samesite' => 'Lax',
     ]);
     unset($_COOKIE[AUTH_COOKIE]);
