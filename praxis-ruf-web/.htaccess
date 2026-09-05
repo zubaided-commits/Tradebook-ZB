@@ -46,7 +46,10 @@ RewriteCond %{HTTP_USER_AGENT} (omgili|timpibot|webzio|pangubot|ai2bot|ccbot) [N
 RewriteCond %{HTTP_USER_AGENT} (curl|wget|python-requests|python-urllib|libwww) [NC,OR]
 RewriteCond %{HTTP_USER_AGENT} (okhttp|go-http-client|scrapy|phantomjs|nikto|sqlmap) [NC,OR]
 RewriteCond %{HTTP_USER_AGENT} ^$
-RewriteRule ^ - [F,L]
+#    404 statt 403: Ein "verboten" verraet, dass hier etwas liegt. Ein
+#    "nicht gefunden" sieht aus wie eine leere Adresse. Dieselbe Antwort
+#    gibt auch die Sperre in inc.php — beide Wege sollen gleich aussehen.
+RewriteRule ^ - [R=404,L]
 
 # 6) NUR AUS DER PRAXIS ERREICHBAR (optional, sehr wirksam)
 #

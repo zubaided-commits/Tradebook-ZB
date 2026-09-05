@@ -183,18 +183,30 @@ So liegt es auf dem Webspace:
 ```
 public/                     ← Wurzel der Website (bei IONOS oft so benannt)
   index.html …              ← die Praxis-Website — UNBERÜHRT
-  praxisruf/                ← das Aufrufsystem
+  termin/, img/, …          ← weitere Seiten — EBENFALLS UNBERÜHRT
+  praxis-ruf-web/           ← das Aufrufsystem
     .htaccess               ← wirkt nur ab hier abwärts
     inc.php, ruf.php, …
     daten/
 ```
+
+Nachgemessen mit einem echten Apache und genau diesem Aufbau:
+
+| Ordner | Googlebot | Browser der Praxis |
+|---|---|---|
+| `/` (Startseite) | **200** — normal indexiert | 200 |
+| `/termin/`, `/Intern/`, `/img/`, `/signatur/` | **200** — normal indexiert | 200 |
+| `/praxis-ruf-web/` | **404** — gesperrt | 200 |
+
+Nur das Aufrufsystem trägt die Suchmaschinen-Vorgabe `noindex`; alle anderen
+Ordner liefern keine solche Kopfzeile und bleiben ganz normal auffindbar.
 
 „public" heißt nur, dass dieser Ordner im Web ausgeliefert wird — es ist der
 normale Name des Wurzelverzeichnisses, keine Aussage über Schutz. Alles, was
 über die Domain erreichbar ist, liegt dort.
 
 Entscheidend ist die **Ebene darunter**: Die `.htaccess` gehört nach
-`public/praxisruf/`, **nicht** nach `public/`. Von dort wirkt sie nur für ihren
+`public/praxis-ruf-web/`, **nicht** nach `public/`. Von dort wirkt sie nur für ihren
 eigenen Ordner und alles darunter; `inc.php` wiederum wird ausschließlich von
 den Seiten des Aufrufsystems eingebunden. Die Praxis-Website in `public/`
 bleibt davon unberührt — läge die `.htaccess` dagegen direkt in `public/`,
@@ -215,7 +227,7 @@ entfernen.
 
 ### Nicht in die robots.txt eintragen
 
-Es liegt nahe, `Disallow: /praxisruf/` in die `robots.txt` der Domain zu
+Es liegt nahe, `Disallow: /praxis-ruf-web/` in die `robots.txt` der Domain zu
 schreiben. **Das wäre das Gegenteil von hilfreich.** Die `robots.txt` liegt
 öffentlich unter `ihre-domain.de/robots.txt` und kann von jedem gelesen
 werden — man würde die Adresse dort also selbst veröffentlichen. Der
@@ -223,7 +235,7 @@ werden — man würde die Adresse dort also selbst veröffentlichen. Der
 
 ### Der wirksamste Schritt: unratbarer Ordnername
 
-`/praxisruf/` errät ein Scanner in Sekunden. Ein Name wie `/pr-7k2m9x4q/`
+`/praxis-ruf-web/` errät ein Scanner in Sekunden. Ein Name wie `/pr-7k2m9x4q/`
 nicht. So geht es:
 
 1. Ordner auf dem Webspace umbenennen (im IONOS-Dateimanager oder per FTP).
