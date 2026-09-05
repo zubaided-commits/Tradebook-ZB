@@ -30,7 +30,7 @@ const AUTH_TAGE     = 30;       // wie lange eine Anmeldung gilt
 // Sichtbar auf jeder Seite unten. Nach dem Hochladen einer neuen Fassung
 // laesst sich damit auf einen Blick pruefen, ob der Browser wirklich die
 // neue Datei zeigt und nicht eine zwischengespeicherte alte.
-const FASSUNG       = '2026-09-05-b';
+const FASSUNG       = '2026-09-05-c';
 
 /* ------------------------------------------------------------------ *
  * Konfiguration
@@ -66,13 +66,16 @@ function konfig(): array
         'gongStaerke'          => 0.16,   // leiser und weicher als ein Signalton
         'gongPauseSekunden'    => 2,      // Gong klingt aus, dann der Name
         'wiederholPauseSekunden' => 2,    // Atempause vor der Wiederholung
+        'phrasenPauseSekunden' => 0.55,   // Atempause zwischen Name und Zimmer
         // Bevorzugt werden weibliche deutsche Stimmen, die es auf den
         // jeweiligen Geraeten wirklich gibt — von der besten zur einfachsten.
         // Welche vorhanden sind, entscheidet allein das Geraet; auf der
         // Lautsprecherseite laesst sich unter den vorhandenen auswaehlen.
-        // Ruhig, klar und etwas langsamer als ein Gespraech.
-        'stimme'               => ['sprache' => 'de-DE', 'tempo' => 0.82,
-                                   'tonhoehe' => 1.04, 'lautstaerke' => 1.0,
+        // Ruhig, klar und etwas langsamer als ein Gespraech. Die Tonhoehe
+        // bleibt bewusst unveraendert: Eine verschobene Tonhoehe klingt bei
+        // diesen Stimmen blechern und damit noch kuenstlicher.
+        'stimme'               => ['sprache' => 'de-DE', 'tempo' => 0.80,
+                                   'tonhoehe' => 1.0, 'lautstaerke' => 1.0,
                                    // Windows zuerst: Katja ist die beste
                                    // weibliche deutsche Stimme, die oertlich
                                    // auf dem Rechner laeuft. Stimmen, die

@@ -162,3 +162,42 @@ function fuerAussprache(string $name, array $zusatz = []): string
     }
     return implode('', $teile);
 }
+
+/**
+ * Zahlen als Wort. Eine deutsche Stimme liest "Sprechzimmer 1" je nach
+ * Zusammenhang als "Sprechzimmer erste" — eine Ordnungszahl, weil dort im
+ * Deutschen oft eine steht ("am 1. Mai"). Richtig waere "Sprechzimmer eins".
+ * Fuer die Ansage wird die Ziffer darum ausgeschrieben; angezeigt bleibt sie.
+ */
+function zahlwort(int $n): string
+{
+    $eins = ['null', 'eins', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben',
+             'acht', 'neun', 'zehn', 'elf', 'zwölf', 'dreizehn', 'vierzehn',
+             'fünfzehn', 'sechzehn', 'siebzehn', 'achtzehn', 'neunzehn'];
+    $zehn = [2 => 'zwanzig', 'dreißig', 'vierzig', 'fünfzig',
+             'sechzig', 'siebzig', 'achtzig', 'neunzig'];
+
+    if ($n < 0 || $n > 99) {
+        return (string) $n;          // nichts, was in einem Raumnamen steht
+    }
+    if ($n < 20) {
+        return $eins[$n];
+    }
+    $z = intdiv($n, 10);
+    $e = $n % 10;
+    if ($e === 0) {
+        return $zehn[$z];
+    }
+    // 21 = "einundzwanzig", nicht "einsundzwanzig"
+    return ($e === 1 ? 'ein' : $eins[$e]) . 'und' . $zehn[$z];
+}
+
+/** Schreibt alleinstehende Zahlen in einem Text als Wort aus. */
+function zahlenAusschreiben(string $text): string
+{
+    return preg_replace_callback(
+        '/(?<![\d\p{L}])(\d{1,2})(?![\d\p{L}])/u',
+        static fn (array $t): string => zahlwort((int) $t[1]),
+        $text
+    ) ?? $text;
+}

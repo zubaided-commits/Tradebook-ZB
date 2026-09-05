@@ -112,6 +112,10 @@ switch ($was) {
             'ansage'       => fuerAussprache($gezeigt, $k['aussprache']),
             'anrede'       => $anrede,
             'sprechzimmer' => $zimmerName,
+            // Fuer die Stimme mit ausgeschriebener Zahl: "Sprechzimmer 1"
+            // liest eine deutsche Stimme sonst als "Sprechzimmer erste".
+            // Angezeigt bleibt ueberall die Ziffer.
+            'zimmerAnsage' => zahlenAusschreiben($zimmerName),
             'kurz'         => $kurz,
             'wartezimmer'  => $ziel,
             'wiederholen'  => (bool) $k['wiederholen'],

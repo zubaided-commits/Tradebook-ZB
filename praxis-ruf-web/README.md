@@ -139,6 +139,19 @@ die Auswahl wird sofort vorgehört und auf dem Gerät gemerkt. Auf iPad und
 iPhone bringt es hörbar am meisten, unter *Einstellungen → Bedienungshilfen →
 Gesprochene Inhalte → Stimmen → Deutsch* eine Stimme in „Premium" zu laden.
 
+Die Ansage wird in **zwei Bögen** gesprochen — erst der Name, dann eine
+halbe Sekunde Atempause, dann das Zimmer. Das ist der hörbarste Unterschied
+zwischen „abgelesen" und „gesprochen", der sich ohne eine andere Stimme
+herausholen lässt: Jeder Bogen bekommt eine eigene Sprachmelodie mit eigenem
+Anfang und Ende, statt in einem Zug heruntergelesen zu werden
+(`phrasenPauseSekunden`). Die Tonhöhe bleibt bei 1.0 — sie zu verschieben
+klingt bei diesen Stimmen blechern, nicht wärmer.
+
+Zahlen werden für die Ansage ausgeschrieben: Aus „Sprechzimmer 1" wird
+gesprochen „Sprechzimmer eins". Ohne das liest eine deutsche Stimme die
+Ziffer als Ordnungszahl — „Sprechzimmer erste" —, weil dort im Deutschen oft
+eine steht („am 1. Mai"). Angezeigt bleibt überall die Ziffer.
+
 Eine deutsche Stimme liest deutsche Rechtschreibung — bei Namen aus dem
 Persischen, Dari, Paschto und Arabischen geht das schief: `Z` klingt wie
 „ts", `J` wie in „ja", `sh` und `q` kennt das Deutsche so nicht. `aussprache.php`

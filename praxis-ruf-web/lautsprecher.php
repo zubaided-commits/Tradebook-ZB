@@ -90,7 +90,11 @@ $k = konfig();
   'use strict';
   const $ = (id) => document.getElementById(id);
   const konfig = <?= json_encode([
-      'wartezimmer'     => $k['wartezimmer'],
+      'wartezimmer'     => array_map(static fn (array $w): array => $w + [
+          // "Wartezimmer 1" spricht eine deutsche Stimme sonst als
+          // "Wartezimmer erste" aus.
+          'ansage' => zahlenAusschreiben((string) $w['name']),
+      ], $k['wartezimmer']),
       'gong'            => (bool) $k['gong'],
       'stimme'          => $k['stimme'],
       'wachton'         => (bool) $k['wachton'],
@@ -101,6 +105,7 @@ $k = konfig();
       'anzeigeDauer'    => (int) $k['anzeigeDauerSekunden'],
       'gongPause'       => (float) $k['gongPauseSekunden'],
       'wiederholPause'  => (float) $k['wiederholPauseSekunden'],
+      'phrasenPause'    => (float) $k['phrasenPauseSekunden'],
   ], JSON_UNESCAPED_UNICODE) ?>;
 
   const TAKT_MS = 2000;          // so oft wird nachgefragt
@@ -108,6 +113,8 @@ $k = konfig();
   // erst nach einer Atempause ein. Beide Werte stehen in config.php.
   const GONGPAUSE_MS      = Math.round(Math.max(0, konfig.gongPause || 2) * 1000);
   const WIEDERHOLPAUSE_MS = Math.round(Math.max(0, konfig.wiederholPause || 2) * 1000);
+  // Die kurze Atempause mitten in der Ansage, zwischen Namen und Zimmer.
+  const PHRASENPAUSE_MS   = Math.round(Math.max(0, konfig.phrasenPause || 0.5) * 1000);
   // So alt darf ein Aufruf hoechstens sein, wenn das Geraet ihn zum ersten
   // Mal sieht — sonst wird er stillschweigend uebergangen.
   const ALTERSGRENZE_S = Math.max(20, konfig.anzeigeDauer || 45);
@@ -293,8 +300,26 @@ $k = konfig();
         if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
       } catch (e) {}
       tonFrei = true;
-      sprechen('Frau Subaida Jar, bitte in Sprechzimmer eins.');
+      sprechenFolge(['Frau Subaida Jar', 'bitte in Sprechzimmer eins.']);
     });
+  }
+
+  // Eine Ansage in Teilen sprechen, mit einer Atempause dazwischen. Aus
+  // einem durchlaufenden Satz wird so ein Sprechen in zwei Boegen — erst
+  // der Name, dann das Zimmer. Jeder Teil bekommt eine eigene Sprachmelodie
+  // mit eigenem Anfang und Ende, statt in einem Zug heruntergelesen zu
+  // werden. Das ist der groesste Unterschied zwischen "abgelesen" und
+  // "gesprochen", den sich ohne andere Stimme herausholen laesst.
+  function sprechenFolge(teile, fertig) {
+    let i = 0;
+    const weiter = () => {
+      if (i >= teile.length) { if (fertig) fertig(); return; }
+      sprechen(teile[i++], () => {
+        if (i >= teile.length) { if (fertig) fertig(); return; }
+        sageUhren.push(setTimeout(weiter, PHRASENPAUSE_MS));
+      });
+    };
+    weiter();
   }
 
   function sprechen(text, fertig) {
@@ -468,17 +493,20 @@ $k = konfig();
     // sie — etwa bei einem Aufruf aus einer aelteren Fassung —, wird der
     // Name genommen, wie er ist.
     const gesprochen = ((a.anrede ? a.anrede + ' ' : '') + (a.ansage || a.name)).trim();
-    const satz = gesprochen + ', bitte in ' + a.sprechzimmer + '.';
+    // In zwei Boegen, mit Atempause dazwischen: erst der Name, dann das
+    // Zimmer. Die Zahl im Zimmernamen ist ausgeschrieben — sonst sagt eine
+    // deutsche Stimme "Sprechzimmer erste" statt "Sprechzimmer eins".
+    const teile = [gesprochen, 'bitte in ' + (a.zimmerAnsage || a.sprechzimmer) + '.'];
 
     gong();
     // Der Gong klingt aus, dann folgt die Ansage — nicht uebereinander.
     sageUhren.push(setTimeout(() => {
-      sprechen(satz, () => {
+      sprechenFolge(teile, () => {
         if (a.wiederholen === false) { fertig(); return; }
         // Die Wiederholung setzt erst nach einer Atempause ein, gemessen
         // ab dem Ende der ersten Ansage — nicht nach fester Uhr. So bleibt
         // der Abstand gleich, ob der Name kurz oder lang ist.
-        sageUhren.push(setTimeout(() => sprechen(satz, fertig), WIEDERHOLPAUSE_MS));
+        sageUhren.push(setTimeout(() => sprechenFolge(teile, fertig), WIEDERHOLPAUSE_MS));
       });
     }, GONGPAUSE_MS));
   }
@@ -650,7 +678,7 @@ $k = konfig();
     // dass auf diesem Geraet die Sprachausgabe fehlt. Eine lautlose
     // Probe-Ansage taugt dafuer nicht: Safari behandelt sie teils als
     // ueberhaupt keine Ansage, und der Ton bliebe spaeter stumm.
-    sprechen('Lautsprecher ' + (w ? w.name : '') + ' ist bereit.');
+    sprechen('Lautsprecher ' + (w ? (w.ansage || w.name) : '') + ' ist bereit.');
 
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();

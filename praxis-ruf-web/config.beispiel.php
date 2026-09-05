@@ -52,6 +52,13 @@ return [
     'gongPauseSekunden'      => 2,     // zwischen Gong und Name
     'wiederholPauseSekunden' => 2,     // Atempause vor der Wiederholung
 
+    // Die Ansage wird in zwei Boegen gesprochen — erst der Name, dann das
+    // Zimmer — mit dieser Atempause dazwischen. Das ist der Unterschied
+    // zwischen "abgelesen" und "gesprochen": Jeder Teil bekommt eine eigene
+    // Sprachmelodie. Groesser als 0.8 klingt zerstueckelt, kleiner als 0.3
+    // verschluckt die Wirkung.
+    'phrasenPauseSekunden'   => 0.55,
+
     // Welche Stimmen zur Verfuegung stehen, entscheidet allein das Geraet:
     // Eine Webseite kann keine Stimme mitbringen oder nachladen. Hier steht
     // nur, welche bevorzugt genommen wird, wenn es sie gibt — von der besten
@@ -72,8 +79,10 @@ return [
             'Helena', 'Katja', 'Anna', 'Petra', 'Marlene', 'Martina',
             'Google Deutsch', 'Hedda',
         ],
-        'tempo'       => 0.82,        // ruhig; 0.75 sehr langsam, 0.95 zuegig
-        'tonhoehe'    => 1.04,        // 0.95 dunkler, 1.10 heller
+        'tempo'       => 0.80,        // ruhig; 0.75 sehr langsam, 0.95 zuegig
+        // Am besten bei 1.0 lassen: Eine verschobene Tonhoehe klingt bei
+        // diesen Stimmen blechern und damit kuenstlicher, nicht waermer.
+        'tonhoehe'    => 1.0,
         'lautstaerke' => 1.0,
     ],
 
