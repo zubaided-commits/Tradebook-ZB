@@ -27,12 +27,19 @@ return [
     'anzeigeDauerSekunden' => 45,     // solange gilt ein Aufruf als aktuell
     'verlaufDauerMinuten'  => 10,     // danach verschwinden die Namen von selbst
 
-    // Haelt Bluetooth-Lautsprecher wach. Viele Funklautsprecher (JBL & Co.)
-    // schalten sich nach 10-20 Minuten Stille selbst ab; dann wird der naechste
-    // Aufruf nicht mehr gehoert. Ein sehr leiser, tiefer Ton alle 60 Sekunden
-    // verhindert das und haelt zugleich die Funkstrecke wach, damit die ersten
-    // Silben nicht abgeschnitten werden.
-    // Bei einem Lautsprecher am Kabel wird das nicht gebraucht: false.
+    // Haelt zweierlei wach:
+    //
+    // 1. Den Lautsprecher. Viele Funklautsprecher (JBL & Co.) schalten sich
+    //    nach 10-20 Minuten Stille selbst ab; dann wird der naechste Aufruf
+    //    nicht mehr gehoert.
+    // 2. Die Seite selbst. Ist das Browserfenster minimiert oder verdeckt,
+    //    bremst der Browser nach wenigen Minuten alle Zeitgeber auf einen
+    //    Aufruf pro Minute herunter — der Aufruf kaeme zu spaet oder gar
+    //    nicht. Seiten, die Ton ausgeben, sind davon ausgenommen.
+    //
+    // Dafuer laeuft ein sehr leiser, tiefer Ton dauerhaft in Schleife, im
+    // Raum nicht zu hoeren. Nur abschalten, wenn das Fenster immer sichtbar
+    // bleibt UND der Lautsprecher am Kabel haengt.
     'wachton'         => true,
     'wachtonSekunden' => 60,     // Abstand zwischen zwei Wecktoenen
     'wachtonHertz'    => 60,     // tief genug, um nicht zu stoeren

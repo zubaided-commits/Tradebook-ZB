@@ -52,6 +52,14 @@ ungültig — der eigentliche Weg für einen Personalwechsel.
 Gong (weicher Zweiklang)  ──2 s──  Name  ──2 s──  Name (Wiederholung)
 ```
 
+Rufen **beide Sprechzimmer gleichzeitig**, fällt die zweite Ansage der ersten
+nicht ins Wort: Sie wird eingereiht und beginnt erst, wenn die erste samt
+Wiederholung fertig ist. Das ist nicht nur eine Frage der Höflichkeit — der
+Server merkt sich als „aktuell" immer nur *einen* Aufruf, sodass bei zwei
+Aufrufen innerhalb derselben zwei Sekunden der erste früher schlicht
+verlorenging. Das Gerät liest deshalb die Verlaufsliste statt nur den
+aktuellen Aufruf und sagt jeden an, den es noch nicht kennt.
+
 Der Gong ist ein Grundton mit zwei leisen Obertönen, zwei Töne im Abstand
 einer Quarte, weich einsetzend und lang ausklingend — freundlich statt
 alarmierend, auch beim zwanzigsten Mal am Tag. Er klingt aus, bevor der Name
@@ -61,6 +69,19 @@ ersten Ansage ein, nicht nach fester Uhr — der Abstand bleibt damit gleich,
 ob der Name kurz oder lang ist. Vor einer aufgenommenen Sprachdurchsage
 erklingt derselbe Gong. Alle drei Werte stehen in `config.php`
 (`gongStaerke`, `gongPauseSekunden`, `wiederholPauseSekunden`).
+
+## Fenster minimiert — wach bleiben
+
+Ist das Browserfenster minimiert oder ganz verdeckt, bremst der Browser nach
+wenigen Minuten alle Zeitgeber auf einen Aufruf pro Minute herunter; ein
+Patientenaufruf käme dann verspätet oder gar nicht. Wovon der Browser eine
+Ausnahme macht: Seiten, die gerade Ton ausgeben. Im Betrieb läuft darum
+dauerhaft ein sehr leiser, tiefer Ton in Schleife (`wachton`). Er ist im Raum
+nicht zu hören, hält die Seite aber wach — und nebenbei auch einen
+Bluetooth-Lautsprecher, der sich sonst nach einigen Minuten Stille abschaltet.
+
+Das Fenster trotzdem sichtbar zu lassen, bleibt der sicherste Weg;
+`lautsprecher-starten.bat` legt es dafür klein in eine Bildschirmecke.
 
 ## Stimme und Aussprache
 

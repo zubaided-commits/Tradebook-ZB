@@ -98,6 +98,7 @@ $k = konfig();
       'wachtonHertz'    => (float) $k['wachtonHertz'],
       'wachtonStaerke'  => (float) $k['wachtonStaerke'],
       'gongStaerke'     => (float) $k['gongStaerke'],
+      'anzeigeDauer'    => (int) $k['anzeigeDauerSekunden'],
       'gongPause'       => (float) $k['gongPauseSekunden'],
       'wiederholPause'  => (float) $k['wiederholPauseSekunden'],
   ], JSON_UNESCAPED_UNICODE) ?>;
@@ -107,8 +108,14 @@ $k = konfig();
   // erst nach einer Atempause ein. Beide Werte stehen in config.php.
   const GONGPAUSE_MS      = Math.round(Math.max(0, konfig.gongPause || 2) * 1000);
   const WIEDERHOLPAUSE_MS = Math.round(Math.max(0, konfig.wiederholPause || 2) * 1000);
+  // So alt darf ein Aufruf hoechstens sein, wenn das Geraet ihn zum ersten
+  // Mal sieht — sonst wird er stillschweigend uebergangen.
+  const ALTERSGRENZE_S = Math.max(20, konfig.anzeigeDauer || 45);
   let raum = null, tonFrei = false, audioCtx = null, stimme = null;
-  let letzteAufrufId = null, letzteDurchsageId = null;
+  let letzteDurchsageId = null;
+  // Welche Aufrufe schon angesagt wurden — nach Kennung, damit keiner
+  // doppelt kommt und keiner verlorengeht.
+  let angesagt = new Set();
   let fehlerZaehler = 0, sageUhren = [];
   // Safari kann eine SpeechSynthesisUtterance mitten im Sprechen (oder
   // sogar davor) unbemerkt aus dem Speicher raeumen, wenn nirgendwo eine
@@ -161,6 +168,28 @@ $k = konfig();
   // im Klick freigegeben und danach fuer jede Durchsage wiederverwendet.
   const tonElement = new Audio();
   tonElement.preload = 'auto';
+
+  // Ist das Fenster minimiert oder verdeckt, bremst der Browser nach
+  // wenigen Minuten alle Zeitgeber auf einen Aufruf pro Minute herunter —
+  // ein Patientenaufruf kaeme dann bis zu eine Minute zu spaet oder gar
+  // nicht. Wovon der Browser eine Ausnahme macht: Seiten, die gerade Ton
+  // ausgeben. Darum laeuft im Betrieb dauerhaft ein sehr leiser, tiefer
+  // Ton in Schleife. Er ist im Raum nicht zu hoeren, haelt die Seite aber
+  // wach — und nebenbei auch einen Bluetooth-Lautsprecher, der sich sonst
+  // nach einigen Minuten Stille abschaltet.
+  const WACH_WAV = 'data:audio/wav;base64,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';
+  const wachElement = new Audio();
+  wachElement.preload = 'auto';
+  wachElement.loop = true;
+
+  function wachHaltenTon() {
+    if (!konfig.wachton) return;
+    try {
+      wachElement.src = WACH_WAV;
+      const v = wachElement.play();
+      if (v && v.catch) v.catch(() => {});
+    } catch (e) {}
+  }
   tonElement.addEventListener('ended', () => tonFertig());
   tonElement.addEventListener('error', () => tonFertig());
 
@@ -241,6 +270,13 @@ $k = konfig();
       try { localStorage.setItem('praxisruf-stimme', $('stimmWahl').value); } catch (e) {}
       stimmeWaehlen();
       // Sofort vorhoeren — das Antippen des Auswahlfelds gilt als Geste.
+      // Eine noch laufende Probe wird beendet, damit bei mehrfachem Waehlen
+      // nicht zwei Stimmen durcheinanderreden. cancel() aber nur, wenn
+      // wirklich etwas laeuft: im Leerlauf bringt es manche Browser aus dem
+      // Tritt, und der naechste Versuch bliebe stumm.
+      try {
+        if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+      } catch (e) {}
       tonFrei = true;
       sprechen('Frau Subaida Jar, bitte in Sprechzimmer eins.');
     });
@@ -279,21 +315,6 @@ $k = konfig();
     speechSynthesis.speak(u);
   }
 
-  // Beendet die laufende Ansage UND geloescht die noch geplanten Uhren,
-  // damit nach einem neuen Aufruf nicht der vorherige Name nachklingt.
-  function ansageAbbrechen() {
-    sageUhren.forEach(clearTimeout);
-    sageUhren = [];
-    ansageLaeuft = false;
-    try { tonElement.pause(); } catch (e) {}
-    // cancel() nur, wenn tatsaechlich etwas laeuft oder ansteht. Ein
-    // cancel() im Leerlauf bringt Safaris Sprachausgabe durcheinander —
-    // der naechste speak()-Aufruf bleibt dann ohne Fehlermeldung stumm.
-    try {
-      if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
-    } catch (e) {}
-  }
-
   // Ein einzelner Ton klingt nach Piepser. Gespielt wird darum ein Grundton
   // mit zwei leisen Obertoenen — das ergibt einen vollen, weichen Klang wie
   // bei einem Glockenspiel. Der Einsatz ist bewusst weich (kein Knacken),
@@ -316,11 +337,16 @@ $k = konfig();
   // Zwei Toene im Abstand einer Quarte, aufsteigend und ineinander
   // ausklingend: ruhig und freundlich statt alarmierend — ein Klang, den
   // man den ganzen Tag ueber immer wieder hoeren kann.
-  function gong() {
+  async function gong() {
     if (!tonFrei || !konfig.gong) return;
     try {
       audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+      // Erst abwarten, bis der Tonkanal wirklich laeuft. Frueher wurden die
+      // Toene sofort eingeplant; war der Kanal in dem Moment noch angehalten,
+      // verfiel die Einplanung und der Gong blieb aus.
+      if (audioCtx.state === 'suspended') {
+        try { await audioCtx.resume(); } catch (e) {}
+      }
       const jetzt = audioCtx.currentTime;
       const staerke = Math.min(Math.max(konfig.gongStaerke || 0.16, 0.01), 0.5);
       klangGeben(jetzt,        523.25, 2.0, staerke);          // C5
@@ -363,15 +389,46 @@ $k = konfig();
     wachtonUhr = setInterval(wachtonSpielen, abstand);
   }
 
-  /* ---------- Aufruf und Durchsage ---------- */
-  function aufrufAnsagen(a) {
-    const voll = ((a.anrede ? a.anrede + ' ' : '') + a.name).trim();
-    $('letzter').textContent = 'zuletzt: ' + voll;
+  /* ---------- Warteschlange ---------- */
+  // Rufen beide Sprechzimmer fast gleichzeitig, darf die zweite Ansage der
+  // ersten nicht ins Wort fallen. Jede Ansage wird darum eingereiht und
+  // erst begonnen, wenn die vorige samt ihrer Wiederholung fertig ist.
+  let warteschlange = [];
+  let laeuftGerade  = false;
+  let tonFertigRuf  = null;   // Rueckmeldung der gerade laufenden Aufnahme
+
+  function einreihen(auftrag) {
+    warteschlange.push(auftrag);
+    naechsteAnsage();
+  }
+
+  function naechsteAnsage() {
+    if (laeuftGerade) return;
+    const auftrag = warteschlange.shift();
+    if (!auftrag) { ansageLaeuft = false; lampe(''); return; }
+
+    laeuftGerade = true;
+    ansageLaeuft = true;
     lampe('spricht');
 
-    ansageAbbrechen();
-    ansageLaeuft = true;
-    gong();
+    let fertigGemeldet = false;
+    const fertig = () => {
+      if (fertigGemeldet) return;      // onend und Uhr koennen beide kommen
+      fertigGemeldet = true;
+      laeuftGerade = false;
+      // Zwischen zwei Ansagen dieselbe Atempause wie vor einer Wiederholung,
+      // damit sie nicht ineinanderlaufen.
+      sageUhren.push(setTimeout(naechsteAnsage, WIEDERHOLPAUSE_MS));
+    };
+
+    if (auftrag.art === 'durchsage') durchsageSpielen(auftrag.id, fertig);
+    else                            aufrufAnsagen(auftrag.a, fertig);
+  }
+
+  /* ---------- Aufruf und Durchsage ---------- */
+  function aufrufAnsagen(a, fertig) {
+    const voll = ((a.anrede ? a.anrede + ' ' : '') + a.name).trim();
+    $('letzter').textContent = 'zuletzt: ' + voll;
 
     // Angezeigt wird der echte Name, gesprochen die fuer eine deutsche
     // Stimme umgeschriebene Fassung (aus 'Zubaida' wird 'Subaida'). Fehlt
@@ -380,28 +437,24 @@ $k = konfig();
     const gesprochen = ((a.anrede ? a.anrede + ' ' : '') + (a.ansage || a.name)).trim();
     const satz = gesprochen + ', bitte in ' + a.sprechzimmer + '.';
 
-    const schluss = () => { ansageLaeuft = false; lampe(''); };
-
+    gong();
     // Der Gong klingt aus, dann folgt die Ansage — nicht uebereinander.
     sageUhren.push(setTimeout(() => {
       sprechen(satz, () => {
-        if (a.wiederholen === false) { schluss(); return; }
+        if (a.wiederholen === false) { fertig(); return; }
         // Die Wiederholung setzt erst nach einer Atempause ein, gemessen
         // ab dem Ende der ersten Ansage — nicht nach fester Uhr. So bleibt
         // der Abstand gleich, ob der Name kurz oder lang ist.
-        sageUhren.push(setTimeout(() => sprechen(satz, schluss), WIEDERHOLPAUSE_MS));
+        sageUhren.push(setTimeout(() => sprechen(satz, fertig), WIEDERHOLPAUSE_MS));
       });
     }, GONGPAUSE_MS));
   }
 
   // Auch vor einer gesprochenen Durchsage geht der Gong voran: Wer im
-  // Wartezimmer sitzt, wird erst aufmerksam und hoert dann die Ansage von
+  // Wartezimmer sitzt, wird erst aufmerksam und hoert die Ansage dann von
   // Anfang an, statt die ersten Worte zu verpassen.
-  function durchsageSpielen(id) {
-    if (!tonFrei) return;
-    ansageAbbrechen();
-    ansageLaeuft = true;
-    lampe('spricht');
+  function durchsageSpielen(id, fertig) {
+    tonFertigRuf = fertig;
     gong();
     sageUhren.push(setTimeout(() => {
       try {
@@ -410,10 +463,17 @@ $k = konfig();
         const versprechen = tonElement.play();
         if (versprechen && versprechen.catch) versprechen.catch(tonFertig);
       } catch (e) { tonFertig(); }
+      // Faengt die Aufnahme gar nicht erst an oder meldet sie kein Ende,
+      // bleibt die Warteschlange sonst fuer immer stehen.
+      sageUhren.push(setTimeout(tonFertig, 90000));
     }, GONGPAUSE_MS));
   }
 
-  function tonFertig() { ansageLaeuft = false; lampe(''); }
+  function tonFertig() {
+    const ruf = tonFertigRuf;
+    tonFertigRuf = null;
+    if (ruf) ruf();
+  }
 
   function lampe(art) {
     $('lampe').className = 'lampe' + (art ? ' ' + art : '');
@@ -436,16 +496,29 @@ $k = konfig();
       if ($('lampe').className === 'lampe fehler') lampe('');
       $('lage').textContent = 'verbunden';
 
-      if (d.aufruf && d.aufruf.id !== letzteAufrufId) {
-        letzteAufrufId = d.aufruf.id;
-        const fuerUns = d.aufruf.wartezimmer === 'alle' || d.aufruf.wartezimmer === raum;
-        if (!ersterDurchlauf && fuerUns) aufrufAnsagen(d.aufruf);
+      // Nicht nur der zuletzt gemeldete Aufruf wird angesehen, sondern die
+      // ganze Liste: Der Server merkt sich als "aktuell" immer nur einen
+      // Aufruf. Rufen beide Sprechzimmer innerhalb derselben zwei Sekunden,
+      // ueberschreibt der zweite den ersten, und der erste waere nie
+      // angesagt worden. Im Verlauf stehen beide.
+      const liste = Array.isArray(d.verlauf) ? d.verlauf.slice().reverse() : [];
+      for (const a of liste) {
+        if (!a || !a.id || angesagt.has(a.id)) continue;
+        angesagt.add(a.id);
+        if (ersterDurchlauf) continue;          // beim Start nichts nachholen
+        if (a.wartezimmer !== 'alle' && a.wartezimmer !== raum) continue;
+        // Ein Aufruf, der beim ersten Sehen schon alt ist, wird nicht mehr
+        // ausgerufen — etwa nach einer Unterbrechung der Verbindung.
+        if (d.zeit && a.zeit && (d.zeit - a.zeit) > ALTERSGRENZE_S) continue;
+        einreihen({ art: 'aufruf', a });
       }
+      // Die Liste ist begrenzt; alte Kennungen muessen nicht ewig mitlaufen.
+      if (angesagt.size > 200) angesagt = new Set(liste.map((a) => a && a.id));
 
       if (d.durchsage && d.durchsage.id !== letzteDurchsageId) {
         letzteDurchsageId = d.durchsage.id;
         const fuerUns = d.durchsage.ziel === 'alle' || d.durchsage.ziel === raum;
-        if (!ersterDurchlauf && fuerUns) durchsageSpielen(d.durchsage.id);
+        if (!ersterDurchlauf && fuerUns) einreihen({ art: 'durchsage', id: d.durchsage.id });
       }
 
       ersterDurchlauf = false;
@@ -505,6 +578,7 @@ $k = konfig();
     $('betrieb').classList.remove('weg');
 
     wachHalten();
+    wachHaltenTon();      // Dauerton: haelt Seite und Lautsprecher wach
     wachtonStarten();
     gong();                         // kurze Probe: der Lautsprecher ist zu hören
     nachfragen();
