@@ -70,6 +70,28 @@ ob der Name kurz oder lang ist. Vor einer aufgenommenen Sprachdurchsage
 erklingt derselbe Gong. Alle drei Werte stehen in `config.php`
 (`gongStaerke`, `gongPauseSekunden`, `wiederholPauseSekunden`).
 
+## Nach einer Unterbrechung
+
+War die Verbindung weg oder der Browser zu, wird der Rückstand **nicht**
+nachgeholt. Das ist Absicht: Hört die Praxis nichts, ruft sie denselben
+Patienten mehrfach — käme die Verbindung zurück und das Gerät arbeitete alles
+ab, folgte eine Kette von Ansagen, die niemanden mehr betrifft und die im
+Wartezimmer nur verwirrt.
+
+Stattdessen:
+
+* **Beim Öffnen der Seite** wird gar nichts nachgeholt.
+* **Nach einer Unterbrechung** (länger als 15 s ohne Antwort) wird nur der
+  *jüngste* Aufruf ausgerufen, und auch der nur, wenn er noch aktuell ist.
+  Die Anzeige nennt für eine halbe Minute, wie viele ältere Aufrufe
+  übersprungen wurden.
+* **Mehrfach derselbe Name** im selben Schwung wird einmal ausgerufen.
+* **Staut sich die Schlange**, zählen die neuesten drei; wer beim Drankommen
+  älter als zwei Minuten ist, wird übergangen.
+
+Im laufenden Betrieb ändert das nichts — dort wird jeder Aufruf ausgerufen,
+auch ein absichtlich wiederholter über „Nochmal".
+
 ## Fenster minimiert — wach bleiben
 
 Ist das Browserfenster minimiert oder ganz verdeckt, bremst der Browser nach

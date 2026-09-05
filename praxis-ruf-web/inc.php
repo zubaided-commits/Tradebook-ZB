@@ -30,7 +30,7 @@ const AUTH_TAGE     = 30;       // wie lange eine Anmeldung gilt
 // Sichtbar auf jeder Seite unten. Nach dem Hochladen einer neuen Fassung
 // laesst sich damit auf einen Blick pruefen, ob der Browser wirklich die
 // neue Datei zeigt und nicht eine zwischengespeicherte alte.
-const FASSUNG       = '2026-09-05-a';
+const FASSUNG       = '2026-09-05-b';
 
 /* ------------------------------------------------------------------ *
  * Konfiguration

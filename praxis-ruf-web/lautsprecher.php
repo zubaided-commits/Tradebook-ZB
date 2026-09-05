@@ -111,11 +111,26 @@ $k = konfig();
   // So alt darf ein Aufruf hoechstens sein, wenn das Geraet ihn zum ersten
   // Mal sieht — sonst wird er stillschweigend uebergangen.
   const ALTERSGRENZE_S = Math.max(20, konfig.anzeigeDauer || 45);
+  // Laenger als das keine Antwort vom Server: Das war eine Unterbrechung,
+  // kein normaler Takt. Danach wird nicht alles nachgeholt.
+  const LUECKE_S = 15;
+  // Wer so lange in der Schlange stand, wird nicht mehr ausgerufen — bis
+  // dahin ist die Patientin ohnehin anders geholt worden.
+  const WARTEGRENZE_S = 120;
+  // Mehr als das wartet nie: Bei einem Rueckstau zaehlen die neuesten.
+  const SCHLANGE_MAX = 3;
   let raum = null, tonFrei = false, audioCtx = null, stimme = null;
   let letzteDurchsageId = null;
   // Welche Aufrufe schon angesagt wurden — nach Kennung, damit keiner
   // doppelt kommt und keiner verlorengeht.
   let angesagt = new Set();
+  // Wann kam die letzte Antwort vom Server, und wie weit geht die Uhr des
+  // Servers gegenueber dieser Seite vor? Beides wird gebraucht, um das
+  // Alter eines Aufrufs zu beurteilen, ohne sich auf die Uhr des Rechners
+  // zu verlassen.
+  let letzterErfolg = 0;
+  let zeitversatz = 0;
+  let hinweisBis = 0;
   let fehlerZaehler = 0, sageUhren = [];
   // Safari kann eine SpeechSynthesisUtterance mitten im Sprechen (oder
   // sogar davor) unbemerkt aus dem Speicher raeumen, wenn nirgendwo eine
@@ -399,12 +414,30 @@ $k = konfig();
 
   function einreihen(auftrag) {
     warteschlange.push(auftrag);
+    // Staut es sich, zaehlen die neuesten Aufrufe: Wer ganz hinten steht,
+    // waere ohnehin erst nach Minuten an der Reihe.
+    if (warteschlange.length > SCHLANGE_MAX) {
+      warteschlange = warteschlange.slice(-SCHLANGE_MAX);
+    }
     naechsteAnsage();
+  }
+
+  // Wie alt ist ein Aufruf, gemessen an der Uhr des Servers?
+  function alterSekunden(a) {
+    if (!a || !a.zeit || !zeitversatz) return 0;
+    return (Date.now() / 1000 + zeitversatz) - a.zeit;
   }
 
   function naechsteAnsage() {
     if (laeuftGerade) return;
-    const auftrag = warteschlange.shift();
+
+    // Was waehrend der Wartezeit zu alt geworden ist, wird uebergangen.
+    // Das Alter wird deshalb nicht nur beim Einreihen geprueft, sondern
+    // auch, wenn ein Aufruf endlich an der Reihe waere.
+    let auftrag = warteschlange.shift();
+    while (auftrag && auftrag.art === 'aufruf' && alterSekunden(auftrag.a) > WARTEGRENZE_S) {
+      auftrag = warteschlange.shift();
+    }
     if (!auftrag) { ansageLaeuft = false; lampe(''); return; }
 
     laeuftGerade = true;
@@ -494,7 +527,16 @@ $k = konfig();
       const d = await antwort.json();
       fehlerZaehler = 0;
       if ($('lampe').className === 'lampe fehler') lampe('');
-      $('lage').textContent = 'verbunden';
+
+      // War die Verbindung laenger weg als ein paar Takte, ist das eine
+      // Unterbrechung — kein normaler Betrieb.
+      const jetzt = Date.now();
+      const luecke = letzterErfolg ? (jetzt - letzterErfolg) / 1000 : 0;
+      const neustart = ersterDurchlauf || luecke > LUECKE_S;
+      letzterErfolg = jetzt;
+      if (d.zeit) zeitversatz = d.zeit - jetzt / 1000;
+
+      if (jetzt > hinweisBis) $('lage').textContent = 'verbunden';
 
       // Nicht nur der zuletzt gemeldete Aufruf wird angesehen, sondern die
       // ganze Liste: Der Server merkt sich als "aktuell" immer nur einen
@@ -502,23 +544,67 @@ $k = konfig();
       // ueberschreibt der zweite den ersten, und der erste waere nie
       // angesagt worden. Im Verlauf stehen beide.
       const liste = Array.isArray(d.verlauf) ? d.verlauf.slice().reverse() : [];
+
+      // Erst sammeln, was neu ist — entschieden wird danach.
+      const neue = [];
       for (const a of liste) {
         if (!a || !a.id || angesagt.has(a.id)) continue;
         angesagt.add(a.id);
-        if (ersterDurchlauf) continue;          // beim Start nichts nachholen
         if (a.wartezimmer !== 'alle' && a.wartezimmer !== raum) continue;
-        // Ein Aufruf, der beim ersten Sehen schon alt ist, wird nicht mehr
-        // ausgerufen — etwa nach einer Unterbrechung der Verbindung.
-        if (d.zeit && a.zeit && (d.zeit - a.zeit) > ALTERSGRENZE_S) continue;
-        einreihen({ art: 'aufruf', a });
+        neue.push(a);
       }
       // Die Liste ist begrenzt; alte Kennungen muessen nicht ewig mitlaufen.
       if (angesagt.size > 200) angesagt = new Set(liste.map((a) => a && a.id));
 
+      if (neue.length) {
+        const frisch = (a) => !d.zeit || !a.zeit || (d.zeit - a.zeit) <= ALTERSGRENZE_S;
+
+        if (ersterDurchlauf) {
+          // Beim Start wird nichts nachgeholt: Was vorher lief, ist
+          // erledigt oder von Hand geholt worden.
+          neue.length = 0;
+        } else if (neustart) {
+          // Nach einer Unterbrechung nicht den ganzen Rueckstand ausrufen.
+          // Hoert die Praxis nichts, ruft sie denselben Namen mehrfach —
+          // hinterher kaeme sonst eine ganze Kette von Ansagen, die
+          // niemanden mehr betreffen. Ausgerufen wird nur der letzte
+          // Aufruf, und auch der nur, wenn er noch aktuell ist.
+          const letzter = neue[neue.length - 1];
+          const uebersprungen = neue.length - (frisch(letzter) ? 1 : 0);
+          neue.length = 0;
+          if (frisch(letzter)) neue.push(letzter);
+          if (uebersprungen > 0) {
+            $('lage').textContent = 'Verbindung war weg — '
+              + uebersprungen + ' ältere ' + (uebersprungen === 1 ? 'Aufruf' : 'Aufrufe')
+              + ' übersprungen';
+            hinweisBis = jetzt + 30000;
+          }
+        } else {
+          // Im laufenden Betrieb: nur was noch aktuell ist.
+          for (let i = neue.length - 1; i >= 0; i--) {
+            if (!frisch(neue[i])) neue.splice(i, 1);
+          }
+        }
+
+        // Mehrfach derselbe Name im selben Schwung — etwa weil im
+        // Sprechzimmer mehrmals gedrueckt wurde — wird einmal ausgerufen.
+        const gesehen = new Set();
+        for (let i = neue.length - 1; i >= 0; i--) {
+          const schluessel = (neue[i].name || '') + '|' + (neue[i].sprechzimmer || '');
+          if (gesehen.has(schluessel)) neue.splice(i, 1);
+          else gesehen.add(schluessel);
+        }
+
+        for (const a of neue) einreihen({ art: 'aufruf', a });
+      }
+
       if (d.durchsage && d.durchsage.id !== letzteDurchsageId) {
         letzteDurchsageId = d.durchsage.id;
         const fuerUns = d.durchsage.ziel === 'alle' || d.durchsage.ziel === raum;
-        if (!ersterDurchlauf && fuerUns) einreihen({ art: 'durchsage', id: d.durchsage.id });
+        // Eine Durchsage aus der Zeit der Unterbrechung ist überholt.
+        if (!ersterDurchlauf && !neustart && fuerUns) {
+          einreihen({ art: 'durchsage', id: d.durchsage.id });
+        }
       }
 
       ersterDurchlauf = false;
