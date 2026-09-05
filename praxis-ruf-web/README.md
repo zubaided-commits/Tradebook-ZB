@@ -178,10 +178,28 @@ zeigt und nicht eine zwischengespeicherte alte.
 
 ## Nicht auffindbar bleiben
 
-Alles hier wirkt **nur im Ordner des Aufrufsystems**. Die `.htaccess` gilt für
-ihren eigenen Ordner und darunter, und `inc.php` wird nur von den Seiten des
-Aufrufsystems eingebunden — die Praxis-Website und alle anderen Seiten unter
-derselben Domain bleiben unberührt.
+So liegt es auf dem Webspace:
+
+```
+public/                     ← Wurzel der Website (bei IONOS oft so benannt)
+  index.html …              ← die Praxis-Website — UNBERÜHRT
+  praxisruf/                ← das Aufrufsystem
+    .htaccess               ← wirkt nur ab hier abwärts
+    inc.php, ruf.php, …
+    daten/
+```
+
+„public" heißt nur, dass dieser Ordner im Web ausgeliefert wird — es ist der
+normale Name des Wurzelverzeichnisses, keine Aussage über Schutz. Alles, was
+über die Domain erreichbar ist, liegt dort.
+
+Entscheidend ist die **Ebene darunter**: Die `.htaccess` gehört nach
+`public/praxisruf/`, **nicht** nach `public/`. Von dort wirkt sie nur für ihren
+eigenen Ordner und alles darunter; `inc.php` wiederum wird ausschließlich von
+den Seiten des Aufrufsystems eingebunden. Die Praxis-Website in `public/`
+bleibt davon unberührt — läge die `.htaccess` dagegen direkt in `public/`,
+würde die Sammlersperre die öffentliche Website treffen und sie aus Google
+entfernen.
 
 * **Sammler werden abgewiesen** — Suchmaschinen, KI-Crawler (GPTBot,
   ClaudeBot, PerplexityBot, CCBot, Bytespider, Amazonbot …) und

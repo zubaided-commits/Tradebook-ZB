@@ -2,10 +2,19 @@
 
 # 1) Immer verschluesselt. Ohne HTTPS gibt der Browser das Mikrofon
 #    fuer die Durchsage nicht frei, und Namen liefen ungeschuetzt durchs Netz.
+#
+#    %{REQUEST_URI} statt $1: Liegt diese Datei in einem Unterordner — und
+#    genau da liegt sie, naemlich in public/praxisruf/ —, dann sieht die
+#    Regel nur den Teil des Pfades UNTERHALB dieses Ordners. Aus
+#    /praxisruf/lautsprecher.php waere so beim Umleiten
+#    /lautsprecher.php geworden: der Ordner faellt weg, und man landet auf
+#    der Praxis-Website statt bei der Anmeldung. %{REQUEST_URI} enthaelt
+#    immer den vollstaendigen Pfad ab der Domain und ist deshalb
+#    unabhaengig davon, in welchem Ordner die Datei liegt.
 RewriteEngine On
 RewriteCond %{HTTPS} !=on
 RewriteCond %{HTTP:X-Forwarded-Proto} !https
-RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
 # 2) Verzeichnisinhalte nicht auflisten
 Options -Indexes
