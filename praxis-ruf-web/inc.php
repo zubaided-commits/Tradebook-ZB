@@ -30,7 +30,7 @@ const AUTH_TAGE     = 30;       // wie lange eine Anmeldung gilt
 // Sichtbar auf jeder Seite unten. Nach dem Hochladen einer neuen Fassung
 // laesst sich damit auf einen Blick pruefen, ob der Browser wirklich die
 // neue Datei zeigt und nicht eine zwischengespeicherte alte.
-const FASSUNG       = '2026-09-05-c';
+const FASSUNG       = '2026-09-05-d';
 
 /* ------------------------------------------------------------------ *
  * Konfiguration
@@ -99,6 +99,31 @@ function konfig(): array
     return $k;
 }
 
+/**
+ * Ist das Praxis-Passwort zu schwach? Das Passwort ist der einzige Schutz
+ * des ganzen Systems — ist es kurz oder ein gaengiges Wort, nuetzen alle
+ * uebrigen Vorkehrungen wenig. Die Warnung erscheint absichtlich NUR nach
+ * erfolgreicher Anmeldung: Auf der oeffentlichen Anmeldeseite waere sie ein
+ * Hinweis fuer jeden, der das Passwort erraten will.
+ */
+function passwortSchwach(): string
+{
+    $pw = (string) konfig()['passwort'];
+    if (mb_strlen($pw) < 12) {
+        return 'Das Praxis-Passwort ist kürzer als 12 Zeichen.';
+    }
+    $haeufig = ['passwort', 'password', 'praxis', '123456', 'qwertz', 'arzt'];
+    foreach ($haeufig as $w) {
+        if (stripos($pw, $w) !== false) {
+            return 'Das Praxis-Passwort enthält ein leicht zu erratendes Wort.';
+        }
+    }
+    if (count(array_unique(str_split($pw))) < 5) {
+        return 'Das Praxis-Passwort besteht aus zu wenigen verschiedenen Zeichen.';
+    }
+    return '';
+}
+
 function abbruch(string $text): void
 {
     http_response_code(500);
@@ -123,6 +148,49 @@ function abbruch(string $text): void
  * alle bestehenden Anmeldungen ungueltig — praktisch bei einem
  * Personalwechsel.
  * ------------------------------------------------------------------ */
+
+/**
+ * Schutzkopfzeilen — bewusst hier in PHP und nicht nur in .htaccess.
+ * Greift dort einmal eine Regel nicht (mod_headers fehlt, .htaccess wird
+ * ueberschrieben, der Hoster stellt um), stuende die Seite sonst voellig
+ * ohne Schutz da. Doppelt gesetzt schadet nichts.
+ */
+function schutzKopfzeilen(): void
+{
+    if (headers_sent()) {
+        return;
+    }
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: no-referrer');
+    header('X-Robots-Tag: noindex, nofollow');
+
+    // Nur ueber HTTPS ansprechbar, auch bei kuenftigen Aufrufen. Erst
+    // setzen, wenn die Verbindung wirklich verschluesselt ist — sonst
+    // sperrt man sich bei einer Fehlkonfiguration selbst aus.
+    if (istHttps()) {
+        header('Strict-Transport-Security: max-age=31536000');
+    }
+
+    // Die Seiten bringen alles selbst mit: kein fremdes Skript, kein
+    // fremdes Bild, keine Verbindung nach aussen. Genau das wird hier
+    // festgeschrieben — damit ein eingeschleuster Name auch dann nichts
+    // nachladen oder weiterschicken koennte, wenn irgendwo eine
+    // Maskierung fehlte. 'unsafe-inline' ist noetig, weil Stil und Skript
+    // in den Seiten selbst stehen; die uebrigen Regeln wirken trotzdem.
+    header(
+        "Content-Security-Policy: default-src 'self'; "
+        . "script-src 'self' 'unsafe-inline'; "
+        . "style-src 'self' 'unsafe-inline'; "
+        . "img-src 'self' data:; "
+        . "media-src 'self' data:; "
+        . "connect-src 'self'; "
+        . "form-action 'self'; "
+        . "base-uri 'none'; "
+        . "frame-ancestors 'none'"
+    );
+    // Aeltere Browser kennen frame-ancestors noch nicht.
+    header('X-Frame-Options: DENY');
+}
 
 function istHttps(): bool
 {
@@ -214,13 +282,47 @@ function anmeldungVerlangenApi(): void
     }
 }
 
-/** Einfacher Schutz gegen Durchprobieren: nach 8 Fehlversuchen 10 Minuten Sperre. */
+/**
+ * Schutz gegen Durchprobieren, in zwei Stufen.
+ *
+ * 1. Je Absender: nach 8 Fehlversuchen zehn Minuten gesperrt.
+ * 2. Insgesamt: nach 60 Fehlversuchen binnen zehn Minuten ist die Anmeldung
+ *    fuenf Minuten lang fuer alle zu.
+ *
+ * Die zweite Stufe ist die wichtigere, und zwar aus einem bestimmten Grund:
+ * Die erste stuetzt sich darauf, den Absender auseinanderhalten zu koennen,
+ * und dafuer gibt es hinter dem Lastverteiler eines Hosters nur den
+ * X-Forwarded-For-Kopf. Wie genau IONOS diesen Kopf setzt — anhaengen,
+ * ersetzen oder durchreichen —, laesst sich von hier aus nicht nachpruefen.
+ * Reicht er ihn ungeprueft durch, koennte jemand bei jedem Versuch eine
+ * andere Adresse hineinschreiben und waere von der ersten Stufe nie
+ * betroffen. Die zweite Stufe zaehlt darum stumpf alle Fehlversuche
+ * zusammen, ganz ohne Absender — sie wirkt also auch dann, wenn die
+ * Annahme ueber den Kopf falsch ist.
+ *
+ * Der Preis: Wer angegriffen wird, kommt fuenf Minuten lang selbst nicht
+ * neu hinein. Das faellt kaum ins Gewicht — eine Anmeldung gilt dreissig
+ * Tage, die laufenden Geraete bleiben unberuehrt, und nur eine NEUE
+ * Anmeldung waere so lange verzoegert.
+ */
+const SPERRE_PRO_ABSENDER = 8;
+const SPERRE_INSGESAMT    = 30;
+
 function anmeldungErlaubt(): bool
 {
     $s = standLesen();
-    $ip = herkunft();
-    $e = $s['sperren'][$ip] ?? null;
-    return !($e && $e['zahl'] >= 8 && (time() - $e['zeit']) < 600);
+    $jetzt = time();
+
+    $e = $s['sperren'][herkunft()] ?? null;
+    if ($e && $e['zahl'] >= SPERRE_PRO_ABSENDER && ($jetzt - $e['zeit']) < 600) {
+        return false;
+    }
+
+    $g = $s['sperreGesamt'] ?? null;
+    if ($g && $g['zahl'] >= SPERRE_INSGESAMT && ($jetzt - $g['zeit']) < 300) {
+        return false;
+    }
+    return true;
 }
 
 function fehlversuchMerken(): void
@@ -234,6 +336,15 @@ function fehlversuchMerken(): void
         $e['zahl']++;
         $e['zeit'] = time();
         $s['sperren'][$ip] = $e;
+
+        // Zweite Stufe: alle Fehlversuche zusammen, unabhaengig vom Absender.
+        $g = $s['sperreGesamt'] ?? ['zahl' => 0, 'zeit' => 0];
+        if (time() - $g['zeit'] > 600) {
+            $g['zahl'] = 0;
+        }
+        $g['zahl']++;
+        $g['zeit'] = time();
+        $s['sperreGesamt'] = $g;
         return $s;
     });
 }
@@ -254,11 +365,21 @@ function fehlversucheLoeschen(): void
  */
 function herkunft(): string
 {
+    // X-Forwarded-For sieht aus wie "kunde, proxy1, proxy2". Jeder Proxy
+    // haengt HINTEN an, von wem er die Anfrage bekommen hat.
+    //
+    // Frueher wurde der ERSTE Eintrag genommen — der ist aber der, den der
+    // Aufrufer selbst mitschickt, und damit frei erfindbar. Wer das Passwort
+    // durchprobieren wollte, musste bei jedem Versuch nur eine andere Adresse
+    // hineinschreiben und war von der Sperre nie betroffen. Genommen wird
+    // deshalb der LETZTE Eintrag: den hat der Lastverteiler des Hosters
+    // angehaengt, und der laesst sich von aussen nicht faelschen.
     $weitergeleitet = (string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? '');
     if ($weitergeleitet !== '') {
-        $erste = trim(explode(',', $weitergeleitet)[0]);
-        if ($erste !== '') {
-            return substr(hash('sha256', $erste), 0, 16);
+        $kette = array_filter(array_map('trim', explode(',', $weitergeleitet)));
+        $letzte = end($kette);
+        if ($letzte !== false && $letzte !== '' && filter_var($letzte, FILTER_VALIDATE_IP)) {
+            return substr(hash('sha256', $letzte), 0, 16);
         }
     }
     return substr(hash('sha256', $_SERVER['REMOTE_ADDR'] ?? '-'), 0, 16);
@@ -279,7 +400,7 @@ function vorspannAb(string $roh): string
 function leererStand(): array
 {
     return ['aufruf' => null, 'durchsage' => null, 'verlauf' => [],
-            'geraete' => [], 'sperren' => []];
+            'geraete' => [], 'sperren' => [], 'sperreGesamt' => null];
 }
 
 function ordnerSicherstellen(): void
@@ -367,6 +488,15 @@ function aufraeumen(array $s): array
         if (($jetzt - ($e['zeit'] ?? 0)) > 3600) {
             unset($s['sperren'][$ip]);
         }
+    }
+    // Bei einem Angriff mit vielen Adressen wuerde die Liste sonst immer
+    // weiter wachsen und die Zustandsdatei aufblaehen.
+    if (count($s['sperren']) > 500) {
+        uasort($s['sperren'], fn ($a, $b) => ($b['zeit'] ?? 0) <=> ($a['zeit'] ?? 0));
+        $s['sperren'] = array_slice($s['sperren'], 0, 200, true);
+    }
+    if (isset($s['sperreGesamt']) && ($jetzt - ($s['sperreGesamt']['zeit'] ?? 0)) > 3600) {
+        $s['sperreGesamt'] = null;
     }
 
     altenTonLoeschen();
@@ -467,3 +597,7 @@ function istWartezimmer(string $id): bool
     }
     return false;
 }
+
+// Gilt fuer jede Seite und jede Schnittstellenantwort: inc.php wird ueberall
+// als Erstes eingebunden, noch bevor irgendetwas ausgegeben wird.
+schutzKopfzeilen();

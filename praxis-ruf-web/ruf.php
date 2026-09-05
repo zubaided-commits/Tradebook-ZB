@@ -114,6 +114,15 @@ $k = konfig();
 </header>
 
 <main>
+  <?php if (($schwach = passwortSchwach()) !== ''): ?>
+    <div class="warnung an">
+      <strong>Sicherheitshinweis:</strong> <?= h($schwach) ?>
+      Das Passwort ist der einzige Schutz für alle Patientennamen in diesem
+      System. Bitte in <code>config.php</code> ein längeres, eigenes Passwort
+      eintragen — danach müssen sich alle Geräte einmal neu anmelden.
+    </div>
+  <?php endif; ?>
+
   <div class="warnung" id="warnung"></div>
 
   <label class="feld" for="name">Wen rufen Sie auf?</label>

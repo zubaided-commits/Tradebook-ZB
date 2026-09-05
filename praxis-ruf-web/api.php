@@ -58,13 +58,30 @@ switch ($was) {
             }
         }
 
+        // Ein Geraet im Wartezimmer bekommt nur, was es fuer seine eigene
+        // Ansage braucht. Bisher ging die vollstaendige Liste aller Aufrufe
+        // an jeden Lautsprecher — auch die Namen aus dem anderen
+        // Wartezimmer, die dort niemand hoeren wird. Weniger Daten auf einem
+        // unbeaufsichtigten Geraet im Wartebereich ist der Sinn der Sache.
+        $verlauf = $stand['verlauf'];
+        $aufrufFuerAntwort = $stand['aufruf'];
+        if ($rolle === 'lautsprecher' && $raum !== '') {
+            $passt = static fn (array $a): bool =>
+                ($a['wartezimmer'] ?? '') === 'alle' || ($a['wartezimmer'] ?? '') === $raum;
+            $verlauf = array_values(array_filter($verlauf, $passt));
+            if ($aufrufFuerAntwort && !$passt($aufrufFuerAntwort)) {
+                $aufrufFuerAntwort = null;
+            }
+        }
+
         antwort([
             'zeit'         => time(),
-            'aufruf'       => $stand['aufruf'],
+            'aufruf'       => $aufrufFuerAntwort,
             'durchsage'    => $stand['durchsage'],
-            'verlauf'      => $stand['verlauf'],
+            'verlauf'      => $verlauf,
             'lautsprecher' => $lautsprecher,
-            'aerzte'       => array_keys($aerzte),
+            // Welche Sprechzimmer offen sind, geht nur die Aerztinnen an.
+            'aerzte'       => $rolle === 'lautsprecher' ? [] : array_keys($aerzte),
         ]);
         // kein break noetig, antwort() beendet
 

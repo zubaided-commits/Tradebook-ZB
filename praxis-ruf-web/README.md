@@ -176,6 +176,32 @@ Unten auf jeder Seite steht die Fassungsnummer. Nach dem Hochladen einer
 neuen Datei lässt sich damit prüfen, ob der Browser wirklich die neue Fassung
 zeigt und nicht eine zwischengespeicherte alte.
 
+## Sicherheit
+
+Zugang gibt es ausschließlich über das gemeinsame Praxis-Passwort. Es gibt
+keine zweite Tür: keine Benutzerliste, keinen Wiederherstellungslink, keine
+Fernwartung.
+
+| | |
+|---|---|
+| **Anmeldung** | Selbst signiertes Cookie (HMAC-SHA256, Schlüssel ist das Passwort). Rolle und Ablauf stehen im Cookie und lassen sich nicht ändern, ohne die Signatur zu brechen. `HttpOnly` (kein Zugriff per JavaScript), `Secure`, `SameSite=Lax`. |
+| **Passwort ändern** | Macht sofort **alle** bestehenden Anmeldungen ungültig — der Weg bei Personalwechsel oder Verdacht. |
+| **Durchprobieren** | Zwei Stufen: 8 Fehlversuche je Absender (10 min gesperrt) **und** 30 Fehlversuche insgesamt (5 min gesperrt). Die zweite Stufe wirkt auch dann, wenn der Absender nicht zuverlässig erkennbar ist. |
+| **Geheime Dateien** | `config.php`, `inc.php` und `daten/` sind per `.htaccess` gesperrt. Zusätzlich tragen die Dateien in `daten/` die Endung `.php` und beginnen mit `<?php exit;` — ein direkter Abruf gibt auch dann nichts preis, wenn `.htaccess` einmal nicht greift. |
+| **Kopfzeilen** | HSTS, Content-Security-Policy, `X-Frame-Options: DENY`, `nosniff`, `no-referrer`, `noindex` — gesetzt **in PHP**, nicht nur in `.htaccess`, damit sie auch dann stehen, wenn dort einmal eine Regel nicht greift. |
+| **Datensparsamkeit** | Ein Gerät im Wartezimmer bekommt nur die Aufrufe für seinen eigenen Raum — nicht die Namen aus dem anderen Wartezimmer und nicht, welche Sprechzimmer offen sind. |
+| **Namen** | Stehen nie in einer Adresszeile, nur im POST-Inhalt — sonst lägen sie in den Zugriffsprotokollen des Hosters. Angemeldete Seiten sind `no-store`, landen also in keinem Zwischenspeicher. |
+
+Geprüft mit `angriff.js`: 36 Angriffsversuche — Zugriff ohne Anmeldung,
+gefälschte und manipulierte Cookies, Passwort-Durchprobieren mit wechselnder
+Absenderadresse, Pfad-Ausbruch über die Ton-Schnittstelle, eingeschleustes
+HTML in Patientennamen, direkter Abruf der Konfiguration.
+
+**Was das nicht abdeckt:** Wer physisch am Empfangs-PC sitzt, ist angemeldet —
+der Bildschirm gehört gesperrt, wenn niemand da ist. Und das Passwort ist nur
+so gut, wie es gewählt wurde; ist es zu kurz oder zu leicht zu erraten, weist
+die Bedienseite nach der Anmeldung darauf hin.
+
 ## Datenschutz in Kürze
 
 Namen stehen nie in einer Adresszeile, nur im POST-Inhalt — sonst lägen sie
