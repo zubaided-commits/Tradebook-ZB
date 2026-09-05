@@ -30,7 +30,7 @@ const AUTH_TAGE     = 30;       // wie lange eine Anmeldung gilt
 // Sichtbar auf jeder Seite unten. Nach dem Hochladen einer neuen Fassung
 // laesst sich damit auf einen Blick pruefen, ob der Browser wirklich die
 // neue Datei zeigt und nicht eine zwischengespeicherte alte.
-const FASSUNG       = '2026-09-05-d';
+const FASSUNG       = '2026-09-05-e';
 
 /* ------------------------------------------------------------------ *
  * Konfiguration
@@ -150,6 +150,53 @@ function abbruch(string $text): void
  * ------------------------------------------------------------------ */
 
 /**
+ * Suchmaschinen, Sammler und KI-Crawler abweisen.
+ *
+ * Wichtig zum Geltungsbereich: Diese Pruefung steht in inc.php, und inc.php
+ * wird ausschliesslich von den Seiten des Aufrufsystems eingebunden. Die
+ * Praxis-Website und alles andere unter der Domain sind davon nicht
+ * beruehrt — dort laeuft dieser Code gar nicht erst. Dasselbe gilt fuer die
+ * .htaccess: Sie wirkt nur in ihrem eigenen Ordner und darunter.
+ *
+ * Geantwortet wird mit 404 statt 403: Ein "verboten" verraet, dass es hier
+ * etwas gibt. Ein "nicht gefunden" sieht aus wie eine leere Adresse.
+ *
+ * Die Kennung eines Besuchers laesst sich faelschen — wer das tut, kommt an
+ * dieser Sperre vorbei. Sie haelt die ehrlichen Sammler fern, und das sind
+ * fast alle. Der eigentliche Schutz bleibt das Passwort.
+ */
+// Bewusst keine zu allgemeinen Woerter wie "search" oder "index": Die
+// stehen auch in harmlosen Browserkennungen und wuerden echte Besucher
+// aussperren. Die einschlaegigen Sammler sind unten namentlich genannt.
+const SAMMLER_MUSTER = '~(bot|crawl|spider|scrape|slurp|'
+    // KI-Sammler, ausdruecklich benannt
+    . 'gptbot|chatgpt|oai-searchbot|claudebot|claude-web|anthropic|cohere|'
+    . 'perplexity|bytespider|amazonbot|applebot|meta-external|diffbot|'
+    . 'youbot|imagesift|omgili|timpibot|webzio|pangubot|ai2bot|'
+    // Werkzeuge, mit denen Seiten abgegrast werden
+    . 'curl|wget|python-requests|python-urllib|libwww|okhttp|go-http-client|'
+    . 'httpclient|java/|scrapy|phantomjs|masscan|zgrab|nmap|nikto|sqlmap)~i';
+
+function sammlerAbweisen(): void
+{
+    // Auf der Kommandozeile gibt es keine Browserkennung — dort waere die
+    // Sperre unsinnig und wuerde Wartungsskripte abwuergen.
+    if (PHP_SAPI === 'cli') {
+        return;
+    }
+    $kennung = trim((string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+
+    // Ganz ohne Kennung meldet sich kein gewoehnlicher Browser.
+    if ($kennung === '' || preg_match(SAMMLER_MUSTER, $kennung)) {
+        http_response_code(404);
+        header('Content-Type: text/html; charset=utf-8');
+        header('X-Robots-Tag: noindex, nofollow, noarchive, nosnippet');
+        echo "<!doctype html><title>404</title><h1>404 Not Found</h1>\n";
+        exit;
+    }
+}
+
+/**
  * Schutzkopfzeilen — bewusst hier in PHP und nicht nur in .htaccess.
  * Greift dort einmal eine Regel nicht (mod_headers fehlt, .htaccess wird
  * ueberschrieben, der Hoster stellt um), stuende die Seite sonst voellig
@@ -162,7 +209,9 @@ function schutzKopfzeilen(): void
     }
     header('X-Content-Type-Options: nosniff');
     header('Referrer-Policy: no-referrer');
-    header('X-Robots-Tag: noindex, nofollow');
+    // noarchive/nosnippet zusaetzlich: kein Zwischenspeicher, keine Vorschau,
+    // falls doch einmal ein Dienst die Seite in die Finger bekommt.
+    header('X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex');
 
     // Nur ueber HTTPS ansprechbar, auch bei kuenftigen Aufrufen. Erst
     // setzen, wenn die Verbindung wirklich verschluesselt ist — sonst
@@ -600,4 +649,5 @@ function istWartezimmer(string $id): bool
 
 // Gilt fuer jede Seite und jede Schnittstellenantwort: inc.php wird ueberall
 // als Erstes eingebunden, noch bevor irgendetwas ausgegeben wird.
+sammlerAbweisen();
 schutzKopfzeilen();

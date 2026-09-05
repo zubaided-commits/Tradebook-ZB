@@ -15,10 +15,45 @@ Options -Indexes
     Require all denied
 </FilesMatch>
 
-# 4) Suchmaschinen fernhalten
+# 4) Suchmaschinen und Sammler fernhalten
+#
+#    GELTUNGSBEREICH: Diese Datei wirkt NUR in ihrem eigenen Ordner und
+#    darunter — also nur fuer das Aufrufsystem. Die Praxis-Website und alle
+#    anderen Seiten unter der Domain sind davon nicht beruehrt.
 <IfModule mod_headers.c>
-    Header set X-Robots-Tag "noindex, nofollow"
+    Header set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex"
     Header set Referrer-Policy "no-referrer"
     Header set X-Content-Type-Options "nosniff"
-    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-Frame-Options "DENY"
 </IfModule>
+
+# 5) Bekannte Sammler abweisen — Suchmaschinen, KI-Crawler, Abgras-Werkzeuge.
+#    Dieselbe Sperre steht zusaetzlich in inc.php, damit sie auch dann greift,
+#    wenn hier einmal eine Regel nicht wirkt.
+RewriteCond %{HTTP_USER_AGENT} (bot|crawl|spider|scrape|slurp) [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} (gptbot|chatgpt|oai-searchbot|claudebot|claude-web) [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} (anthropic|cohere|perplexity|bytespider|amazonbot) [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} (applebot|meta-external|diffbot|youbot|imagesift) [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} (omgili|timpibot|webzio|pangubot|ai2bot|ccbot) [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} (curl|wget|python-requests|python-urllib|libwww) [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} (okhttp|go-http-client|scrapy|phantomjs|nikto|sqlmap) [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} ^$
+RewriteRule ^ - [F,L]
+
+# 6) NUR AUS DER PRAXIS ERREICHBAR (optional, sehr wirksam)
+#
+#    Hat die Praxis einen festen Internetanschluss mit gleichbleibender
+#    Adresse, ist das der staerkste Schutz ueberhaupt: Dann kommt von
+#    ausserhalb der Praxis niemand auch nur bis zur Anmeldeseite.
+#
+#    Die eigene Adresse steht auf https://www.wieistmeineip.de
+#    Danach die naechsten vier Zeilen entkommentieren (das # entfernen)
+#    und die Beispieladresse ersetzen.
+#
+#    ACHTUNG: Bei den meisten Anschluessen wechselt die Adresse regelmaessig.
+#    Dann sperrt man sich damit selbst aus. Vorher beim Anbieter fragen, ob
+#    die Adresse fest ist.
+#
+# <RequireAll>
+#     Require ip 203.0.113.42
+# </RequireAll>

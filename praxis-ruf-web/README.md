@@ -176,6 +176,55 @@ Unten auf jeder Seite steht die Fassungsnummer. Nach dem Hochladen einer
 neuen Datei lässt sich damit prüfen, ob der Browser wirklich die neue Fassung
 zeigt und nicht eine zwischengespeicherte alte.
 
+## Nicht auffindbar bleiben
+
+Alles hier wirkt **nur im Ordner des Aufrufsystems**. Die `.htaccess` gilt für
+ihren eigenen Ordner und darunter, und `inc.php` wird nur von den Seiten des
+Aufrufsystems eingebunden — die Praxis-Website und alle anderen Seiten unter
+derselben Domain bleiben unberührt.
+
+* **Sammler werden abgewiesen** — Suchmaschinen, KI-Crawler (GPTBot,
+  ClaudeBot, PerplexityBot, CCBot, Bytespider, Amazonbot …) und
+  Abgras-Werkzeuge (curl, wget, python-requests, Scrapy) sowie Anfragen ganz
+  ohne Browserkennung. Sie bekommen **404**, nicht 403: Ein „verboten" verrät,
+  dass hier etwas liegt; ein „nicht gefunden" sieht aus wie eine leere
+  Adresse. Die Sperre steht doppelt — in `.htaccess` und in `inc.php` —, damit
+  sie auch dann greift, wenn eine der beiden einmal nicht wirkt.
+* **`X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex`** auf
+  jeder Seite.
+* **`Referrer-Policy: no-referrer`** — klickt jemand von hier weg, erfährt die
+  andere Seite die Adresse nicht.
+
+### Nicht in die robots.txt eintragen
+
+Es liegt nahe, `Disallow: /praxisruf/` in die `robots.txt` der Domain zu
+schreiben. **Das wäre das Gegenteil von hilfreich.** Die `robots.txt` liegt
+öffentlich unter `ihre-domain.de/robots.txt` und kann von jedem gelesen
+werden — man würde die Adresse dort also selbst veröffentlichen. Der
+`X-Robots-Tag` oben erledigt dasselbe, ohne sie zu verraten.
+
+### Der wirksamste Schritt: unratbarer Ordnername
+
+`/praxisruf/` errät ein Scanner in Sekunden. Ein Name wie `/pr-7k2m9x4q/`
+nicht. So geht es:
+
+1. Ordner auf dem Webspace umbenennen (im IONOS-Dateimanager oder per FTP).
+2. In `lautsprecher-starten.bat` die Zeile `set ADRESSE=` anpassen.
+3. Neues Lesezeichen in den Sprechzimmern anlegen, altes löschen.
+4. Alle Geräte melden sich einmal neu an.
+
+Zusammen mit der Sammlersperre ist die Seite damit praktisch nicht mehr
+auffindbar: Sie steht in keiner Suchmaschine, wird von keinem Crawler
+gelesen, ist von nirgendwo verlinkt, und die Adresse lässt sich nicht raten.
+
+### Am stärksten: nur aus der Praxis erreichbar
+
+Hat der Praxisanschluss eine **feste** IP-Adresse, lässt sich in der
+`.htaccess` (Abschnitt 6, auskommentiert vorbereitet) festlegen, dass nur
+diese Adresse überhaupt hereinkommt — dann erreicht von außen niemand auch
+nur die Anmeldeseite. Vorher beim Anbieter fragen, ob die Adresse fest ist:
+Wechselt sie, sperrt man sich selbst aus.
+
 ## Sicherheit
 
 Zugang gibt es ausschließlich über das gemeinsame Praxis-Passwort. Es gibt
