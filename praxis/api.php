@@ -143,7 +143,7 @@ function logAction(string $aktion, string $details = ''): void {
 
 // ---------------------------------------------------------------- Stammdaten: Abwesenheitsarten
 const TYPEN = [
-  ['key'=>'urlaub',       'label'=>'Urlaub',                'farbe'=>'#1f9d55', 'konto'=>'urlaub',      'nachweis'=>false],
+  ['key'=>'urlaub',       'label'=>'Urlaub',                'farbe'=>'#16653f', 'konto'=>'urlaub',      'nachweis'=>false],
   ['key'=>'sonderurlaub', 'label'=>'Sonderurlaub',          'farbe'=>'#8b5cf6', 'konto'=>'sonder',      'nachweis'=>false],
   ['key'=>'krank',        'label'=>'Krank (AU)',            'farbe'=>'#e02424', 'konto'=>'krank',       'nachweis'=>true],
   ['key'=>'kind_krank',   'label'=>'Kind krank',            'farbe'=>'#f59e0b', 'konto'=>'kind',        'nachweis'=>true],
@@ -248,7 +248,7 @@ function arbeitstage(array $staff, string $von, string $bis, bool $halbtag): arr
     if (!empty($staff['eintritt']) && $datum < $staff['eintritt']) continue;
     if (!empty($staff['austritt']) && $datum > $staff['austritt']) continue;
     $jahr = (int)date('Y', $t);
-    if (!isset($fcache[$jahr])) $fcache[$jahr] = feiertage($jahr, setting('bundesland', 'NW') ?? 'NW');
+    if (!isset($fcache[$jahr])) $fcache[$jahr] = feiertage($jahr, setting('bundesland', 'HH') ?? 'HH');
     if (isset($fcache[$jahr][$datum])) continue;
     $wd = (int)date('N', $t) - 1;
     $tage += $p[$wd];
@@ -418,7 +418,7 @@ case 'state': {
     $x['nachweis'] = (int)$x['nachweis'];
   }
   unset($x);
-  $bl = setting('bundesland', 'NW') ?? 'NW';
+  $bl = setting('bundesland', 'HH') ?? 'HH';
   out([
     'setup' => false, 'angemeldet' => true,
     'nutzer' => ['name' => $_SESSION['user_name'], 'rolle' => $_SESSION['user_rolle']],
@@ -442,7 +442,7 @@ case 'setup': {
   if (nutzerAnzahl() > 0) fail('bereits_eingerichtet', 409);
   $d = body();
   $user = s($d, 'username'); $pass = s($d, 'passwort');
-  $praxis = s($d, 'praxisname', 'Praxis'); $bl = s($d, 'bundesland', 'NW');
+  $praxis = s($d, 'praxisname', 'Praxis'); $bl = s($d, 'bundesland', 'HH');
   if (strlen($user) < 3) fail('benutzername_zu_kurz');
   if (strlen($pass) < 10) fail('passwort_zu_kurz');
   if (!isset(BUNDESLAENDER[$bl])) fail('bundesland');

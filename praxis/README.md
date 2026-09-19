@@ -1,6 +1,6 @@
-# Praxis-Kalender
+# Praxis-Kalender · Hausarztpraxis Dr. med. Victoria Yar
 
-Abwesenheiten und Urlaubskonto für eine Arztpraxis: **Urlaub, Krank (AU), Kind krank,
+Abwesenheiten und Urlaubskonto für die Hausarztpraxis Dr. med. Victoria Yar, Hamburg Barmbek: **Urlaub, Krank (AU), Kind krank,
 Fortbildung, Abwesend** – plus Sonderurlaub, Überstundenabbau, Berufsschule,
 Mutterschutz/Elternzeit und Praxisschließung.
 
@@ -37,7 +37,7 @@ alle Daten bleiben auf dem eigenen Server.
    Domain aktivieren. Die mitgelieferte `.htaccess` leitet HTTP automatisch auf HTTPS um.
 
 5. **Erste Einrichtung** – die Seite im Browser öffnen. Beim ersten Aufruf werden
-   Praxisname, Bundesland (für die Feiertage) und das erste Benutzerkonto abgefragt.
+   Praxisname, Bundesland (Hamburg ist voreingestellt) und das erste Benutzerkonto abgefragt.
    Passwort: mindestens 10 Zeichen.
 
 6. **PHP-Version prüfen** – IONOS > Hosting > PHP-Einstellungen: PHP 8.1 oder neuer wählen.
@@ -101,7 +101,13 @@ Art. 9 DSGVO**. Deshalb:
 * **MySQL:** Export über phpMyAdmin im IONOS-Control-Panel.
 * Zusätzlich im Reiter *Urlaubskonto* den **CSV-Export** je Jahr sichern.
 
-## 5. Hinweise zu den Feiertagen
+## 5. Gestaltung
+
+Farben und Schriften sind an die Praxis-Website angeglichen (Praxisgrün `#16653f`,
+Serifenschrift für Überschriften). Es werden **keine externen Schriften oder Skripte**
+geladen – beim Aufruf verlässt keine Anfrage den Praxis-Server.
+
+## 6. Hinweise zu den Feiertagen
 
 Die Feiertage werden aus dem Bundesland berechnet (Ostern nach Gauß, daraus Karfreitag,
 Ostermontag, Christi Himmelfahrt, Pfingstmontag, Fronleichnam). Nicht abgebildet sind
@@ -109,7 +115,10 @@ Feiertage, die nur in einzelnen Gemeinden gelten – **Mariä Himmelfahrt** in T
 und **Fronleichnam** in einzelnen Gemeinden Sachsens und Thüringens. Solche Tage bitte
 als Eintrag „Praxis geschlossen“ erfassen.
 
-## 6. Nächste Ausbaustufen
+### Hamburg
+Voreingestellt ist **Hamburg**: neun bundesweite Feiertage plus Reformationstag (31.10.).
+
+## 7. Nächste Ausbaustufen
 
 1. Eigene Zugänge für das Team mit Antrag → Genehmigung.
 2. Besetzungsregeln je Wochentag (mind. 1 Ärztin + 2 MFA) mit Ampel und Sperrzeiten.
