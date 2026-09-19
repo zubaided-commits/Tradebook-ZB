@@ -1,5 +1,9 @@
-# Zugangsdaten und Datenbank gehoeren nicht ins Repository
+# Zugangsdaten, Datenbank und hochgeladene Nachweise gehoeren NICHT ins Repository
 config.php
 data/*.sqlite
 data/*.sqlite-wal
 data/*.sqlite-shm
+
+# Nachweise (Krankenscheine, Atteste): niemals versionieren
+data/nachweise/*
+!data/nachweise/.htaccess

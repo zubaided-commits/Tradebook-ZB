@@ -103,6 +103,22 @@ tr.sum td.low{background:#fee2e2;color:var(--bad)}
 .zugang{display:block;font-size:0.7rem;color:var(--mut);margin-top:2px}
 .item .t span{display:block}
 .zugang b{color:var(--accent)}
+/* ---- Nachweise ---- */
+.datei{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--line);
+  border-radius:10px;margin-bottom:7px;background:#fff}
+.datei .ic{width:26px;height:26px;border-radius:7px;background:var(--accent-soft);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;flex:0 0 auto}
+.datei .n{flex:1;min-width:0}
+.datei .n a{color:var(--ink);font-size:0.82rem;font-weight:600;text-decoration:none;word-break:break-all}
+.datei .n a:hover{text-decoration:underline}
+.datei .n span{display:block;font-size:0.67rem;color:var(--mut)}
+.datei button{background:none;border:none;color:var(--mut);font-size:0.72rem;cursor:pointer;
+  font-family:inherit;padding:4px 6px}
+.datei button:hover{color:var(--bad)}
+.upload{border:2px dashed var(--line);border-radius:12px;padding:13px;background:#fbfdfc}
+.upload input[type=file]{border:none;padding:6px 0;font-size:0.82rem;background:none}
+td.d .klammer{position:absolute;right:1px;top:1px;width:0;height:0;
+  border-left:6px solid transparent;border-top:6px solid rgba(255,255,255,0.9);z-index:2}
 /* ---- Hilfe ---- */
 .hilfe{background:#fff;border:1px dashed var(--line);border-radius:12px;padding:12px 14px;
   font-size:0.78rem;color:var(--mut);line-height:1.6;margin-top:12px}
@@ -197,6 +213,35 @@ function api(a, data){
       .then(function(j){ if(j && j.error) throw j; return j; });
   });
 }
+function apiUpload(absenceId, art, datei){
+  var fd = new FormData();
+  fd.append('absence_id', absenceId);
+  fd.append('art', art);
+  fd.append('datei', datei);
+  return fetch('api.php?a=upload', {
+    method:'POST', credentials:'same-origin',
+    headers: S && S.csrf ? {'X-Praxis-Token': S.csrf} : {},
+    body: fd
+  }).then(function(r){
+    return r.json().catch(function(){ return {error:'antwort_unlesbar'}; })
+      .then(function(j){ if(j && j.error) throw j; return j; });
+  });
+}
+function mb(bytes){
+  if(bytes < 1024) return bytes+' B';
+  if(bytes < 1048576) return Math.round(bytes/1024)+' KB';
+  return (Math.round(bytes/104857.6)/10).toString().replace('.',',')+' MB';
+}
+function dateienVon(absenceId){
+  return (S.dateien||[]).filter(function(f){ return f.absence_id === absenceId; });
+}
+function standardArt(typ){
+  if(typ === 'krank') return 'au';
+  if(typ === 'kind_krank') return 'au_kind';
+  if(typ === 'fortbildung') return 'zertifikat';
+  return 'sonstiges';
+}
+
 var FEHLER = {
   config_missing:'config.php fehlt auf dem Server.',
   db_connect:'Datenbank nicht erreichbar – Zugangsdaten in config.php prüfen.',
@@ -208,7 +253,23 @@ var FEHLER = {
   datum_ungueltig:'Bitte gültige Daten eingeben.',
   bis_vor_von:'Das Enddatum liegt vor dem Startdatum.',
   csrf:'Sitzung abgelaufen – bitte Seite neu laden.',
-  name_fehlt:'Bitte einen Namen eingeben.'
+  name_fehlt:'Bitte einen Namen eingeben.',
+  dateityp:'Nur PDF und Bilder (JPG, PNG, HEIC, WEBP) sind erlaubt.',
+  datei_zu_gross:'Die Datei ist zu groß. Bitte als PDF oder kleineres Foto hochladen.',
+  keine_datei:'Es wurde keine Datei ausgewählt.',
+  datei_leer:'Die Datei ist leer.',
+  upload_fehlgeschlagen:'Das Hochladen hat nicht geklappt. Bitte noch einmal versuchen.',
+  ordner_nicht_beschreibbar:'Der Ordner data/nachweise ist nicht beschreibbar (Rechte 775 setzen).',
+  speichern_fehlgeschlagen:'Die Datei konnte auf dem Server nicht gespeichert werden.',
+  eintrag_unbekannt:'Der Eintrag wurde nicht gefunden.',
+  datei_unbekannt:'Der Nachweis wurde nicht gefunden.',
+  benutzername_vergeben:'Diesen Benutzernamen gibt es schon.',
+  benutzername_zeichen:'Nur Kleinbuchstaben, Ziffern, Punkt, Minus und Unterstrich.',
+  letzte_leitung:'Das ist der letzte Zugang mit der Rolle Leitung – er kann nicht entfernt oder herabgestuft werden.',
+  eigener_zugang:'Den eigenen Zugang können Sie nicht löschen.',
+  zugang_deaktiviert:'Dieser Zugang ist gesperrt. Bitte an die Praxisleitung wenden.',
+  kein_mitarbeiter_verknuepft:'Ihr Zugang ist noch keiner Person im Plan zugeordnet.',
+  keine_berechtigung:'Dafür fehlt Ihnen die Berechtigung.'
 };
 function fehlerText(e){
   if(!e) return 'Unbekannter Fehler.';
@@ -230,8 +291,11 @@ function load(){
       '<div class="center"><div class="card"><h2>Fehler</h2><div class="err">'+esc(fehlerText(e))+'</div></div></div>';
   });
 }
+var HATDATEI = {};      // absence_id -> Anzahl Nachweise
 function buildIndex(){
   IDX = {};
+  HATDATEI = {};
+  (S.dateien||[]).forEach(function(f){ HATDATEI[f.absence_id] = (HATDATEI[f.absence_id]||0) + 1; });
   S.staff.forEach(function(m){ IDX[m.id] = {}; });
   S.absences.forEach(function(a){
     if(a.status==='abgelehnt' || a.status==='storniert') return;
@@ -329,7 +393,8 @@ function zelle(m, datum, klass){
     var t = TY[a.typ] || {farbe:'#888', label:a.typ};
     var kurz = t.label.substr(0,1).toUpperCase();
     var blass = / frei\b/.test(klass) ? ';opacity:0.3' : '';
-    inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+blass+'">'+ (a.halbtag?'':kurz) +'</span>';
+    inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+blass+'">'+ (a.halbtag?'':kurz) +'</span>'
+          + (HATDATEI[a.id] ? '<span class="klammer" title="Nachweis vorhanden"></span>' : '');
   }
   var titel = a ? (TY[a.typ]?TY[a.typ].label:a.typ)+' · '+dmy(a.von)+'–'+dmy(a.bis)+(a.notiz?' · '+a.notiz:'') : dmy(datum);
   return '<td class="d '+klass+'" title="'+esc(titel)+'" onclick="zelleKlick(\''+m.id+'\',\''+datum+'\')">'+inner+'</td>';
@@ -373,7 +438,7 @@ function setPlanart(a){ PLANART = a; render(); }
 
 function viewPlan(){
   var h = heuteStreifen();
-  if(S.leitung) h += antraegeKarte();
+  if(S.leitung){ h += antraegeKarte(); h += fehlendeNachweise(); }
   h += '<div style="display:flex;gap:9px;align-items:center;margin-bottom:12px" class="noprint">'
      + '<div class="seg">'
      +   '<button class="'+(PLANART==='monat'?'on':'')+'" onclick="setPlanart(\'monat\')">Monat</button>'
@@ -418,6 +483,30 @@ function antraegeKarte(){
       + '</div>';
   });
   return h + '</div>';
+}
+/** Krankmeldungen und Fortbildungen, zu denen noch kein Nachweis hinterlegt ist. */
+function fehlendeNachweise(){
+  var pflicht = {krank:1, kind_krank:1, fortbildung:1};
+  var offen = S.absences.filter(function(a){
+    return pflicht[a.typ] && !HATDATEI[a.id] && !a.nachweis
+        && a.status !== 'abgelehnt' && a.status !== 'storniert' && a.bis <= S.heute;
+  }).sort(function(a,b){ return a.von < b.von ? 1 : -1; }).slice(0, 8);
+  if(!offen.length) return '';
+  var h = '<div class="card noprint"><h2>Nachweis fehlt noch</h2>';
+  offen.forEach(function(a){
+    var m = S.staff.filter(function(x){ return x.id === a.staff_id; })[0] || {name:'?'};
+    var t = TY[a.typ] || {label:a.typ, farbe:'#888'};
+    h += '<div class="antrag"><span class="dot" style="background:'+t.farbe+'"></span>'
+      + '<div class="t"><b>'+esc(m.name)+'</b> · '+esc(t.label)+'<br>'
+      + '<span class="muted">'+zeitraum(a.von,a.bis)+' · '+a.kalendertage+' Kalendertage</span></div>'
+      + '<button class="btn small ghost" onclick="openEintragById(\''+a.id+'\')">Nachweis hinzufügen</button></div>';
+  });
+  return h + '<p class="muted" style="margin-top:8px">Krankenscheine, Atteste und Zertifikate lassen sich '
+     + 'direkt am Eintrag hochladen – oder die Mitarbeiterin lädt ihren eigenen hoch.</p></div>';
+}
+function openEintragById(id){
+  var a = S.absences.filter(function(x){ return x.id === id; })[0];
+  if(a) openEintrag(a);
 }
 function entscheiden(id, status){
   api('entscheiden', {id:id, status:status}).then(load)
@@ -776,7 +865,10 @@ function viewMeins(){
       + '<div class="kbox rest'+(k.rest<0?' neg':'')+'"><div class="v">'+num(k.rest)+'</div><div class="l">Rest</div></div>'
     + '</div>'
     + '<div class="kgrid">'+kbox(k.krank,'Krank (AT)')+kbox(k.kind,'Kind krank')+kbox(k.fortbildung,'Fortbildung')+'</div>'
-    + '<button class="btn" onclick="openEintrag({})">Urlaub beantragen</button></div>';
+    + '<button class="btn" onclick="openEintrag({})">Urlaub beantragen</button>'
+    + '<div class="hilfe">Krankenschein oder Attest fürs Kind: unten beim passenden Eintrag auf '
+    + '<b>Nachweis hochladen</b> tippen – Foto oder PDF genügt. Nur die Praxisleitung und Sie selbst '
+    + 'können die Datei öffnen.</div></div>';
 
   var meine = S.absences.filter(function(a){ return a.staff_id === sid; })
                         .sort(function(a,b){ return a.von < b.von ? 1 : -1; });
@@ -787,7 +879,10 @@ function viewMeins(){
     var st = a.status === 'beantragt' ? ' · <b>wartet auf Genehmigung</b>'
            : (a.status === 'abgelehnt' ? ' · abgelehnt' : '');
     h += '<div class="item"><span class="dot" style="background:'+t.farbe+'"></span>'
-      + '<div class="t"><b>'+esc(t.label)+'</b><span>'+dmy(a.von)+' – '+dmy(a.bis)+' · '+tage(a.tage)+st+'</span></div>'
+      + '<div class="t"><b>'+esc(t.label)+'</b><span>'+zeitraum(a.von,a.bis)+' · '+tage(a.tage)+st
+      + (HATDATEI[a.id] ? ' · '+HATDATEI[a.id]+' Nachweis'+(HATDATEI[a.id]>1?'e':'') : '')+'</span></div>'
+      + '<button class="btn small ghost" onclick="openEintragById(\''+a.id+'\')">'
+      + (HATDATEI[a.id] ? 'Nachweis' : 'Nachweis hochladen')+'</button>'
       + (a.status === 'beantragt'
           ? '<button class="btn small ghost" onclick="delEintrag(\''+a.id+'\')">Zurückziehen</button>' : '')
       + '</div>';
@@ -821,6 +916,16 @@ function viewEinst(){
    + '<div class="card"><h2>Daten</h2>'
    + '<a class="btn ghost" href="api.php?a=export&jahr='+JAHR+'" style="text-decoration:none;text-align:center">Abwesenheiten '+JAHR+' als CSV</a>'
    + '<button class="btn ghost" onclick="recalc()">Arbeitstage neu berechnen</button>'
+   + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">'
+   + '<b style="font-size:0.88rem">Nachweise</b>'
+   + '<p class="muted" style="margin:6px 0 10px">'+((S.dateien||[]).length)+' Dateien gespeichert ('
+   + mb((S.dateien||[]).reduce(function(x,f){ return x + f.groesse; }, 0))+'), '
+   + 'abgelegt in <code>data/nachweise</code> – über das Internet nicht direkt erreichbar.</p>'
+   + '<div class="row"><div><label>Nachweise löschen, die älter sind als</label>'
+   + '<select id="e_jahre"><option value="2">2 Jahre</option><option value="3" selected>3 Jahre</option>'
+   + '<option value="5">5 Jahre</option><option value="10">10 Jahre</option></select></div>'
+   + '<div style="display:flex;align-items:flex-end"><button class="btn ghost" style="margin:0" '
+   + 'onclick="aufraeumen()">Jetzt löschen</button></div></div></div>'
    + '<p class="muted" style="margin-top:10px"><b>Datenschutz:</b> Hier stehen Beschäftigtendaten und Krankheitszeiten – '
    + 'besondere Kategorien nach Art. 9 DSGVO. Keine Diagnosen eintragen, Zugang nur für die Praxisleitung, '
    + 'Aufruf nur über HTTPS, und Einträge ausgeschiedener Mitarbeiterinnen nach Ablauf der Aufbewahrungsfrist löschen.</p></div>'
@@ -836,6 +941,13 @@ function savePasswort(){
   api('passwort', {alt:el('p_alt').value, neu:el('p_neu').value})
    .then(function(){ zeige('Passwort geändert.', true); })
    .catch(function(e){ zeige(fehlerText(e)); });
+}
+function aufraeumen(){
+  var j = el('e_jahre').value;
+  if(!confirm('Alle Nachweise löschen, die älter als '+j+' Jahre sind? Das lässt sich nicht rückgängig machen.')) return;
+  api('aufraeumen', {jahre:j}).then(function(r){
+    return load().then(function(){ zeige(r.geloescht+' Nachweise gelöscht.', true); });
+  }).catch(function(e){ zeige(fehlerText(e)); });
 }
 function recalc(){
   api('recalc', {}).then(load).then(function(){ zeige('Neu berechnet.', true); })
@@ -861,10 +973,28 @@ function openEintrag(a){
   if(nurLesen){
     var m0 = S.staff.filter(function(x){ return x.id === a.staff_id; })[0] || {name:'?'};
     var t0 = TY[a.typ] || {label:a.typ};
-    dialog('Eintrag',
-      '<p style="font-size:0.95rem;line-height:1.7"><b>'+esc(m0.name)+'</b><br>'+esc(t0.label)+'<br>'
-      + dmy(a.von)+' – '+dmy(a.bis)+'</p>'
-      + '<p class="muted">Ändern darf das nur die Praxisleitung.</p>', null);
+    var eigener = a.staff_id === S.nutzer.staff_id;
+    var kopf = '<p style="font-size:0.95rem;line-height:1.7"><b>'+esc(m0.name)+'</b><br>'+esc(t0.label)+'<br>'
+             + zeitraum(a.von, a.bis)+'</p>';
+    if(!eigener){
+      dialog('Eintrag', kopf + '<p class="muted">Ändern darf das nur die Praxisleitung.</p>', null);
+      return;
+    }
+    // Eigener Eintrag: Zeitraum unveränderbar, aber Nachweis darf hochgeladen werden
+    dialog('Mein Eintrag',
+      kopf + nachweisBereich(a, a.typ, false)
+      + '<p class="muted">Den Zeitraum ändert die Praxisleitung. Ihren Krankenschein oder das Attest '
+      + 'fürs Kind können Sie hier selbst hinzufügen.</p>',
+      function(){
+        var feld = el('a_datei');
+        if(!feld || !feld.files || !feld.files.length) return Promise.resolve();
+        var art = el('a_datei_art') ? el('a_datei_art').value : 'sonstiges';
+        var kette = Promise.resolve();
+        Array.prototype.forEach.call(feld.files, function(d){
+          kette = kette.then(function(){ return apiUpload(a.id, art, d); });
+        });
+        return kette;
+      }, 'Nachweis hochladen');
     return;
   }
 
@@ -901,9 +1031,7 @@ function openEintrag(a){
    + ' onchange="vorschau()" style="width:auto;margin-right:6px">nur ein halber Tag</label></div></div>'
    + '<div class="row one"><div><label>Notiz – freiwillig, keine Diagnosen</label>'
    + '<input id="a_notiz" maxlength="120" value="'+esc(a.notiz||'')+'"></div></div>'
-   + (istL ? '<div class="row one"><div><label><input type="checkbox" id="a_nachweis" '+(a.nachweis?'checked':'')
-   + ' style="width:auto;margin-right:6px">Nachweis liegt vor (AU / Zertifikat)</label></div></div>'
-           : '<input type="hidden" id="a_nachweis" value="">')
+   + nachweisBereich(a, typ, istL)
    + '<div id="a_vorschau" class="ok" style="display:none"></div>'
    + (darfLoeschen ? '<button class="btn danger" onclick="delEintrag(\''+a.id+'\')">Eintrag löschen</button>' : ''),
      function(){
@@ -911,11 +1039,71 @@ function openEintrag(a){
          von:el('a_von').value, bis:el('a_bis').value, halbtag:el('a_halb').checked?1:0,
          notiz:el('a_notiz').value,
          nachweis:(el('a_nachweis') && el('a_nachweis').checked)?1:0,
-         status:'genehmigt'});
+         status:'genehmigt'})
+       .then(function(r){
+         // Ausgewählte Nachweise an den (ggf. gerade erst angelegten) Eintrag hängen
+         var feld = el('a_datei');
+         var ziel = a.id || (r.ids && r.ids[0]);
+         if(!feld || !feld.files || !feld.files.length || !ziel) return r;
+         var art = el('a_datei_art') ? el('a_datei_art').value : 'sonstiges';
+         var kette = Promise.resolve();
+         Array.prototype.forEach.call(feld.files, function(datei){
+           kette = kette.then(function(){ return apiUpload(ziel, art, datei); });
+         });
+         return kette;
+       });
      },
      istL ? 'Speichern' : 'Antrag senden');
   vorschau();
 }
+/** Abschnitt "Nachweise" im Eintragsdialog: vorhandene Dateien + Auswahlfeld. */
+function nachweisBereich(a, typ, istL){
+  var arten = S.nachweis_arten || {};
+  var vorgabe = standardArt(typ);
+  var liste = a.id ? dateienVon(a.id) : [];
+  var h = '<div class="row one"><div><label>Nachweis (Krankenschein, Attest, Zertifikat)</label>';
+
+  liste.forEach(function(f){
+    var endung = (f.dateiname.split('.').pop() || '').toUpperCase().substr(0,4);
+    h += '<div class="datei"><span class="ic">'+esc(endung||'DAT')+'</span>'
+      + '<div class="n"><a href="api.php?a=datei&id='+esc(f.id)+'" target="_blank" rel="noopener">'
+      +   esc(f.dateiname)+'</a>'
+      + '<span>'+esc(f.art_label)+' · '+mb(f.groesse)+' · '+esc(dmy((f.hochgeladen_am||'').substr(0,10)))+'</span></div>'
+      + '<a class="btn small ghost" href="api.php?a=datei&id='+esc(f.id)+'&download=1" '
+      +   'style="text-decoration:none">Speichern</a>'
+      + '<button type="button" onclick="delDatei(\''+f.id+'\')">Löschen</button></div>';
+  });
+
+  h += '<div class="upload">'
+    + '<select id="a_datei_art" style="margin-bottom:8px" onchange="this.dataset.handisch=1">'
+    + Object.keys(arten).map(function(k){
+        return '<option value="'+k+'"'+(k===vorgabe?' selected':'')+'>'+esc(arten[k])+'</option>'; }).join('')
+    + '</select>'
+    + '<input type="file" id="a_datei" multiple '
+    +   'accept="application/pdf,image/jpeg,image/png,image/heic,image/heif,image/webp,.pdf,.jpg,.jpeg,.png,.heic,.heif">'
+    + '<p class="muted" style="margin-top:6px">PDF oder Foto, bis '+mb(S.max_upload||10485760)+' je Datei. '
+    + 'Mehrere Dateien möglich (z. B. Folgebescheinigung). '
+    + (a.id ? 'Wird nach dem Speichern hochgeladen.' : 'Wird zusammen mit dem Eintrag gespeichert.')
+    + '</p></div>';
+
+  h += (istL
+    ? '<label style="margin-top:9px"><input type="checkbox" id="a_nachweis" '+(a.nachweis?'checked':'')
+      + ' style="width:auto;margin-right:6px">Nachweis liegt vor (Haken wird beim Hochladen automatisch gesetzt)</label>'
+    : '<input type="hidden" id="a_nachweis" value="">');
+  return h + '</div></div>';
+}
+function delDatei(id){
+  if(!confirm('Diesen Nachweis endgültig löschen?')) return;
+  api('del_datei', {id:id}).then(function(){ closeDialog(); return load(); })
+   .then(function(){ zeige('Nachweis gelöscht.', true); })
+   .catch(function(e){ alert(fehlerText(e)); });
+}
+/** Art des Nachweises automatisch zur gewählten Abwesenheitsart passend setzen. */
+function artAnpassen(){
+  var sel = el('a_datei_art');
+  if(sel && !sel.dataset.handisch) sel.value = standardArt(el('a_typ').value);
+}
+
 /** Erster Tag ab heute, an dem diese Person laut Wochenmuster arbeitet. */
 function naechsterArbeitstag(staffId){
   var m = S.staff.filter(function(x){ return x.id === staffId; })[0];
@@ -944,6 +1132,7 @@ function typWahl(b){
     x.classList.remove('on'); });
   b.classList.add('on');
   el('a_typ').value = b.getAttribute('data-typ');
+  artAnpassen();
   vorschau();
 }
 function spanne(plus){

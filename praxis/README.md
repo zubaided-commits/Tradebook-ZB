@@ -30,8 +30,12 @@ alle Daten bleiben auf dem eigenen Server.
    ```
    Die Tabellen legt die Anwendung beim ersten Aufruf selbst an.
 
-3. **Schreibrechte** – nur bei SQLite nötig: der Ordner `data/` muss vom Webserver
-   beschreibbar sein (Rechte 755 oder 775).
+3. **Schreibrechte** – der Ordner `data/` muss vom Webserver beschreibbar sein
+   (Rechte 755 oder 775). Das gilt für die SQLite-Datenbank **und** für die
+   hochgeladenen Nachweise unter `data/nachweise` (wird automatisch angelegt).
+
+   Die mitgelieferte `.user.ini` erlaubt Uploads bis 12 MB. Falls IONOS kleinere
+   Werte erzwingt, zeigt die Anwendung im Upload-Feld die tatsächliche Grenze an.
 
 4. **SSL einschalten** – im IONOS-Control-Panel das kostenlose SSL-Zertifikat für die
    Domain aktivieren. Die mitgelieferte `.htaccess` leitet HTTP automatisch auf HTTPS um.
@@ -64,6 +68,29 @@ Der grüne Knopf **+ Eintrag** unten rechts ist immer erreichbar.
 | **Kalender** | Der Plan des ganzen Teams, nur zum Ansehen. |
 | **Mein Urlaub** | Eigenes Urlaubskonto, eigene Einträge, **Urlaub beantragen**, eigenes Passwort ändern. |
 
+### Krankenschein und Nachweise hochladen
+
+An jedem Eintrag hängt ein Feld **Nachweis**. Dort lassen sich PDF-Dateien und Fotos
+anhängen – ein abfotografierter Krankenschein reicht:
+
+* **Krankenschein / AU (selbst)** – bei „Krank (AU)"
+* **Krankenschein / Attest (Kind)** – bei „Kind krank"
+* **Fortbildungs-Zertifikat** – bei „Fortbildung"
+* **Sonstiger Nachweis** – für alles andere
+
+Die Art wird passend zur Abwesenheit vorgeschlagen und lässt sich ändern. Mehrere
+Dateien pro Eintrag sind möglich (z. B. Erst- und Folgebescheinigung). Der Haken
+„Nachweis liegt vor" setzt sich beim Hochladen von selbst.
+
+**Wer lädt hoch?** Die Praxisleitung für jede Person – und jede Mitarbeiterin mit
+Zugang für sich selbst: *Mein Urlaub → beim Eintrag auf „Nachweis hochladen"*. Das
+geht auch bei Einträgen, die die Leitung angelegt hat (der übliche Fall: Krankmeldung
+wird eingetragen, die AU kommt später).
+
+Im Kalender zeigt eine kleine Ecke in der Tagesspalte, dass ein Nachweis hinterlegt
+ist. Die Leitung sieht außerdem oben die Liste **„Nachweis fehlt noch"** – alle
+vergangenen Krank-, Kind-krank- und Fortbildungstage ohne Beleg.
+
 ## 3. Wer darf was
 
 | | Praxisleitung | Mitarbeiterin | ohne Zugang |
@@ -72,6 +99,8 @@ Der grüne Knopf **+ Eintrag** unten rechts ist immer erreichbar.
 | Für **jede** Person eintragen, ändern, löschen | ✔ | – | – |
 | Für sich selbst Urlaub **beantragen** | ✔ (direkt gültig) | ✔ (Leitung genehmigt) | – |
 | Eigenes Urlaubskonto | ✔ alle | ✔ nur das eigene | – |
+| Nachweise hochladen | für alle | nur eigene | – |
+| Nachweise ansehen und löschen | alle | nur eigene | – |
 | Personen anlegen, Zugänge vergeben | ✔ | – | – |
 | Praxis-Einstellungen | ✔ | – | – |
 
@@ -137,12 +166,33 @@ Art. 9 DSGVO**. Deshalb:
   Bitte nach der Installation einmal prüfen: `https://ihre-domain.de/kalender/config.php`
   darf **keinen** Inhalt anzeigen, und `…/data/praxis.sqlite` darf sich nicht herunterladen lassen.
 * Einträge ausgeschiedener Mitarbeiterinnen nach Ablauf der Aufbewahrungsfristen löschen.
+
+### Hochgeladene Nachweise
+
+Krankenscheine und Atteste sind besonders schutzbedürftig. Deshalb:
+
+* Die Dateien liegen in `data/nachweise` und sind über das Web **nicht direkt
+  abrufbar** – weder über den Dateinamen noch durch Raten: jede Datei bekommt einen
+  zufälligen Namen, und der Ordner ist per `.htaccess` gesperrt (zusätzlich ist dort
+  die PHP-Ausführung abgeschaltet).
+* Ausgeliefert wird nur über `api.php`, und nur nach Anmeldung und Rechteprüfung:
+  **die Praxisleitung sieht alle, jede Mitarbeiterin ausschließlich ihre eigenen.**
+* Erlaubt sind PDF, JPG, PNG, HEIC und WEBP. Der Typ wird am Inhalt geprüft, nicht am
+  Dateinamen – eine als Bild getarnte PHP-Datei wird abgelehnt.
+* Wird ein Eintrag oder eine Person gelöscht, verschwinden die zugehörigen Dateien mit.
+* Für die Arbeitgeberkopie einer AU gibt es keine starre gesetzliche Aufbewahrungsfrist;
+  sie ist zu löschen, sobald der Zweck entfällt. Unter *Einstellungen → Nachweise*
+  löschen Sie mit einem Klick alles, was älter als 2, 3, 5 oder 10 Jahre ist. Welche
+  Frist für Ihre Praxis passt, klären Sie bitte mit Steuerberatung bzw.
+  Datenschutzbeauftragtem.
+* Die AU selbst enthält keine Diagnose – bitte auch keine in die Notiz schreiben.
 * In das Verzeichnis der Verarbeitungstätigkeiten aufnehmen (Zweck: Urlaubs- und
   Fehlzeitenverwaltung; Rechtsgrundlage: § 26 BDSG / Art. 6 Abs. 1 b DSGVO).
 
 ## 5. Sicherung
 
-* **SQLite:** die Datei `data/praxis.sqlite` regelmäßig per FTP herunterladen.
+* **SQLite:** die Datei `data/praxis.sqlite` regelmäßig per FTP herunterladen –
+  zusammen mit dem Ordner `data/nachweise`, sonst fehlen die Belege.
 * **MySQL:** Export über phpMyAdmin im IONOS-Control-Panel.
 * Zusätzlich im Reiter *Urlaubskonto* den **CSV-Export** je Jahr sichern.
 

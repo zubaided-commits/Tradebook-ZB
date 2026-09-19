@@ -103,6 +103,10 @@ function ensureSchema(): void {
     "CREATE TABLE IF NOT EXISTS " . t('carry') . " (
        id $id, staff_id $txt, jahr INT, uebertrag DOUBLE DEFAULT 0,
        anspruch_override DOUBLE NULL, hinweis_am $txt)",
+    "CREATE TABLE IF NOT EXISTS " . t('files') . " (
+       id $id, absence_id $txt, staff_id $txt, art $txt,
+       dateiname $txt, pfad $txt, mime $txt, groesse INT,
+       hochgeladen_am $txt, hochgeladen_von $txt)",
     "CREATE TABLE IF NOT EXISTS " . t('log') . " (
        id $id, ts $txt, nutzer $txt, aktion $txt, details $lng)",
   ];
@@ -112,6 +116,7 @@ function ensureSchema(): void {
   ensureColumn('users', 'aktiv', 'INT DEFAULT 1');
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('abs') . "_von ON " . t('absences') . " (von)");
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('abs') . "_staff ON " . t('absences') . " (staff_id)");
+  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('fil') . "_abs ON " . t('files') . " (absence_id)");
 }
 
 /** Spalte anlegen, falls sie noch fehlt (SQLite und MySQL). */
@@ -372,6 +377,76 @@ function anteilImJahr(array $a, array $staff, int $jahr): float {
   return $r['tage'];
 }
 
+// ---------------------------------------------------------------- Nachweise (AU, Atteste, Zertifikate)
+const NACHWEIS_ARTEN = [
+  'au'        => 'Krankenschein / AU (selbst)',
+  'au_kind'   => 'Krankenschein / Attest (Kind)',
+  'zertifikat'=> 'Fortbildungs-Zertifikat',
+  'sonstiges' => 'Sonstiger Nachweis',
+];
+const ERLAUBTE_TYPEN = [
+  'application/pdf' => 'pdf',
+  'image/jpeg'      => 'jpg',
+  'image/png'       => 'png',
+  'image/heic'      => 'heic',
+  'image/heif'      => 'heif',
+  'image/webp'      => 'webp',
+];
+const MAX_DATEI = 10485760;   // 10 MB
+
+function nachweisOrdner(): string {
+  $dir = __DIR__ . '/data/nachweise';
+  if (!is_dir($dir)) {
+    @mkdir($dir, 0775, true);
+    // Zusaetzlicher Schutz direkt im Ordner
+    @file_put_contents($dir . '/.htaccess',
+      "<IfModule mod_authz_core.c>\n  Require all denied\n</IfModule>\n" .
+      "<IfModule !mod_authz_core.c>\n  Order allow,deny\n  Deny from all\n</IfModule>\n" .
+      "php_flag engine off\nRemoveHandler .php .phtml .php3 .php4 .php5 .php7 .php8\n");
+  }
+  return $dir;
+}
+/** Groesste Datei, die PHP auf diesem Server annimmt. */
+function maxUpload(): int {
+  $zuByte = function (string $v): int {
+    $v = trim($v);
+    if ($v === '') return 0;
+    $n = (int)$v;
+    switch (strtolower(substr($v, -1))) {
+      case 'g': return $n * 1073741824;
+      case 'm': return $n * 1048576;
+      case 'k': return $n * 1024;
+    }
+    return $n;
+  };
+  $werte = array_filter([MAX_DATEI, $zuByte(ini_get('upload_max_filesize')), $zuByte(ini_get('post_max_size'))]);
+  return $werte ? (int)min($werte) : MAX_DATEI;
+}
+/** Nachweise einer Abwesenheit bzw. alle (ohne Dateipfade nach aussen). */
+function dateienFuer(?string $absenceId = null): array {
+  if ($absenceId === null) {
+    $rows = db()->query("SELECT * FROM " . t('files') . " ORDER BY hochgeladen_am")->fetchAll();
+  } else {
+    $st = db()->prepare("SELECT * FROM " . t('files') . " WHERE absence_id = ? ORDER BY hochgeladen_am");
+    $st->execute([$absenceId]);
+    $rows = $st->fetchAll();
+  }
+  $out = [];
+  foreach ($rows as $r) {
+    $out[] = [
+      'id' => $r['id'], 'absence_id' => $r['absence_id'], 'staff_id' => $r['staff_id'],
+      'art' => $r['art'], 'art_label' => NACHWEIS_ARTEN[$r['art']] ?? 'Nachweis',
+      'dateiname' => $r['dateiname'], 'mime' => $r['mime'], 'groesse' => (int)$r['groesse'],
+      'hochgeladen_am' => $r['hochgeladen_am'], 'hochgeladen_von' => $r['hochgeladen_von'],
+    ];
+  }
+  return $out;
+}
+/** Darf die angemeldete Person diesen Nachweis sehen oder hochladen? */
+function darfNachweis(string $staffId): bool {
+  return istLeitung() || ($staffId !== '' && $staffId === eigeneStaffId());
+}
+
 // ---------------------------------------------------------------- Sitzung / Auth
 function startSession(): void {
   global $CFG;
@@ -488,6 +563,11 @@ case 'state': {
     'absences' => $abs,
     'feiertage' => feiertage($jahr, $bl),
     'konten' => $kt,
+    'dateien' => array_values(array_filter(dateienFuer(), function ($f) use ($istL, $eigene) {
+      return $istL || $f['staff_id'] === $eigene;
+    })),
+    'nachweis_arten' => NACHWEIS_ARTEN,
+    'max_upload' => maxUpload(),
   ]);
 }
 
@@ -605,6 +685,7 @@ case 'del_staff': {
   $id = s(body(), 'id');
   if ($id === '') fail('id_fehlt');
   $pdo = db();
+  dateienLoeschen('staff_id', $id);
   $pdo->prepare("DELETE FROM " . t('absences') . " WHERE staff_id = ?")->execute([$id]);
   $pdo->prepare("DELETE FROM " . t('carry') . " WHERE staff_id = ?")->execute([$id]);
   $pdo->prepare("DELETE FROM " . t('staff') . " WHERE id = ?")->execute([$id]);
@@ -706,6 +787,7 @@ case 'del_absence': {
       fail('keine_berechtigung', 403);
     }
   }
+  dateienLoeschen('absence_id', $id);
   db()->prepare("DELETE FROM " . t('absences') . " WHERE id = ?")->execute([$id]);
   logAction('eintrag_geloescht', $id);
   out(['ok' => true]);
@@ -876,12 +958,149 @@ case 'entscheiden': {
   out(['ok' => true]);
 }
 
+case 'upload': {
+  requirePost(); requireLogin(); requireCsrf();
+  $absenceId = s($_POST, 'absence_id');
+  $art       = s($_POST, 'art', 'sonstiges');
+  if (!isset(NACHWEIS_ARTEN[$art])) $art = 'sonstiges';
+  if ($absenceId === '') fail('eintrag_fehlt');
+
+  $st = db()->prepare("SELECT * FROM " . t('absences') . " WHERE id = ?");
+  $st->execute([$absenceId]);
+  $eintrag = $st->fetch();
+  if (!$eintrag) fail('eintrag_unbekannt', 404);
+  if (!darfNachweis((string)$eintrag['staff_id'])) fail('keine_berechtigung', 403);
+
+  // Datei groesser als post_max_size: PHP liefert ein leeres $_FILES
+  if (empty($_FILES['datei'])) {
+    $laenge = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+    fail($laenge > 0 ? 'datei_zu_gross' : 'keine_datei');
+  }
+  $f = $_FILES['datei'];
+  if (($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+    fail(in_array($f['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)
+      ? 'datei_zu_gross' : 'upload_fehlgeschlagen');
+  }
+  if (!is_uploaded_file($f['tmp_name'])) fail('upload_fehlgeschlagen');
+  if ((int)$f['size'] <= 0) fail('datei_leer');
+  if ((int)$f['size'] > maxUpload()) fail('datei_zu_gross');
+
+  // Typ am Inhalt pruefen, nicht am Namen
+  $mime = '';
+  if (function_exists('finfo_open')) {
+    $fi = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = (string)finfo_file($fi, $f['tmp_name']);
+    finfo_close($fi);
+  }
+  $endungAlt = strtolower(pathinfo((string)$f['name'], PATHINFO_EXTENSION));
+  if (!isset(ERLAUBTE_TYPEN[$mime])) {
+    // Aeltere Server erkennen HEIC/HEIF nicht - dann die Endung akzeptieren
+    if (in_array($endungAlt, ['heic', 'heif'], true) &&
+        in_array($mime, ['application/octet-stream', 'image/heif', 'image/heic', ''], true)) {
+      $mime = 'image/' . $endungAlt;
+    } else {
+      fail('dateityp');
+    }
+  }
+  $endung = ERLAUBTE_TYPEN[$mime];
+
+  $ordner = nachweisOrdner();
+  if (!is_dir($ordner) || !is_writable($ordner)) fail('ordner_nicht_beschreibbar', 500);
+  $name = bin2hex(random_bytes(16)) . '.' . $endung;
+  if (!move_uploaded_file($f['tmp_name'], $ordner . '/' . $name)) fail('speichern_fehlgeschlagen', 500);
+  @chmod($ordner . '/' . $name, 0640);
+
+  // Anzeigenamen bereinigen: nur harmlose Zeichen behalten, keine Pfadangaben
+  $roh = str_replace(['\\', '/'], '-', (string)$f['name']);
+  $anzeige = (string)preg_replace('/[^\p{L}\p{N} ._()\-]+/u', '', $roh);
+  $anzeige = trim($anzeige) !== '' ? mb_substr(trim($anzeige), 0, 120) : 'Nachweis';
+  db()->prepare("INSERT INTO " . t('files') . "
+      (id, absence_id, staff_id, art, dateiname, pfad, mime, groesse, hochgeladen_am, hochgeladen_von)
+      VALUES (?,?,?,?,?,?,?,?,?,?)")
+     ->execute([uuid(), $absenceId, (string)$eintrag['staff_id'], $art, $anzeige, $name,
+                $mime, (int)$f['size'], date('c'), $_SESSION['user_name']]);
+  // Haken "Nachweis liegt vor" automatisch setzen
+  db()->prepare("UPDATE " . t('absences') . " SET nachweis = 1 WHERE id = ?")->execute([$absenceId]);
+  logAction('nachweis_hochgeladen', $art . ' zu ' . $absenceId);
+  out(['ok' => true]);
+}
+
+case 'datei': {
+  requireLogin();
+  $id = s($_GET, 'id');
+  $st = db()->prepare("SELECT * FROM " . t('files') . " WHERE id = ?");
+  $st->execute([$id]);
+  $f = $st->fetch();
+  if (!$f) fail('datei_unbekannt', 404);
+  if (!darfNachweis((string)$f['staff_id'])) fail('keine_berechtigung', 403);
+  $pfad = nachweisOrdner() . '/' . basename((string)$f['pfad']);
+  if (!is_file($pfad)) fail('datei_fehlt', 404);
+
+  header_remove('Content-Type');
+  header('Content-Type: ' . $f['mime']);
+  header('Content-Length: ' . filesize($pfad));
+  $name = preg_replace('/["\r\n]/', '', (string)$f['dateiname']);
+  header('Content-Disposition: ' . (empty($_GET['download']) ? 'inline' : 'attachment')
+         . '; filename="' . $name . '"');
+  header('X-Content-Type-Options: nosniff');
+  header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; object-src 'self'; sandbox");
+  header('Cache-Control: private, no-store');
+  readfile($pfad);
+  exit;
+}
+
+case 'del_datei': {
+  requirePost(); requireLogin(); requireCsrf();
+  $id = s(body(), 'id');
+  $st = db()->prepare("SELECT * FROM " . t('files') . " WHERE id = ?");
+  $st->execute([$id]);
+  $f = $st->fetch();
+  if (!$f) fail('datei_unbekannt', 404);
+  if (!darfNachweis((string)$f['staff_id'])) fail('keine_berechtigung', 403);
+  @unlink(nachweisOrdner() . '/' . basename((string)$f['pfad']));
+  db()->prepare("DELETE FROM " . t('files') . " WHERE id = ?")->execute([$id]);
+  // Haken zuruecksetzen, wenn kein Nachweis mehr haengt
+  $rest = db()->prepare("SELECT COUNT(*) c FROM " . t('files') . " WHERE absence_id = ?");
+  $rest->execute([$f['absence_id']]);
+  if ((int)$rest->fetch()['c'] === 0) {
+    db()->prepare("UPDATE " . t('absences') . " SET nachweis = 0 WHERE id = ?")->execute([$f['absence_id']]);
+  }
+  logAction('nachweis_geloescht', (string)$f['dateiname']);
+  out(['ok' => true]);
+}
+
+case 'aufraeumen': {
+  requirePost(); requireLeitung(); requireCsrf();
+  $jahre = (int)f(body(), 'jahre', 3);
+  if ($jahre < 1) $jahre = 1;
+  $grenze = date('c', strtotime('-' . $jahre . ' years'));
+  $st = db()->prepare("SELECT * FROM " . t('files') . " WHERE hochgeladen_am < ?");
+  $st->execute([$grenze]);
+  $weg = $st->fetchAll();
+  foreach ($weg as $f) {
+    @unlink(nachweisOrdner() . '/' . basename((string)$f['pfad']));
+    db()->prepare("DELETE FROM " . t('files') . " WHERE id = ?")->execute([$f['id']]);
+  }
+  logAction('nachweise_aufgeraeumt', count($weg) . ' Dateien aelter als ' . $jahre . ' Jahre');
+  out(['ok' => true, 'geloescht' => count($weg)]);
+}
+
 default:
   fail('unbekannte_aktion', 404);
 }
 
 // ---------------------------------------------------------------- Nachgelagerte Helfer
 function staffCacheLeeren(): void { $GLOBALS['STAFF_CACHE'] = []; }
+/** Hochgeladene Nachweise mitsamt Dateien entfernen. */
+function dateienLoeschen(string $spalte, string $wert): void {
+  $st = db()->prepare("SELECT * FROM " . t('files') . " WHERE $spalte = ?");
+  $st->execute([$wert]);
+  foreach ($st->fetchAll() as $f) {
+    @unlink(nachweisOrdner() . '/' . basename((string)$f['pfad']));
+  }
+  db()->prepare("DELETE FROM " . t('files') . " WHERE $spalte = ?")->execute([$wert]);
+}
+
 /** Alle Zugaenge (ohne Passwort-Hashes). */
 function listUsers(): array {
   $rows = db()->query("SELECT id, username, anzeige, rolle, staff_id, aktiv, created_at
