@@ -46,14 +46,56 @@ alle Daten bleiben auf dem eigenen Server.
 
 ## 2. Bedienung
 
+### Für die Praxisleitung – vier Reiter
+
 | Reiter | Inhalt |
 |---|---|
-| **Monat** | Klassischer Wandplaner: Zeilen = Team, Spalten = Tage. Auf ein Feld tippen legt einen Eintrag an. Unten steht je Tag, wie viele anwesend sind. |
-| **Jahr** | Jahresübersicht über alle 365 Tage, zum Ausdrucken (Querformat). |
-| **Heute** | Wer ist heute da, wer fehlt, und was steht in den nächsten 14 Tagen an. |
-| **Urlaubskonto** | Anspruch, Übertrag, genommen, geplant, Rest – dazu Krank-, Kind-krank- und Fortbildungstage. |
-| **Team** | Mitarbeiterinnen anlegen: Wochenmuster, Urlaubstage, Ein-/Austritt, Farbe. |
-| **Einstellungen** | Praxisname, Bundesland, Passwort, CSV-Export. |
+| **Kalender** | Oben der Heute-Streifen (wer ist da, wer fehlt) und offene Anträge. Darunter der Plan, umschaltbar zwischen **Monat** und **Ganzes Jahr**. Auf ein Feld tippen legt einen Eintrag an. |
+| **Urlaub** | Urlaubskonten aller: Anspruch, Übertrag, genommen, geplant, Rest – dazu Krank-, Kind-krank- und Fortbildungstage. |
+| **Team** | Personen anlegen und ändern; darunter die **Zugänge** zum Anmelden. |
+| **Einstellungen** | Praxisname, Bundesland, eigenes Passwort, CSV-Export. |
+
+Der grüne Knopf **+ Eintrag** unten rechts ist immer erreichbar.
+
+### Für Mitarbeiterinnen mit Zugang – zwei Reiter
+
+| Reiter | Inhalt |
+|---|---|
+| **Kalender** | Der Plan des ganzen Teams, nur zum Ansehen. |
+| **Mein Urlaub** | Eigenes Urlaubskonto, eigene Einträge, **Urlaub beantragen**, eigenes Passwort ändern. |
+
+## 3. Wer darf was
+
+| | Praxisleitung | Mitarbeiterin | ohne Zugang |
+|---|---|---|---|
+| Plan ansehen | ✔ | ✔ | – |
+| Für **jede** Person eintragen, ändern, löschen | ✔ | – | – |
+| Für sich selbst Urlaub **beantragen** | ✔ (direkt gültig) | ✔ (Leitung genehmigt) | – |
+| Eigenes Urlaubskonto | ✔ alle | ✔ nur das eigene | – |
+| Personen anlegen, Zugänge vergeben | ✔ | – | – |
+| Praxis-Einstellungen | ✔ | – | – |
+
+**Eine Person braucht keinen Zugang.** Die Leitung trägt Urlaub, Krankheit und alles
+Weitere für sie ein – das ist der Normalfall für die meisten Praxen.
+
+### Zugang jederzeit nachträglich anlegen
+
+*Team → bei der Person auf **Zugang anlegen*** → Benutzername (wird vorgeschlagen),
+Passwort vergeben, Rolle wählen, speichern. Das funktioniert auch Monate später:
+alle bereits eingetragenen Tage gehören dann automatisch zum Konto dieser Person,
+es geht nichts verloren.
+
+* **Rolle „Leitung"** darf alles – sinnvoll für die Ärztin und die Praxismanagerin.
+* **Rolle „Mitarbeiterin"** sieht den Plan, das eigene Konto und kann Urlaub beantragen.
+* **Anmelden erlaubt** abschalten sperrt den Zugang, ohne etwas zu löschen (z. B. bei
+  längerer Abwesenheit oder nach dem Austritt).
+* Ein Zugang kann auch **ohne Person** bestehen (reines Verwaltungskonto).
+* Die letzte Leitung lässt sich weder löschen noch herabstufen – so sperrt sich niemand aus.
+
+Passwörter: mindestens 10 Zeichen. Beim Anlegen wird das Passwort im Klartext
+angezeigt, damit Sie es weitergeben können – danach ist es nicht mehr lesbar.
+Bitte die Mitarbeiterin bitten, es nach der ersten Anmeldung unter *Mein Urlaub*
+selbst zu ändern.
 
 ### Wochenmuster und Teilzeit
 Im Team-Dialog werden die Wochentage angetippt: **1× = ganzer Arbeitstag, 2× = halber
@@ -80,13 +122,16 @@ pro Woche also 16,8 ≈ 17 Tage.
 
 ---
 
-## 3. Datenschutz
+## 4. Datenschutz
 
 Hier stehen Beschäftigtendaten und Krankheitszeiten – **besondere Kategorien nach
 Art. 9 DSGVO**. Deshalb:
 
 * **Keine Diagnosen** eintragen. „Krank“ genügt; das Notizfeld ist für Organisatorisches.
-* Zugang nur für die Praxisleitung bzw. Praxismanagerin, jede Person mit eigenem Konto.
+* Jede Person mit eigenem Konto – Zugänge nicht teilen.
+* Mitarbeiterinnen sehen fremde Notizen nie. Ob sie im Plan auch die **Art** der
+  Abwesenheit sehen (Urlaub, Krank …) oder nur, *dass* jemand fehlt, stellen Sie
+  unter *Einstellungen* ein.
 * Nur über **HTTPS** aufrufen; die `.htaccess` erzwingt das.
 * `config.php` und der Ordner `data/` sind per `.htaccess` vom Webzugriff ausgenommen.
   Bitte nach der Installation einmal prüfen: `https://ihre-domain.de/kalender/config.php`
@@ -95,19 +140,19 @@ Art. 9 DSGVO**. Deshalb:
 * In das Verzeichnis der Verarbeitungstätigkeiten aufnehmen (Zweck: Urlaubs- und
   Fehlzeitenverwaltung; Rechtsgrundlage: § 26 BDSG / Art. 6 Abs. 1 b DSGVO).
 
-## 4. Sicherung
+## 5. Sicherung
 
 * **SQLite:** die Datei `data/praxis.sqlite` regelmäßig per FTP herunterladen.
 * **MySQL:** Export über phpMyAdmin im IONOS-Control-Panel.
 * Zusätzlich im Reiter *Urlaubskonto* den **CSV-Export** je Jahr sichern.
 
-## 5. Gestaltung
+## 6. Gestaltung
 
 Farben und Schriften sind an die Praxis-Website angeglichen (Praxisgrün `#16653f`,
 Serifenschrift für Überschriften). Es werden **keine externen Schriften oder Skripte**
 geladen – beim Aufruf verlässt keine Anfrage den Praxis-Server.
 
-## 6. Hinweise zu den Feiertagen
+## 7. Hinweise zu den Feiertagen
 
 Die Feiertage werden aus dem Bundesland berechnet (Ostern nach Gauß, daraus Karfreitag,
 Ostermontag, Christi Himmelfahrt, Pfingstmontag, Fronleichnam). Nicht abgebildet sind
@@ -118,10 +163,9 @@ als Eintrag „Praxis geschlossen“ erfassen.
 ### Hamburg
 Voreingestellt ist **Hamburg**: neun bundesweite Feiertage plus Reformationstag (31.10.).
 
-## 7. Nächste Ausbaustufen
+## 8. Nächste Ausbaustufen
 
-1. Eigene Zugänge für das Team mit Antrag → Genehmigung.
-2. Besetzungsregeln je Wochentag (mind. 1 Ärztin + 2 MFA) mit Ampel und Sperrzeiten.
-3. Fristenmodul: Pflichtunterweisungen (jährlich), Strahlenschutz (5 Jahre),
+1. Besetzungsregeln je Wochentag (mind. 1 Ärztin + 2 MFA) mit Ampel und Sperrzeiten.
+2. Fristenmodul: Pflichtunterweisungen (jährlich), Strahlenschutz (5 Jahre),
    CME-Punkte, AU-Nachweise, KV-Vertretungsmeldung ab 7 Tagen Abwesenheit.
-4. Dienstplan und Arbeitszeiterfassung.
+3. Dienstplan und Arbeitszeiterfassung.

@@ -107,8 +107,30 @@ function ensureSchema(): void {
        id $id, ts $txt, nutzer $txt, aktion $txt, details $lng)",
   ];
   foreach ($sql as $q) $pdo->exec($q);
+  // Nachtraeglich ergaenzte Spalten (bestehende Installationen)
+  ensureColumn('users', 'staff_id', $txt);
+  ensureColumn('users', 'aktiv', 'INT DEFAULT 1');
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('abs') . "_von ON " . t('absences') . " (von)");
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('abs') . "_staff ON " . t('absences') . " (staff_id)");
+}
+
+/** Spalte anlegen, falls sie noch fehlt (SQLite und MySQL). */
+function ensureColumn(string $tabelle, string $spalte, string $typ): void {
+  $pdo = db(); $t = t($tabelle);
+  try {
+    if (isMysql()) {
+      $st = $pdo->prepare("SELECT COUNT(*) c FROM information_schema.columns
+                           WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?");
+      $st->execute([$t, $spalte]);
+      $da = ((int)$st->fetch()['c']) > 0;
+    } else {
+      $da = false;
+      foreach ($pdo->query("PRAGMA table_info(" . $t . ")")->fetchAll() as $r) {
+        if (($r['name'] ?? '') === $spalte) { $da = true; break; }
+      }
+    }
+    if (!$da) $pdo->exec("ALTER TABLE $t ADD COLUMN $spalte $typ");
+  } catch (Throwable $e) { /* Spalte existiert bereits */ }
 }
 
 function setting(string $k, ?string $def = null): ?string {
@@ -370,6 +392,13 @@ function startSession(): void {
   if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(16));
 }
 function angemeldet(): bool { return !empty($_SESSION['user_id']); }
+/** Praxisleitung: darf alles. 'admin' ist die alte Bezeichnung und gilt weiter. */
+function istLeitung(): bool {
+  return in_array($_SESSION['user_rolle'] ?? '', ['leitung', 'admin'], true);
+}
+function requireLeitung(): void { requireLogin(); if (!istLeitung()) fail('keine_berechtigung', 403); }
+/** Mit welcher Mitarbeiterin ist das angemeldete Konto verknuepft? */
+function eigeneStaffId(): string { return (string)($_SESSION['user_staff'] ?? ''); }
 function requireLogin(): void { if (!angemeldet()) fail('nicht_angemeldet', 401); }
 function requireCsrf(): void {
   $t = $_SERVER['HTTP_X_PRAXIS_TOKEN'] ?? '';
@@ -419,9 +448,35 @@ case 'state': {
   }
   unset($x);
   $bl = setting('bundesland', 'HH') ?? 'HH';
+  $istL    = istLeitung();
+  $eigene  = eigeneStaffId();
+  $details = setting('details_sichtbar', '1') === '1';
+
+  // Mitarbeiterinnen sehen fremde Eintraege ohne Notiz, auf Wunsch auch ohne Art
+  if (!$istL) {
+    foreach ($abs as &$x) {
+      if ($x['staff_id'] !== $eigene) {
+        $x['notiz'] = '';
+        if (!$details) $x['typ'] = 'abwesend';
+      }
+    }
+    unset($x);
+  }
+
+  $kt = konten($jahr);
+  if (!$istL) $kt = isset($kt[$eigene]) ? [$eigene => $kt[$eigene]] : [];
+
+  $offen = 0;
+  foreach ($abs as $x) if ($x['status'] === 'beantragt') $offen++;
+
   out([
     'setup' => false, 'angemeldet' => true,
-    'nutzer' => ['name' => $_SESSION['user_name'], 'rolle' => $_SESSION['user_rolle']],
+    'nutzer' => ['name' => $_SESSION['user_name'], 'rolle' => $istL ? 'leitung' : 'mitarbeiter',
+                 'staff_id' => $eigene],
+    'leitung' => $istL,
+    'offene_antraege' => $offen,
+    'users' => $istL ? listUsers() : [],
+    'details_sichtbar' => $details ? 1 : 0,
     'csrf' => $_SESSION['csrf'],
     'praxis' => setting('praxisname', 'Praxis'),
     'bundesland' => $bl,
@@ -432,8 +487,7 @@ case 'state': {
     'staff' => $staff,
     'absences' => $abs,
     'feiertage' => feiertage($jahr, $bl),
-    'konten' => konten($jahr),
-    'urlaub_sichtbar' => setting('urlaub_sichtbar', '1'),
+    'konten' => $kt,
   ]);
 }
 
@@ -447,7 +501,7 @@ case 'setup': {
   if (strlen($pass) < 10) fail('passwort_zu_kurz');
   if (!isset(BUNDESLAENDER[$bl])) fail('bundesland');
   db()->prepare("INSERT INTO " . t('users') . " (id, username, pass_hash, anzeige, rolle, created_at) VALUES (?,?,?,?,?,?)")
-      ->execute([uuid(), $user, password_hash($pass, PASSWORD_DEFAULT), $praxis, 'admin', date('c')]);
+      ->execute([uuid(), $user, password_hash($pass, PASSWORD_DEFAULT), 'Praxisleitung', 'leitung', date('c')]);
   setSetting('praxisname', $praxis);
   setSetting('bundesland', $bl);
   setSetting('urlaub_sichtbar', '1');
@@ -466,6 +520,7 @@ case 'login': {
   $st = db()->prepare("SELECT * FROM " . t('users') . " WHERE username = ?");
   $st->execute([$user]);
   $u = $st->fetch();
+  if ($u && (int)($u['aktiv'] ?? 1) === 0) { usleep(300000); fail('zugang_deaktiviert', 403); }
   if (!$u || !password_verify($pass, $u['pass_hash'])) {
     $_SESSION['versuche']++; $_SESSION['sperre'] = time();
     usleep(400000);
@@ -475,7 +530,8 @@ case 'login': {
   $_SESSION['versuche'] = 0;
   $_SESSION['user_id'] = $u['id'];
   $_SESSION['user_name'] = $u['anzeige'] ?: $u['username'];
-  $_SESSION['user_rolle'] = $u['rolle'] ?: 'admin';
+  $_SESSION['user_rolle'] = $u['rolle'] ?: 'leitung';
+  $_SESSION['user_staff'] = (string)($u['staff_id'] ?? '');
   $_SESSION['csrf'] = bin2hex(random_bytes(16));
   logAction('login', $user);
   out(['ok' => true]);
@@ -503,7 +559,7 @@ case 'passwort': {
 }
 
 case 'save_staff': {
-  requirePost(); requireLogin(); requireCsrf();
+  requirePost(); requireLeitung(); requireCsrf();
   $d = body();
   $id = s($d, 'id');
   $name = s($d, 'name');
@@ -545,7 +601,7 @@ case 'save_staff': {
 }
 
 case 'del_staff': {
-  requirePost(); requireLogin(); requireCsrf();
+  requirePost(); requireLeitung(); requireCsrf();
   $id = s(body(), 'id');
   if ($id === '') fail('id_fehlt');
   $pdo = db();
@@ -578,6 +634,23 @@ case 'save_absence': {
   if ($bis < $von) fail('bis_vor_von');
   if ((strtotime($bis) - strtotime($von)) / 86400 > 400) fail('zeitraum_zu_lang');
   $halbtag = !empty($d['halbtag']) && $von === $bis;
+
+  // Mitarbeiterinnen duerfen nur fuer sich selbst und nur als Antrag eintragen
+  if (!istLeitung()) {
+    if ($typ === 'geschlossen') fail('keine_berechtigung', 403);
+    $eigene = eigeneStaffId();
+    if ($eigene === '') fail('kein_mitarbeiter_verknuepft', 403);
+    $d['staff_id'] = $eigene;
+    $d['status'] = 'beantragt';
+    if ($id !== '') {
+      $st = db()->prepare("SELECT * FROM " . t('absences') . " WHERE id = ?");
+      $st->execute([$id]);
+      $alt = $st->fetch();
+      if (!$alt || $alt['staff_id'] !== $eigene || $alt['status'] !== 'beantragt') {
+        fail('keine_berechtigung', 403);
+      }
+    }
+  }
 
   $staffIds = [];
   if ($typ === 'geschlossen') {                    // gilt fuer die ganze Praxis
@@ -625,13 +698,21 @@ case 'del_absence': {
   requirePost(); requireLogin(); requireCsrf();
   $id = s(body(), 'id');
   if ($id === '') fail('id_fehlt');
+  if (!istLeitung()) {
+    $st = db()->prepare("SELECT * FROM " . t('absences') . " WHERE id = ?");
+    $st->execute([$id]);
+    $alt = $st->fetch();
+    if (!$alt || $alt['staff_id'] !== eigeneStaffId() || $alt['status'] !== 'beantragt') {
+      fail('keine_berechtigung', 403);
+    }
+  }
   db()->prepare("DELETE FROM " . t('absences') . " WHERE id = ?")->execute([$id]);
   logAction('eintrag_geloescht', $id);
   out(['ok' => true]);
 }
 
 case 'save_carry': {
-  requirePost(); requireLogin(); requireCsrf();
+  requirePost(); requireLeitung(); requireCsrf();
   $d = body();
   $sid = s($d, 'staff_id'); $jahr = (int)f($d, 'jahr', (float)date('Y'));
   if (!ladeStaff($sid)) fail('mitarbeiter_unbekannt');
@@ -655,7 +736,7 @@ case 'save_carry': {
 }
 
 case 'save_settings': {
-  requirePost(); requireLogin(); requireCsrf();
+  requirePost(); requireLeitung(); requireCsrf();
   $d = body();
   if (($p = s($d, 'praxisname')) !== '') setSetting('praxisname', mb_substr($p, 0, 80));
   if (($b = s($d, 'bundesland')) !== '') {
@@ -663,7 +744,7 @@ case 'save_settings': {
     setSetting('bundesland', $b);
     neuBerechnen(null);                      // Feiertage aendern die Arbeitstage
   }
-  if (isset($d['urlaub_sichtbar'])) setSetting('urlaub_sichtbar', !empty($d['urlaub_sichtbar']) ? '1' : '0');
+  if (isset($d['details_sichtbar'])) setSetting('details_sichtbar', !empty($d['details_sichtbar']) ? '1' : '0');
   logAction('einstellungen_gespeichert');
   out(['ok' => true]);
 }
@@ -694,8 +775,104 @@ case 'export': {
 }
 
 case 'recalc': {
-  requirePost(); requireLogin(); requireCsrf();
+  requirePost(); requireLeitung(); requireCsrf();
   neuBerechnen(null);
+  out(['ok' => true]);
+}
+
+case 'save_user': {
+  requirePost(); requireLeitung(); requireCsrf();
+  $d = body();
+  $id    = s($d, 'id');
+  $user  = mb_strtolower(s($d, 'username'));
+  $pass  = s($d, 'passwort');
+  $rolle = s($d, 'rolle', 'mitarbeiter');
+  if (!in_array($rolle, ['leitung', 'mitarbeiter'], true)) fail('rolle_ungueltig');
+  $sid   = s($d, 'staff_id');
+  if ($sid !== '' && !ladeStaff($sid)) fail('mitarbeiter_unbekannt');
+  $aktiv = !empty($d['aktiv']) ? 1 : 0;
+  $pdo   = db();
+
+  if ($user === '' || mb_strlen($user) < 3) fail('benutzername_zu_kurz');
+  if (!preg_match('/^[a-z0-9._-]+$/', $user)) fail('benutzername_zeichen');
+
+  // Name aus der verknuepften Mitarbeiterin, sonst der Benutzername
+  $anzeige = s($d, 'anzeige');
+  if ($anzeige === '' && $sid !== '') { $m = ladeStaff($sid); $anzeige = $m['name']; }
+  if ($anzeige === '') $anzeige = $user;
+
+  $st = $pdo->prepare("SELECT id FROM " . t('users') . " WHERE LOWER(username) = ?");
+  $st->execute([$user]);
+  $vorhanden = $st->fetch();
+  if ($vorhanden && $vorhanden['id'] !== $id) fail('benutzername_vergeben');
+
+  if ($id === '') {
+    if (mb_strlen($pass) < 10) fail('passwort_zu_kurz');
+    $pdo->prepare("INSERT INTO " . t('users') . "
+        (id, username, pass_hash, anzeige, rolle, created_at, staff_id, aktiv)
+        VALUES (?,?,?,?,?,?,?,?)")
+        ->execute([uuid(), $user, password_hash($pass, PASSWORD_DEFAULT), $anzeige,
+                   $rolle, date('c'), $sid, $aktiv]);
+    logAction('zugang_angelegt', $user);
+    out(['ok' => true]);
+  }
+
+  $st = $pdo->prepare("SELECT * FROM " . t('users') . " WHERE id = ?");
+  $st->execute([$id]);
+  $alt = $st->fetch();
+  if (!$alt) fail('zugang_unbekannt', 404);
+
+  // Die letzte Leitung darf nicht herabgestuft oder abgeschaltet werden
+  $leitungAktiv = (int)$pdo->query("SELECT COUNT(*) c FROM " . t('users') . "
+      WHERE rolle IN ('leitung','admin') AND (aktiv IS NULL OR aktiv = 1)")->fetch()['c'];
+  $warLeitung = in_array($alt['rolle'], ['leitung','admin'], true) && (int)($alt['aktiv'] ?? 1) === 1;
+  if ($warLeitung && $leitungAktiv <= 1 && ($rolle !== 'leitung' || !$aktiv)) {
+    fail('letzte_leitung', 409);
+  }
+  $pdo->prepare("UPDATE " . t('users') . " SET username=?, anzeige=?, rolle=?, staff_id=?, aktiv=? WHERE id=?")
+      ->execute([$user, $anzeige, $rolle, $sid, $aktiv, $id]);
+  if ($pass !== '') {
+    if (mb_strlen($pass) < 10) fail('passwort_zu_kurz');
+    $pdo->prepare("UPDATE " . t('users') . " SET pass_hash = ? WHERE id = ?")
+        ->execute([password_hash($pass, PASSWORD_DEFAULT), $id]);
+  }
+  // eigene Sitzung aktuell halten
+  if ($id === ($_SESSION['user_id'] ?? '')) {
+    $_SESSION['user_rolle'] = $rolle;
+    $_SESSION['user_staff'] = $sid;
+    $_SESSION['user_name']  = $anzeige;
+  }
+  logAction('zugang_geaendert', $user);
+  out(['ok' => true]);
+}
+
+case 'del_user': {
+  requirePost(); requireLeitung(); requireCsrf();
+  $id = s(body(), 'id');
+  if ($id === '') fail('id_fehlt');
+  if ($id === ($_SESSION['user_id'] ?? '')) fail('eigener_zugang', 409);
+  $pdo = db();
+  $st = $pdo->prepare("SELECT * FROM " . t('users') . " WHERE id = ?");
+  $st->execute([$id]);
+  $u = $st->fetch();
+  if (!$u) fail('zugang_unbekannt', 404);
+  $leitung = (int)$pdo->query("SELECT COUNT(*) c FROM " . t('users') . "
+      WHERE rolle IN ('leitung','admin')")->fetch()['c'];
+  if (in_array($u['rolle'], ['leitung','admin'], true) && $leitung <= 1) fail('letzte_leitung', 409);
+  $pdo->prepare("DELETE FROM " . t('users') . " WHERE id = ?")->execute([$id]);
+  logAction('zugang_geloescht', (string)$u['username']);
+  out(['ok' => true]);
+}
+
+case 'entscheiden': {
+  requirePost(); requireLeitung(); requireCsrf();
+  $d = body();
+  $id = s($d, 'id');
+  $status = s($d, 'status');
+  if (!in_array($status, ['genehmigt', 'abgelehnt'], true)) fail('status_ungueltig');
+  db()->prepare("UPDATE " . t('absences') . " SET status = ?, updated_at = ? WHERE id = ?")
+      ->execute([$status, date('c'), $id]);
+  logAction('antrag_' . $status, $id);
   out(['ok' => true]);
 }
 
@@ -705,6 +882,18 @@ default:
 
 // ---------------------------------------------------------------- Nachgelagerte Helfer
 function staffCacheLeeren(): void { $GLOBALS['STAFF_CACHE'] = []; }
+/** Alle Zugaenge (ohne Passwort-Hashes). */
+function listUsers(): array {
+  $rows = db()->query("SELECT id, username, anzeige, rolle, staff_id, aktiv, created_at
+                       FROM " . t('users') . " ORDER BY rolle, username")->fetchAll();
+  foreach ($rows as &$r) {
+    $r['aktiv'] = (int)($r['aktiv'] ?? 1);
+    $r['rolle'] = in_array($r['rolle'], ['leitung','admin'], true) ? 'leitung' : 'mitarbeiter';
+    $r['staff_id'] = (string)($r['staff_id'] ?? '');
+  }
+  return $rows;
+}
+
 function ladeStaff(string $id): ?array {
   if ($id === '') return null;
   $cache = &$GLOBALS['STAFF_CACHE'];

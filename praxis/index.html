@@ -20,7 +20,7 @@ html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:15px;-webkit-font-smoothing:antialiased}
 .app{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
 .top{position:sticky;top:0;z-index:50;background:var(--accent);color:#fff;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;display:flex;align-items:center;gap:10px}
-.top h1{font-family:var(--serif);font-size:1.28rem;font-weight:600;letter-spacing:0.01em;line-height:1.15}
+.top h1{font-family:var(--serif);font-size:clamp(0.98rem,3.6vw,1.28rem);font-weight:600;letter-spacing:0.01em;line-height:1.15}
 .top .sub{font-size:0.66rem;opacity:0.8;margin-top:1px}
 .top .spacer{flex:1}
 .yearpick{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,0.15);border-radius:9px;padding:2px}
@@ -29,9 +29,9 @@ body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSys
 .yearpick span{font-size:0.8rem;font-weight:700;font-variant-numeric:tabular-nums;padding:0 2px}
 .iconbtn{background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:9px;padding:7px 10px;font-size:0.75rem;cursor:pointer;font-family:inherit;font-weight:600}
 .tabs{display:flex;background:var(--card);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:0;z-index:40}
-.tab{flex:0 0 auto;padding:11px 15px;font-size:0.78rem;font-weight:600;color:var(--mut);border-bottom:2.5px solid transparent;cursor:pointer;white-space:nowrap}
+.tab{flex:0 0 auto;padding:14px 20px;font-size:0.92rem;font-weight:600;color:var(--mut);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
 .tab.on{color:var(--accent);border-bottom-color:var(--accent)}
-.wrap{flex:1;padding:14px;padding-bottom:40px;max-width:1500px;width:100%;margin:0 auto}
+.wrap{flex:1;padding:14px;padding-bottom:96px;max-width:1500px;width:100%;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(15,28,20,0.04)}
 .card h2{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--mut);margin-bottom:12px;font-weight:700}
 label{display:block;font-size:0.68rem;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px}
@@ -68,6 +68,44 @@ td.d .mark.half{clip-path:polygon(0 0,100% 0,0 100%)}
 tr.sum td{height:22px;font-size:0.58rem;color:var(--mut);text-align:center;font-weight:700;background:#f4f8f5}
 tr.sum td.low{background:#fee2e2;color:var(--bad)}
 .mon-head th{font-size:0.58rem;color:var(--accent);background:#fff;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid var(--line)}
+/* ---- Grosser Knopf unten rechts ---- */
+.fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:60;
+  background:var(--accent);color:#fff;border:none;border-radius:30px;padding:15px 22px;
+  font-size:0.95rem;font-weight:700;font-family:inherit;cursor:pointer;
+  box-shadow:0 6px 20px rgba(22,101,63,0.35)}
+.fab:active{transform:scale(0.97)}
+/* ---- Umschalter Monat/Jahr ---- */
+.seg{display:inline-flex;background:var(--accent-soft);border-radius:11px;padding:3px;gap:3px}
+.seg button{border:none;background:transparent;padding:9px 18px;border-radius:9px;font-size:0.84rem;
+  font-weight:700;color:var(--accent);cursor:pointer;font-family:inherit}
+.seg button.on{background:var(--accent);color:#fff}
+/* ---- Auswahl der Eintragsart ---- */
+.typegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px}
+.typegrid button{display:flex;align-items:center;gap:8px;padding:13px 12px;border:2px solid var(--line);
+  border-radius:12px;background:#fff;font-size:0.86rem;font-weight:600;font-family:inherit;
+  cursor:pointer;color:var(--ink);text-align:left}
+.typegrid button i{width:14px;height:14px;border-radius:4px;background:var(--c);flex:0 0 auto}
+.typegrid button.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,#fff)}
+/* ---- Heute-Streifen ---- */
+.heute{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--accent-soft);
+  border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:0.84rem;color:var(--accent)}
+.heute b{font-weight:700}
+.heute .chip{background:#fff;border-radius:20px;padding:4px 11px;font-size:0.76rem;color:var(--ink);
+  display:inline-flex;align-items:center;gap:6px}
+.heute .chip i{width:9px;height:9px;border-radius:50%}
+/* ---- Antraege ---- */
+.antrag{display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding:11px 0;border-bottom:1px solid var(--line)}
+.antrag:last-child{border-bottom:none}
+.antrag .t{flex:1;min-width:150px;font-size:0.84rem}
+.badge{background:var(--warn);color:#fff;border-radius:20px;padding:1px 8px;font-size:0.68rem;
+  font-weight:700;margin-left:6px}
+/* ---- Zugaenge ---- */
+.zugang{display:block;font-size:0.7rem;color:var(--mut);margin-top:2px}
+.item .t span{display:block}
+.zugang b{color:var(--accent)}
+/* ---- Hilfe ---- */
+.hilfe{background:#fff;border:1px dashed var(--line);border-radius:12px;padding:12px 14px;
+  font-size:0.78rem;color:var(--mut);line-height:1.6;margin-top:12px}
 /* ---- Legende ---- */
 .legend{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
 .lg{display:inline-flex;align-items:center;gap:5px;font-size:0.68rem;color:var(--mut)}
@@ -141,6 +179,8 @@ function iso(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function dmy(s){ if(!s) return ''; var p=s.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
+/** "12.10.2026 – 16.10.2026" oder nur "12.10.2026" bei einem einzelnen Tag */
+function zeitraum(von, bis){ return von === bis ? dmy(von) : dmy(von)+' – '+dmy(bis); }
 function num(n){ return (Math.round(n*10)/10).toString().replace('.',','); }
 function tage(n){ return num(n)+' '+(Math.abs(n)===1?'Tag':'Tage'); }
 
@@ -215,19 +255,27 @@ function render(){
      +   '<div class="yearpick"><button onclick="jahrWechsel(-1)">&#8249;</button><span>'+JAHR+'</span><button onclick="jahrWechsel(1)">&#8250;</button></div>'
      +   '<button class="iconbtn" onclick="logout()">Abmelden</button>'
      + '</div>';
-  var tabs = [['monat','Monat'],['jahr','Jahr'],['heute','Heute'],['konten','Urlaubskonto'],['team','Team'],['einst','Einstellungen']];
+  var tabs = S.leitung
+    ? [['plan','Kalender'],['konten','Urlaub'],['team','Team'],['einst','Einstellungen']]
+    : [['plan','Kalender'],['meins','Mein Urlaub']];
+  if(tabs.filter(function(t){ return t[0]===VIEW; }).length === 0) VIEW = 'plan';
   h += '<div class="tabs">'+tabs.map(function(t){
-    return '<div class="tab'+(VIEW===t[0]?' on':'')+'" onclick="setView(\''+t[0]+'\')">'+t[1]+'</div>';
+    var badge = (t[0]==='plan' && S.leitung && S.offene_antraege) ? '<span class="badge">'+S.offene_antraege+'</span>' : '';
+    return '<div class="tab'+(VIEW===t[0]?' on':'')+'" onclick="setView(\''+t[0]+'\')">'+t[1]+badge+'</div>';
   }).join('')+'</div>';
   h += '<div class="wrap">';
   if(MSG) h += '<div id="msg" class="'+(MSG.gut?'ok':'err')+'">'+esc(MSG.text)+'</div>';
-  if(VIEW==='monat')      h += viewMonat();
-  else if(VIEW==='jahr')  h += viewJahr();
-  else if(VIEW==='heute') h += viewHeute();
-  else if(VIEW==='konten')h += viewKonten();
-  else if(VIEW==='team')  h += viewTeam();
-  else                    h += viewEinst();
-  h += '</div></div>';
+  if(VIEW==='plan')        h += viewPlan();
+  else if(VIEW==='konten') h += viewKonten();
+  else if(VIEW==='team')   h += viewTeam();
+  else if(VIEW==='meins')  h += viewMeins();
+  else                     h += viewEinst();
+  h += '</div>';
+  if(VIEW === 'plan' || VIEW === 'konten'){
+    h += '<button class="fab noprint" onclick="openEintrag({})">+ '
+       + (S.leitung ? 'Eintrag' : 'Urlaub beantragen') + '</button>';
+  }
+  h += '</div>';
   el('root').innerHTML = h;
 }
 function setView(v){ VIEW = v; MSG = null; render(); window.scrollTo(0,0); }
@@ -288,8 +336,10 @@ function zelle(m, datum, klass){
 }
 function zelleKlick(staffId, datum){
   var a = IDX[staffId] && IDX[staffId][datum];
-  if(a) openEintrag(a);
-  else openEintrag({staff_id:staffId, von:datum, bis:datum, typ:'urlaub'});
+  if(a){ openEintrag(a); return; }
+  // Mitarbeiterinnen koennen nur fuer sich selbst etwas eintragen
+  if(!S.leitung && staffId !== S.nutzer.staff_id) return;
+  openEintrag({staff_id:staffId, von:datum, bis:datum, typ:'urlaub'});
 }
 function musterKlass(m, d, datum){
   var wd = (d.getDay()+6)%7;
@@ -317,16 +367,73 @@ function legende(){
     + '<span class="lg"><i style="background:repeating-linear-gradient(135deg,#fff,#fff 2px,#eceff2 2px,#eceff2 4px)"></i>kein Arbeitstag (Teilzeit)</span></div>';
 }
 
-// ------------------------------------------------------------------ Ansicht: Monat
+// ------------------------------------------------------------------ Ansicht: Kalender
+var PLANART = 'monat';   // 'monat' oder 'jahr'
+function setPlanart(a){ PLANART = a; render(); }
+
+function viewPlan(){
+  var h = heuteStreifen();
+  if(S.leitung) h += antraegeKarte();
+  h += '<div style="display:flex;gap:9px;align-items:center;margin-bottom:12px" class="noprint">'
+     + '<div class="seg">'
+     +   '<button class="'+(PLANART==='monat'?'on':'')+'" onclick="setPlanart(\'monat\')">Monat</button>'
+     +   '<button class="'+(PLANART==='jahr'?'on':'')+'" onclick="setPlanart(\'jahr\')">Ganzes Jahr</button>'
+     + '</div>'
+     + '<div style="flex:1"></div>'
+     + '<button class="btn small ghost" onclick="window.print()">Drucken</button></div>';
+  h += (PLANART === 'monat') ? viewMonat() : viewJahr();
+  return h;
+}
+
+function heuteStreifen(){
+  var heute = S.heute, staff = aktiveStaff(), abw = [];
+  staff.forEach(function(m){
+    var a = IDX[m.id] && IDX[m.id][heute];
+    if(a) abw.push([m, a]);
+  });
+  var h = '<div class="heute"><b>Heute, '+dmy(heute)+'</b>';
+  if(S.feiertage[heute]) h += '<span class="chip">'+esc(S.feiertage[heute])+'</span>';
+  h += '<span>'+(staff.length - abw.length)+' von '+staff.length+' da</span>';
+  abw.forEach(function(x){
+    var t = TY[x[1].typ] || {farbe:'#888', label:x[1].typ};
+    h += '<span class="chip"><i style="background:'+t.farbe+'"></i>'+esc(x[0].name)+' · '+esc(t.label)+'</span>';
+  });
+  if(!abw.length) h += '<span class="chip">niemand abwesend</span>';
+  return h + '</div>';
+}
+
+function antraegeKarte(){
+  var offen = S.absences.filter(function(a){ return a.status === 'beantragt'; });
+  if(!offen.length) return '';
+  var h = '<div class="card noprint"><h2>Offene Anträge</h2>';
+  offen.forEach(function(a){
+    var m = S.staff.filter(function(x){ return x.id === a.staff_id; })[0] || {name:'?'};
+    var t = TY[a.typ] || {label:a.typ, farbe:'#888'};
+    h += '<div class="antrag">'
+      + '<span class="dot" style="background:'+t.farbe+'"></span>'
+      + '<div class="t"><b>'+esc(m.name)+'</b> · '+esc(t.label)+'<br>'
+      + '<span class="muted">'+zeitraum(a.von,a.bis)+' · '+tage(a.tage)+'</span></div>'
+      + '<button class="btn small" onclick="entscheiden(\''+a.id+'\',\'genehmigt\')">Genehmigen</button>'
+      + '<button class="btn small ghost" onclick="entscheiden(\''+a.id+'\',\'abgelehnt\')">Ablehnen</button>'
+      + '</div>';
+  });
+  return h + '</div>';
+}
+function entscheiden(id, status){
+  api('entscheiden', {id:id, status:status}).then(load)
+   .then(function(){ zeige(status === 'genehmigt' ? 'Genehmigt.' : 'Abgelehnt.', true); })
+   .catch(function(e){ zeige(fehlerText(e)); });
+}
+
+// ------------------------------------------------------------------ Ansicht: Monatsraster
 function viewMonat(){
   var staff = aktiveStaff();
   var erster = new Date(JAHR, MONAT, 1), anzahl = new Date(JAHR, MONAT+1, 0).getDate();
   var h = '<div class="card">';
-  h += '<div class="noprint" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
-     + '<button class="btn small ghost" onclick="monatWechsel(-1)">&#8249;</button>'
-     + '<b style="flex:1;text-align:center">'+MNAME[MONAT]+' '+JAHR+'</b>'
-     + '<button class="btn small ghost" onclick="monatWechsel(1)">&#8250;</button>'
-     + '<button class="btn small" onclick="openEintrag({})">+ Eintrag</button></div>';
+  h += '<div class="noprint" style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'
+     + '<button class="btn small ghost" onclick="monatWechsel(-1)">&#8249; Vorheriger</button>'
+     + '<b style="flex:1;text-align:center;font-size:1.05rem">'+MNAME[MONAT]+' '+JAHR+'</b>'
+     + '<button class="btn small ghost" onclick="monatWechsel(1)">Nächster &#8250;</button></div>';
   if(!staff.length) return h + '<p class="muted">Noch keine Mitarbeiterinnen angelegt. Im Reiter <b>Team</b> anlegen.</p></div>';
 
   var kopf = '<tr><th class="nm">Mitarbeiter</th>';
@@ -365,7 +472,9 @@ function viewMonat(){
 
   h += '<div class="scroll"><table class="plan"><thead>'+kopf+'</thead><tbody>'+body+sum+'</tbody></table></div>';
   h += legende();
-  h += '<p class="muted" style="margin-top:10px">Auf ein Feld tippen, um einen Eintrag anzulegen oder zu ändern.</p>';
+  h += '<div class="hilfe">Auf ein Feld tippen legt einen Eintrag an oder öffnet einen vorhandenen. '
+     + 'Der grüne Knopf unten rechts geht immer. '
+     + (S.leitung ? 'Als Leitung können Sie für jede Person eintragen – auch für Personen ohne eigenen Zugang.' : '') + '</div>';
   return h + '</div>';
 }
 function monatWechsel(d){
@@ -378,10 +487,8 @@ function monatWechsel(d){
 // ------------------------------------------------------------------ Ansicht: Jahr
 function viewJahr(){
   var staff = aktiveStaff();
-  var h = '<div class="card"><div class="noprint" style="display:flex;gap:8px;margin-bottom:12px">'
-        + '<b style="flex:1">Jahresübersicht '+JAHR+'</b>'
-        + '<button class="btn small ghost" onclick="window.print()">Drucken</button>'
-        + '<button class="btn small" onclick="openEintrag({})">+ Eintrag</button></div>';
+  var h = '<div class="card"><div class="noprint" style="margin-bottom:12px">'
+        + '<b style="font-size:1.05rem">Jahresübersicht '+JAHR+'</b></div>';
   if(!staff.length) return h + '<p class="muted">Noch keine Mitarbeiterinnen angelegt.</p></div>';
 
   var monKopf = '<tr class="mon-head"><th class="nm"></th>', tagKopf = '<tr><th class="nm">Mitarbeiter</th>';
@@ -423,47 +530,6 @@ function zelleSchmal(m, datum, klass){
   }
   var titel = a ? (TY[a.typ]?TY[a.typ].label:a.typ)+' · '+dmy(a.von)+'–'+dmy(a.bis) : dmy(datum);
   return '<td class="d '+klass+'" style="'+stil+'" title="'+esc(titel)+'" onclick="zelleKlick(\''+m.id+'\',\''+datum+'\')">'+inner+'</td>';
-}
-
-// ------------------------------------------------------------------ Ansicht: Heute
-function viewHeute(){
-  var heute = S.heute, h = '';
-  var staff = aktiveStaff();
-  var abw = [], anw = [];
-  staff.forEach(function(m){
-    var a = IDX[m.id] && IDX[m.id][heute];
-    if(a) abw.push([m,a]); else anw.push(m);
-  });
-  h += '<div class="card"><h2>Heute · '+dmy(heute)+(S.feiertage[heute]?' · '+esc(S.feiertage[heute]):'')+'</h2>';
-  h += '<div class="kgrid"><div class="kbox"><div class="v">'+anw.length+'</div><div class="l">anwesend</div></div>'
-     + '<div class="kbox"><div class="v">'+abw.length+'</div><div class="l">abwesend</div></div></div>';
-  if(abw.length){
-    h += abw.map(function(p){
-      var t = TY[p[1].typ]||{farbe:'#888',label:p[1].typ};
-      return '<div class="item"><span class="dot" style="background:'+esc(p[0].farbe)+'"></span>'
-        + '<div class="t"><b>'+esc(p[0].name)+'</b><span>bis '+dmy(p[1].bis)+(p[1].notiz?' · '+esc(p[1].notiz):'')+'</span></div>'
-        + '<span class="pill" style="background:'+t.farbe+'">'+esc(t.label)+'</span></div>';
-    }).join('');
-  } else { h += '<p class="muted">Heute ist niemand abwesend.</p>'; }
-  h += '</div>';
-
-  // Kommende 14 Tage
-  h += '<div class="card"><h2>Nächste 14 Tage</h2>';
-  var zeilen = '';
-  for(var i=1;i<=14;i++){
-    var d = new Date(heute+'T12:00:00'); d.setDate(d.getDate()+i);
-    var datum = iso(d), wd=(d.getDay()+6)%7;
-    var weg = staff.filter(function(m){ return IDX[m.id] && IDX[m.id][datum]; });
-    if(!weg.length && wd < 5) continue;
-    if(wd>=5 && !weg.length) continue;
-    zeilen += '<div class="item"><div class="t"><b>'+WTAG[wd]+' '+dmy(datum)+'</b><span>'
-      + (S.feiertage[datum]?esc(S.feiertage[datum])+' · ':'')
-      + weg.map(function(m){ var a=IDX[m.id][datum]; var t=TY[a.typ]||{label:a.typ};
-          return esc(m.name)+' ('+esc(t.label)+')'; }).join(', ')
-      + '</span></div></div>';
-  }
-  h += zeilen || '<p class="muted">Keine Abwesenheiten in den nächsten 14 Tagen.</p>';
-  return h + '</div>';
 }
 
 // ------------------------------------------------------------------ Ansicht: Urlaubskonto
@@ -557,21 +623,99 @@ function hinweisText(id){
 
 // ------------------------------------------------------------------ Ansicht: Team
 function viewTeam(){
-  var h = '<div class="card"><div style="display:flex;gap:8px;margin-bottom:12px"><b style="flex:1">Team</b>'
-        + '<button class="btn small" onclick="openStaff(null)">+ Mitarbeiterin</button></div>';
+  var h = '<div class="card"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
+        + '<b style="flex:1;font-size:1.05rem">Team</b>'
+        + '<button class="btn small" onclick="openStaff(null)">+ Mitarbeiterin</button></div>'
+        + '<p class="muted" style="margin-bottom:12px">Jede Person im Plan ist hier angelegt. '
+        + 'Ein Zugang zum Anmelden ist freiwillig und kann jederzeit später ergänzt werden.</p>';
   if(!S.staff.length) h += '<p class="muted">Noch niemand angelegt.</p>';
   S.staff.forEach(function(m){
-    var k = S.konten[m.id]||{};
     var mus = String(m.muster||'').split(',').map(Number);
     var tageTxt = WTAG.filter(function(w,i){ return mus[i] > 0; }).join(' ');
+    var u = S.users.filter(function(x){ return x.staff_id === m.id; })[0];
+    var zugang = u
+      ? '<span class="zugang">Zugang: <b>'+esc(u.username)+'</b>'
+        + (u.rolle==='leitung' ? ' (Leitung)' : '') + (u.aktiv ? '' : ' – gesperrt') + '</span>'
+      : '<span class="zugang">kein Zugang</span>';
     h += '<div class="item"><span class="dot" style="background:'+esc(m.farbe)+'"></span>'
-      + '<div class="t"><b>'+esc(m.name)+(m.aktiv?'':' <span class="muted">(inaktiv)</span>')+'</b>'
-      + '<span>'+esc(ROLLEN[m.rolle]||m.rolle)+' · '+esc(tageTxt||'–')+' · '+num(m.anspruch)+' Urlaubstage'
-      + (m.eintritt?' · seit '+dmy(m.eintritt):'')+(m.austritt?' · bis '+dmy(m.austritt):'')+'</span></div>'
-      + '<button class="btn small ghost" onclick="openStaff(\''+m.id+'\')">Bearbeiten</button></div>';
+      + '<div class="t"><b>'+esc(m.name)+(m.aktiv?'':' <span class="muted">(nicht im Plan)</span>')+'</b>'
+      + '<span>'+esc(ROLLEN[m.rolle]||m.rolle)+' · '+esc(tageTxt||'–')+' · '+num(m.anspruch)+' Urlaubstage</span>'
+      + zugang + '</div>'
+      + '<button class="btn small ghost" onclick="openStaff(\''+m.id+'\')">Ändern</button>'
+      + (u ? '<button class="btn small ghost" onclick="openUser(\''+u.id+'\')">Zugang</button>'
+           : '<button class="btn small ghost" onclick="openUser(null,\''+m.id+'\')">Zugang anlegen</button>')
+      + '</div>';
   });
+  h += '</div>';
+
+  // Zugaenge ohne verknuepfte Person (z. B. die Leitung selbst)
+  var frei = S.users.filter(function(u){
+    return !S.staff.filter(function(m){ return m.id === u.staff_id; }).length; });
+  h += '<div class="card"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
+     + '<b style="flex:1;font-size:1.05rem">Zugänge</b>'
+     + '<button class="btn small" onclick="openUser(null)">+ Zugang</button></div>'
+     + '<p class="muted" style="margin-bottom:12px">Wer sich anmelden darf. '
+     + '<b>Leitung</b> darf alles – eintragen, ändern, löschen, Zugänge vergeben. '
+     + '<b>Mitarbeiterin</b> sieht den Plan, ihr eigenes Urlaubskonto und kann Urlaub beantragen.</p>';
+  if(!frei.length && !S.users.length) h += '<p class="muted">Keine Zugänge.</p>';
+  frei.forEach(function(u){
+    h += '<div class="item"><div class="t"><b>'+esc(u.anzeige||u.username)+'</b>'
+      + '<span>'+esc(u.username)+' · '+(u.rolle==='leitung'?'Leitung':'Mitarbeiterin')
+      + (u.aktiv?'':' · gesperrt')+'</span></div>'
+      + '<button class="btn small ghost" onclick="openUser(\''+u.id+'\')">Ändern</button></div>';
+  });
+  h += '<div class="hilfe">Beispiel: Sie tragen für eine neue MFA schon Urlaub und Krankheitstage ein, '
+     + 'ohne dass sie einen Zugang hat. Später legen Sie über <b>Zugang anlegen</b> ein Passwort an – '
+     + 'alle bereits eingetragenen Tage gehören dann automatisch zu ihrem Konto.</div>';
   return h + '</div>';
 }
+
+// ------------------------------------------------------------------ Zugang anlegen / ändern
+function openUser(id, staffId){
+  var u = id ? S.users.filter(function(x){ return x.id === id; })[0]
+             : {id:'', username:'', anzeige:'', rolle:'mitarbeiter', staff_id:staffId||'', aktiv:1};
+  var m = S.staff.filter(function(x){ return x.id === u.staff_id; })[0];
+  if(!id && m && !u.username) u.username = vorschlagName(m.name);
+  var auswahl = '<option value="">— keine Person (nur Anmeldung) —</option>' + S.staff.map(function(x){
+      return '<option value="'+x.id+'"'+(u.staff_id===x.id?' selected':'')+'>'+esc(x.name)+'</option>'; }).join('');
+  dialog(id ? 'Zugang ändern' : 'Zugang anlegen',
+     '<div class="row one"><div><label>Gehört zu welcher Person?</label>'
+   + '<select id="u_staff">'+auswahl+'</select></div></div>'
+   + '<div class="row"><div><label>Benutzername</label>'
+   + '<input id="u_user" autocapitalize="off" value="'+esc(u.username)+'" placeholder="z. B. sara"></div>'
+   + '<div><label>Rolle</label><select id="u_rolle">'
+   + '<option value="mitarbeiter"'+(u.rolle==='mitarbeiter'?' selected':'')+'>Mitarbeiterin</option>'
+   + '<option value="leitung"'+(u.rolle==='leitung'?' selected':'')+'>Leitung (darf alles)</option>'
+   + '</select></div></div>'
+   + '<div class="row one"><div><label>'+(id?'Neues Passwort (leer = unverändert)':'Passwort (mind. 10 Zeichen)')+'</label>'
+   + '<input id="u_pass" type="text" autocomplete="off" placeholder="'+(id?'unverändert':'z. B. Praxis-Sonne-2026')+'"></div></div>'
+   + '<div class="row one"><div><label><input type="checkbox" id="u_aktiv" '+(u.aktiv?'checked':'')
+   + ' style="width:auto;margin-right:6px">Anmelden erlaubt</label></div></div>'
+   + '<p class="muted">Das Passwort wird hier im Klartext angezeigt, damit Sie es weitergeben können. '
+   + 'Danach ist es nicht mehr lesbar – bei Bedarf einfach ein neues vergeben. '
+   + 'Bitte der Mitarbeiterin sagen, dass sie es nach der ersten Anmeldung unter '
+   + '<b>Einstellungen</b> ändern soll.</p>'
+   + (id ? '<button class="btn danger" style="margin-top:14px" onclick="delUser(\''+id+'\')">Zugang löschen</button>' : ''),
+     function(){
+       return api('save_user', {id:id||'', username:el('u_user').value, passwort:el('u_pass').value,
+         rolle:el('u_rolle').value, staff_id:el('u_staff').value, aktiv:el('u_aktiv').checked?1:0});
+     });
+}
+function vorschlagName(name){
+  var titel = ['dr','dr.','prof','prof.','med','med.','dipl','frau','herr'];
+  var teile = String(name).toLowerCase().split(/[\s.]+/).filter(function(w){
+    return w && titel.indexOf(w) < 0 && titel.indexOf(w+'.') < 0; });
+  var w = teile[0] || String(name).toLowerCase();
+  return w.replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+          .replace(/[^a-z0-9]/g,'');
+}
+function delUser(id){
+  if(!confirm('Zugang wirklich löschen? Die Person und ihre Einträge bleiben erhalten.')) return;
+  api('del_user', {id:id}).then(function(){ closeDialog(); return load(); })
+   .then(function(){ zeige('Zugang gelöscht.', true); })
+   .catch(function(e){ alert(fehlerText(e)); });
+}
+
 function openStaff(id){
   var m = id ? S.staff.filter(function(x){ return x.id===id; })[0]
              : {name:'',rolle:'mfa',kuerzel:'',farbe:'#16653f',eintritt:'',austritt:'',
@@ -618,6 +762,44 @@ function delStaff(id){
    .catch(function(e){ alert(fehlerText(e)); });
 }
 
+// ------------------------------------------------------------------ Ansicht: Mein Urlaub (Mitarbeiterin)
+function viewMeins(){
+  var sid = S.nutzer.staff_id;
+  var m = S.staff.filter(function(x){ return x.id === sid; })[0];
+  if(!m) return '<div class="card"><h2>Mein Urlaub</h2><p class="muted">Ihr Zugang ist noch keiner Person '
+       + 'im Plan zugeordnet. Bitte die Praxisleitung darum bitten – danach sehen Sie hier Ihr Urlaubskonto.</p></div>';
+  var k = S.konten[sid] || {anspruch:0,uebertrag:0,genommen:0,geplant:0,rest:0,krank:0,kind:0,fortbildung:0};
+  var h = '<div class="card"><h2>Mein Urlaubskonto '+JAHR+'</h2>'
+    + '<div class="kgrid">'
+      + kbox(k.anspruch,'Anspruch') + kbox(k.uebertrag,'Übertrag')
+      + kbox(k.genommen,'genommen') + kbox(k.geplant,'geplant')
+      + '<div class="kbox rest'+(k.rest<0?' neg':'')+'"><div class="v">'+num(k.rest)+'</div><div class="l">Rest</div></div>'
+    + '</div>'
+    + '<div class="kgrid">'+kbox(k.krank,'Krank (AT)')+kbox(k.kind,'Kind krank')+kbox(k.fortbildung,'Fortbildung')+'</div>'
+    + '<button class="btn" onclick="openEintrag({})">Urlaub beantragen</button></div>';
+
+  var meine = S.absences.filter(function(a){ return a.staff_id === sid; })
+                        .sort(function(a,b){ return a.von < b.von ? 1 : -1; });
+  h += '<div class="card"><h2>Meine Einträge '+JAHR+'</h2>';
+  if(!meine.length) h += '<p class="muted">Noch keine Einträge in diesem Jahr.</p>';
+  meine.forEach(function(a){
+    var t = TY[a.typ] || {label:a.typ, farbe:'#888'};
+    var st = a.status === 'beantragt' ? ' · <b>wartet auf Genehmigung</b>'
+           : (a.status === 'abgelehnt' ? ' · abgelehnt' : '');
+    h += '<div class="item"><span class="dot" style="background:'+t.farbe+'"></span>'
+      + '<div class="t"><b>'+esc(t.label)+'</b><span>'+dmy(a.von)+' – '+dmy(a.bis)+' · '+tage(a.tage)+st+'</span></div>'
+      + (a.status === 'beantragt'
+          ? '<button class="btn small ghost" onclick="delEintrag(\''+a.id+'\')">Zurückziehen</button>' : '')
+      + '</div>';
+  });
+  h += '</div>';
+  h += '<div class="card"><h2>Mein Zugang</h2>'
+     + '<div class="row"><div><label>Aktuelles Passwort</label><input id="p_alt" type="password"></div>'
+     + '<div><label>Neues Passwort (mind. 10 Zeichen)</label><input id="p_neu" type="password"></div></div>'
+     + '<button class="btn ghost" onclick="savePasswort()">Passwort ändern</button></div>';
+  return h;
+}
+
 // ------------------------------------------------------------------ Ansicht: Einstellungen
 function viewEinst(){
   var bl = Object.keys(S.bundeslaender).map(function(k){
@@ -627,6 +809,10 @@ function viewEinst(){
   return '<div class="card"><h2>Praxis</h2>'
    + '<div class="row"><div><label>Name der Praxis</label><input id="e_praxis" value="'+esc(S.praxis)+'"></div>'
    + '<div><label>Bundesland</label><select id="e_bl">'+bl+'</select></div></div>'
+   + '<div class="row one"><div><label><input type="checkbox" id="e_det" '+(S.details_sichtbar?'checked':'')
+   + ' style="width:auto;margin-right:6px">Mitarbeiterinnen sehen im Plan auch die <b>Art</b> der Abwesenheit</label>'
+   + '<p class="muted">Ausgeschaltet sehen sie nur, <i>dass</i> jemand fehlt – nicht, ob Urlaub oder Krankheit. '
+   + 'Das eigene Konto sieht jede Person immer vollständig.</p></div></div>'
    + '<button class="btn" onclick="saveEinst()">Speichern</button></div>'
    + '<div class="card"><h2>Passwort ändern</h2>'
    + '<div class="row"><div><label>Aktuelles Passwort</label><input id="p_alt" type="password"></div>'
@@ -641,7 +827,8 @@ function viewEinst(){
    + '<div class="card"><h2>Feiertage '+JAHR+' · '+esc(S.bundeslaender[S.bundesland]||'')+'</h2>'+ft+'</div>';
 }
 function saveEinst(){
-  api('save_settings', {praxisname:el('e_praxis').value, bundesland:el('e_bl').value})
+  api('save_settings', {praxisname:el('e_praxis').value, bundesland:el('e_bl').value,
+                        details_sichtbar: el('e_det') && el('e_det').checked ? 1 : 0})
    .then(load).then(function(){ zeige('Gespeichert.', true); })
    .catch(function(e){ zeige(fehlerText(e)); });
 }
@@ -658,28 +845,112 @@ function recalc(){
 // ------------------------------------------------------------------ Eintrag anlegen / ändern
 function openEintrag(a){
   a = a || {};
+  var istL  = S.leitung;
   var staff = aktiveStaff();
-  if(!staff.length){ alert('Bitte zuerst im Reiter Team eine Mitarbeiterin anlegen.'); return; }
-  var heute = S.heute;
-  var sel = staff.map(function(m){
-    return '<option value="'+m.id+'"'+(a.staff_id===m.id?' selected':'')+'>'+esc(m.name)+'</option>'; }).join('');
-  var typen = S.typen.map(function(t){
-    return '<option value="'+t.key+'"'+((a.typ||'urlaub')===t.key?' selected':'')+'>'+esc(t.label)+'</option>'; }).join('');
-  dialog(a.id ? 'Eintrag bearbeiten' : 'Neuer Eintrag',
-     '<div class="row one"><div><label>Mitarbeiterin</label><select id="a_staff" onchange="vorschau()">'+sel+'</select></div></div>'
-   + '<div class="row one"><div><label>Art</label><select id="a_typ" onchange="vorschau()">'+typen+'</select></div></div>'
-   + '<div class="row"><div><label>Von</label><input id="a_von" type="date" value="'+esc(a.von||heute)+'" onchange="vonGeaendert()"></div>'
+  if(istL && !staff.length){ alert('Bitte zuerst im Reiter Team eine Mitarbeiterin anlegen.'); return; }
+  if(!istL && !S.nutzer.staff_id){
+    alert('Ihr Zugang ist noch keiner Person im Plan zugeordnet. Bitte die Praxisleitung darum bitten.');
+    return;
+  }
+  var sid = a.staff_id || (istL ? (staff[0] && staff[0].id) : S.nutzer.staff_id);
+  var typ = a.typ || 'urlaub';
+  var heute = a.von || naechsterArbeitstag(sid);
+  var darfLoeschen = a.id && (istL || (a.staff_id === S.nutzer.staff_id && a.status === 'beantragt'));
+  var nurLesen = a.id && !istL && !(a.staff_id === S.nutzer.staff_id && a.status === 'beantragt');
+
+  if(nurLesen){
+    var m0 = S.staff.filter(function(x){ return x.id === a.staff_id; })[0] || {name:'?'};
+    var t0 = TY[a.typ] || {label:a.typ};
+    dialog('Eintrag',
+      '<p style="font-size:0.95rem;line-height:1.7"><b>'+esc(m0.name)+'</b><br>'+esc(t0.label)+'<br>'
+      + dmy(a.von)+' – '+dmy(a.bis)+'</p>'
+      + '<p class="muted">Ändern darf das nur die Praxisleitung.</p>', null);
+    return;
+  }
+
+  // 1. Wer
+  var wer = istL
+    ? '<div class="row one"><div><label>1. Für wen?</label><select id="a_staff" onchange="personGewechselt()">'
+      + staff.map(function(m){
+          return '<option value="'+m.id+'"'+(sid===m.id?' selected':'')+'>'+esc(m.name)+'</option>'; }).join('')
+      + '</select></div></div>'
+    : '<input type="hidden" id="a_staff" value="'+esc(sid)+'">';
+
+  // 2. Was - grosse farbige Schaltflächen statt Auswahlliste
+  var arten = S.typen.filter(function(t){ return istL || t.key !== 'geschlossen'; });
+  var chips = arten.map(function(t){
+    return '<button type="button" class="typ'+(t.key===typ?' on':'')+'" data-typ="'+t.key+'" '
+         + 'style="--c:'+t.farbe+'" onclick="typWahl(this)"><i></i>'+esc(t.label)+'</button>';
+  }).join('');
+
+  dialog(a.id ? 'Eintrag ändern' : (istL ? 'Neuer Eintrag' : 'Urlaub beantragen'),
+     wer
+   + '<div class="row one"><div><label>'+(istL?'2. ':'1. ')+'Was?</label>'
+   + '<div class="typegrid" id="a_typen">'+chips+'</div>'
+   + '<input type="hidden" id="a_typ" value="'+esc(typ)+'"></div></div>'
+   + '<div class="row"><div><label>'+(istL?'3. ':'2. ')+'Von</label>'
+   + '<input id="a_von" type="date" value="'+esc(a.von||heute)+'" onchange="vonGeaendert()"></div>'
    + '<div><label>Bis</label><input id="a_bis" type="date" value="'+esc(a.bis||a.von||heute)+'" onchange="vorschau()"></div></div>'
-   + '<div class="row one"><div><label><input type="checkbox" id="a_halb" '+(a.halbtag?'checked':'')+' onchange="vorschau()" style="width:auto;margin-right:6px">halber Tag (nur bei einem einzelnen Tag)</label></div></div>'
-   + '<div class="row one"><div><label>Notiz (keine Diagnosen!)</label><input id="a_notiz" maxlength="120" value="'+esc(a.notiz||'')+'"></div></div>'
-   + '<div class="row one"><div><label><input type="checkbox" id="a_nachweis" '+(a.nachweis?'checked':'')+' style="width:auto;margin-right:6px">Nachweis liegt vor (AU / Zertifikat)</label></div></div>'
+   + '<div style="display:flex;gap:7px;margin-bottom:11px;flex-wrap:wrap">'
+   +   '<button type="button" class="btn small ghost" onclick="spanne(0)">1 Tag</button>'
+   +   '<button type="button" class="btn small ghost" onclick="spanne(6)">1 Woche</button>'
+   +   '<button type="button" class="btn small ghost" onclick="spanne(13)">2 Wochen</button>'
+   +   '<button type="button" class="btn small ghost" onclick="spanne(20)">3 Wochen</button>'
+   + '</div>'
+   + '<div class="row one"><div><label><input type="checkbox" id="a_halb" '+(a.halbtag?'checked':'')
+   + ' onchange="vorschau()" style="width:auto;margin-right:6px">nur ein halber Tag</label></div></div>'
+   + '<div class="row one"><div><label>Notiz – freiwillig, keine Diagnosen</label>'
+   + '<input id="a_notiz" maxlength="120" value="'+esc(a.notiz||'')+'"></div></div>'
+   + (istL ? '<div class="row one"><div><label><input type="checkbox" id="a_nachweis" '+(a.nachweis?'checked':'')
+   + ' style="width:auto;margin-right:6px">Nachweis liegt vor (AU / Zertifikat)</label></div></div>'
+           : '<input type="hidden" id="a_nachweis" value="">')
    + '<div id="a_vorschau" class="ok" style="display:none"></div>'
-   + (a.id ? '<button class="btn danger" onclick="delEintrag(\''+a.id+'\')">Eintrag löschen</button>' : ''),
+   + (darfLoeschen ? '<button class="btn danger" onclick="delEintrag(\''+a.id+'\')">Eintrag löschen</button>' : ''),
      function(){
        return api('save_absence', {id:a.id||'', staff_id:el('a_staff').value, typ:el('a_typ').value,
          von:el('a_von').value, bis:el('a_bis').value, halbtag:el('a_halb').checked?1:0,
-         notiz:el('a_notiz').value, nachweis:el('a_nachweis').checked?1:0, status:'genehmigt'});
-     });
+         notiz:el('a_notiz').value,
+         nachweis:(el('a_nachweis') && el('a_nachweis').checked)?1:0,
+         status:'genehmigt'});
+     },
+     istL ? 'Speichern' : 'Antrag senden');
+  vorschau();
+}
+/** Erster Tag ab heute, an dem diese Person laut Wochenmuster arbeitet. */
+function naechsterArbeitstag(staffId){
+  var m = S.staff.filter(function(x){ return x.id === staffId; })[0];
+  var d = new Date(S.heute+'T12:00:00');
+  if(!m) return iso(d);
+  var mu = String(m.muster||'1,1,1,1,1,0,0').split(',').map(Number);
+  for(var i=0;i<21;i++){
+    var datum = iso(d), wd = (d.getDay()+6)%7;
+    if(mu[wd] > 0 && !S.feiertage[datum]
+       && !(m.eintritt && datum < m.eintritt) && !(m.austritt && datum > m.austritt)) return datum;
+    d.setDate(d.getDate()+1);
+  }
+  return S.heute;
+}
+/** Wenn eine andere Person gewaehlt wird, den Vorschlag anpassen. */
+function personGewechselt(){
+  var von = el('a_von'), bis = el('a_bis');
+  if(von && bis && von.value === bis.value){
+    var neu = naechsterArbeitstag(el('a_staff').value);
+    von.value = neu; bis.value = neu;
+  }
+  vorschau();
+}
+function typWahl(b){
+  Array.prototype.forEach.call(document.querySelectorAll('#a_typen button'), function(x){
+    x.classList.remove('on'); });
+  b.classList.add('on');
+  el('a_typ').value = b.getAttribute('data-typ');
+  vorschau();
+}
+function spanne(plus){
+  var v = el('a_von').value || S.heute;
+  var d = new Date(v+'T12:00:00'); d.setDate(d.getDate()+plus);
+  el('a_von').value = v; el('a_bis').value = iso(d);
+  if(plus > 0) el('a_halb').checked = false;
   vorschau();
 }
 function vonGeaendert(){
@@ -730,10 +1001,11 @@ function dialog(titel, inhalt, onSave, saveLabel){
   d.className = 'ov'; d.id = 'ov';
   d.innerHTML = '<div class="dlg" onclick="event.stopPropagation()"><h3>'+titel+'</h3>'
     + '<div id="dlg_fehler"></div>' + inhalt
-    + '<button class="btn" id="dlg_save">'+(saveLabel||'Speichern')+'</button>'
-    + '<button class="btn ghost" onclick="closeDialog()">Abbrechen</button></div>';
+    + (onSave ? '<button class="btn" id="dlg_save">'+(saveLabel||'Speichern')+'</button>' : '')
+    + '<button class="btn ghost" onclick="closeDialog()">'+(onSave?'Abbrechen':'Schließen')+'</button></div>';
   d.onclick = closeDialog;
   document.body.appendChild(d);
+  if(!onSave) return;
   el('dlg_save').onclick = function(){
     el('dlg_save').disabled = true;
     Promise.resolve(onSave()).then(function(){ closeDialog(); return load(); })
