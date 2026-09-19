@@ -1,0 +1,5 @@
+# Zugangsdaten und Datenbank gehoeren nicht ins Repository
+config.php
+data/*.sqlite
+data/*.sqlite-wal
+data/*.sqlite-shm

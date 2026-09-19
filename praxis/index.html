@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0f766e">
+<title>Praxis-Kalender</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f4f6f8; --card:#fff; --line:#e2e6ea; --ink:#16202a; --mut:#6b7684;
+  --accent:#0f766e; --accent-soft:#e6f4f1; --warn:#b45309; --bad:#b91c1c;
+  --we:#eef1f4; --ft:#fdf2e3;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;font-size:15px;-webkit-font-smoothing:antialiased}
+.app{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
+.top{position:sticky;top:0;z-index:50;background:var(--accent);color:#fff;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;display:flex;align-items:center;gap:10px}
+.top h1{font-size:1rem;font-weight:700;letter-spacing:-0.01em}
+.top .sub{font-size:0.66rem;opacity:0.8;margin-top:1px}
+.top .spacer{flex:1}
+.yearpick{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,0.15);border-radius:9px;padding:2px}
+.yearpick button{background:none;border:none;color:#fff;font-size:0.95rem;padding:4px 8px;cursor:pointer;border-radius:7px;font-family:inherit}
+.yearpick button:active{background:rgba(255,255,255,0.2)}
+.yearpick span{font-size:0.8rem;font-weight:700;font-variant-numeric:tabular-nums;padding:0 2px}
+.iconbtn{background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:9px;padding:7px 10px;font-size:0.75rem;cursor:pointer;font-family:inherit;font-weight:600}
+.tabs{display:flex;background:var(--card);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:0;z-index:40}
+.tab{flex:0 0 auto;padding:11px 15px;font-size:0.78rem;font-weight:600;color:var(--mut);border-bottom:2.5px solid transparent;cursor:pointer;white-space:nowrap}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.wrap{flex:1;padding:14px;padding-bottom:40px;max-width:1500px;width:100%;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.card h2{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--mut);margin-bottom:12px;font-weight:700}
+label{display:block;font-size:0.68rem;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px}
+input,select,textarea{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:1rem;font-family:inherit;background:#fff;color:var(--ink);outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px}
+.row.one{grid-template-columns:1fr}
+.row.three{grid-template-columns:1fr 1fr 1fr}
+.row>div{min-width:0}
+input[type=date]{min-width:0}
+.btn{display:block;width:100%;padding:13px;border:none;border-radius:11px;background:var(--accent);color:#fff;font-size:0.92rem;font-weight:700;font-family:inherit;cursor:pointer;margin-top:6px}
+.btn:active{opacity:0.85}
+.btn.ghost{background:#eef1f4;color:var(--ink)}
+.btn.danger{background:#fee2e2;color:var(--bad)}
+.btn.small{width:auto;padding:8px 13px;font-size:0.78rem;display:inline-block;margin-right:7px}
+.muted{color:var(--mut);font-size:0.78rem;line-height:1.5}
+.err{background:#fee2e2;color:var(--bad);padding:10px 12px;border-radius:10px;font-size:0.8rem;margin-bottom:11px}
+.ok{background:var(--accent-soft);color:var(--accent);padding:10px 12px;border-radius:10px;font-size:0.8rem;margin-bottom:11px}
+/* ---- Planer-Raster ---- */
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px;background:#fff}
+table.plan{border-collapse:separate;border-spacing:0;font-size:0.7rem}
+table.plan th,table.plan td{border-right:1px solid #eef1f4;border-bottom:1px solid #eef1f4}
+table.plan thead th{position:sticky;top:0;background:#fff;z-index:2;font-weight:700;color:var(--mut);padding:4px 0;text-align:center;font-size:0.6rem;line-height:1.25}
+table.plan th.nm{position:sticky;left:0;z-index:3;background:#fff;text-align:left;padding:7px 10px;min-width:118px;max-width:118px;font-size:0.72rem;color:var(--ink);box-shadow:1px 0 0 var(--line)}
+table.plan thead th.nm{z-index:4}
+td.d{width:26px;min-width:26px;height:30px;text-align:center;cursor:pointer;position:relative}
+td.d.we{background:var(--we)}
+td.d.ft{background:var(--ft)}
+td.d.today{outline:2px solid var(--accent);outline-offset:-2px;z-index:1}
+td.d .mark{position:absolute;inset:2px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.55rem;font-weight:700}
+td.d .mark.half{clip-path:polygon(0 0,100% 0,0 100%)}
+tr.sum td{height:22px;font-size:0.58rem;color:var(--mut);text-align:center;font-weight:700;background:#fafbfc}
+tr.sum td.low{background:#fee2e2;color:var(--bad)}
+.mon-head th{font-size:0.58rem;color:var(--accent);background:#fff;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid var(--line)}
+/* ---- Legende ---- */
+.legend{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.lg{display:inline-flex;align-items:center;gap:5px;font-size:0.68rem;color:var(--mut)}
+.lg i{width:11px;height:11px;border-radius:3px;display:inline-block}
+/* ---- Konten ---- */
+.konto{border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:10px}
+.konto .kh{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.konto .kh b{font-size:0.9rem}
+.dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:7px;margin-bottom:9px}
+.kbox{background:#f7f9fa;border-radius:9px;padding:8px;text-align:center}
+.kbox .v{font-size:1rem;font-weight:800;font-variant-numeric:tabular-nums}
+.kbox .l{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px}
+.kbox.rest .v{color:var(--accent)}
+.kbox.rest.neg .v{color:var(--bad)}
+.bar{height:7px;border-radius:4px;background:#e8ecef;overflow:hidden;display:flex;margin-bottom:7px}
+.bar i{display:block;height:100%}
+.flag{background:#fef3c7;color:var(--warn);border-radius:8px;padding:7px 10px;font-size:0.72rem;margin-top:7px;line-height:1.45}
+/* ---- Liste ---- */
+.item{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:none}
+.item .t{flex:1;min-width:0}
+.item .t b{font-size:0.86rem;display:block}
+.item .t span{font-size:0.7rem;color:var(--mut)}
+.pill{font-size:0.6rem;font-weight:700;color:#fff;padding:3px 8px;border-radius:20px;white-space:nowrap}
+/* ---- Dialog ---- */
+.ov{position:fixed;inset:0;background:rgba(15,23,32,0.55);display:flex;align-items:flex-end;justify-content:center;z-index:100;padding:0}
+.dlg{background:#fff;border-radius:18px 18px 0 0;padding:18px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+.dlg h3{font-size:1rem;margin-bottom:14px}
+.wd{display:flex;gap:5px}
+.wd button{flex:1;padding:9px 0;border:1.5px solid var(--line);border-radius:9px;background:#fff;font-size:0.7rem;font-weight:700;cursor:pointer;font-family:inherit;color:var(--mut)}
+.wd button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.wd button.half{background:#a7d8d2;border-color:#a7d8d2;color:#0b3b37}
+.center{max-width:400px;margin:8vh auto;padding:0 16px}
+@media (min-width:760px){ .ov{align-items:center} .dlg{border-radius:18px} }
+@media print{
+  .top,.tabs,.noprint,.btn{display:none !important}
+  body{background:#fff}
+  .wrap{padding:0;max-width:none}
+  .card{border:none;padding:0}
+  .scroll{overflow:visible;border:none}
+  td.d{width:19px;min-width:19px;height:20px}
+  table.plan th.nm{min-width:96px;max-width:96px}
+  @page{size:landscape;margin:8mm}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+'use strict';
+var S = null;                       // Zustand vom Server
+var JAHR = new Date().getFullYear();
+var MONAT = new Date().getMonth();  // 0..11
+var VIEW = 'monat';
+var IDX = {};                       // staff_id -> { 'YYYY-MM-DD': eintrag }
+var TY = {};                        // typ-key -> definition
+var MSG = null;
+
+var WTAG = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+var MNAME = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+var MKURZ = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+var ROLLEN = {arzt:'Ärztin / Arzt', mfa:'MFA', azubi:'Auszubildende', verwaltung:'Verwaltung', sonstige:'Sonstige'};
+
+// ------------------------------------------------------------------ Hilfen
+function el(id){ return document.getElementById(id); }
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function iso(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function dmy(s){ if(!s) return ''; var p=s.split('-'); return p[2]+'.'+p[1]+'.'+p[0]; }
+function num(n){ return (Math.round(n*10)/10).toString().replace('.',','); }
+function tage(n){ return num(n)+' '+(Math.abs(n)===1?'Tag':'Tage'); }
+
+function api(a, data){
+  var opt = {headers:{}, credentials:'same-origin'};
+  if(data !== undefined){
+    opt.method = 'POST';
+    opt.headers['Content-Type'] = 'application/json';
+    if(S && S.csrf) opt.headers['X-Praxis-Token'] = S.csrf;
+    opt.body = JSON.stringify(data);
+  }
+  return fetch('api.php?a='+a, opt).then(function(r){
+    return r.json().catch(function(){ return {error:'antwort_unlesbar'}; })
+      .then(function(j){ if(j && j.error) throw j; return j; });
+  });
+}
+var FEHLER = {
+  config_missing:'config.php fehlt auf dem Server.',
+  db_connect:'Datenbank nicht erreichbar – Zugangsdaten in config.php prüfen.',
+  login_falsch:'Benutzername oder Passwort stimmt nicht.',
+  gesperrt:'Zu viele Fehlversuche. Bitte 5 Minuten warten.',
+  nicht_angemeldet:'Sitzung abgelaufen – bitte neu anmelden.',
+  passwort_zu_kurz:'Das Passwort braucht mindestens 10 Zeichen.',
+  benutzername_zu_kurz:'Der Benutzername braucht mindestens 3 Zeichen.',
+  datum_ungueltig:'Bitte gültige Daten eingeben.',
+  bis_vor_von:'Das Enddatum liegt vor dem Startdatum.',
+  csrf:'Sitzung abgelaufen – bitte Seite neu laden.',
+  name_fehlt:'Bitte einen Namen eingeben.'
+};
+function fehlerText(e){
+  if(!e) return 'Unbekannter Fehler.';
+  if(e.hinweis) return e.hinweis;
+  return FEHLER[e.error] || ('Fehler: '+(e.error||e.message||e));
+}
+function zeige(text, gut){ MSG = {text:text, gut:!!gut}; render(); setTimeout(function(){
+  if(MSG && MSG.text===text){ MSG=null; var b=el('msg'); if(b) b.remove(); } }, 4000); }
+
+// ------------------------------------------------------------------ Laden
+function load(){
+  return api('state&jahr='+JAHR).then(function(d){
+    S = d;
+    if(S.typen){ TY = {}; S.typen.forEach(function(t){ TY[t.key]=t; }); }
+    if(S.staff) buildIndex();
+    render();
+  }).catch(function(e){
+    document.getElementById('root').innerHTML =
+      '<div class="center"><div class="card"><h2>Fehler</h2><div class="err">'+esc(fehlerText(e))+'</div></div></div>';
+  });
+}
+function buildIndex(){
+  IDX = {};
+  S.staff.forEach(function(m){ IDX[m.id] = {}; });
+  S.absences.forEach(function(a){
+    if(a.status==='abgelehnt' || a.status==='storniert') return;
+    if(!IDX[a.staff_id]) return;
+    var d = new Date(a.von+'T12:00:00'), e = new Date(a.bis+'T12:00:00');
+    while(d <= e){ IDX[a.staff_id][iso(d)] = a; d.setDate(d.getDate()+1); }
+  });
+}
+function aktiveStaff(){ return S.staff.filter(function(m){ return m.aktiv; }); }
+
+// ------------------------------------------------------------------ Rendern
+function render(){
+  if(!S){ return; }
+  if(S.setup){ return renderSetup(); }
+  if(!S.angemeldet){ return renderLogin(); }
+  var h = '';
+  h += '<div class="app">';
+  h += '<div class="top">'
+     +   '<div><h1>'+esc(S.praxis)+'</h1><div class="sub">Abwesenheiten &amp; Urlaubskonto</div></div>'
+     +   '<div class="spacer"></div>'
+     +   '<div class="yearpick"><button onclick="jahrWechsel(-1)">&#8249;</button><span>'+JAHR+'</span><button onclick="jahrWechsel(1)">&#8250;</button></div>'
+     +   '<button class="iconbtn" onclick="logout()">Abmelden</button>'
+     + '</div>';
+  var tabs = [['monat','Monat'],['jahr','Jahr'],['heute','Heute'],['konten','Urlaubskonto'],['team','Team'],['einst','Einstellungen']];
+  h += '<div class="tabs">'+tabs.map(function(t){
+    return '<div class="tab'+(VIEW===t[0]?' on':'')+'" onclick="setView(\''+t[0]+'\')">'+t[1]+'</div>';
+  }).join('')+'</div>';
+  h += '<div class="wrap">';
+  if(MSG) h += '<div id="msg" class="'+(MSG.gut?'ok':'err')+'">'+esc(MSG.text)+'</div>';
+  if(VIEW==='monat')      h += viewMonat();
+  else if(VIEW==='jahr')  h += viewJahr();
+  else if(VIEW==='heute') h += viewHeute();
+  else if(VIEW==='konten')h += viewKonten();
+  else if(VIEW==='team')  h += viewTeam();
+  else                    h += viewEinst();
+  h += '</div></div>';
+  el('root').innerHTML = h;
+}
+function setView(v){ VIEW = v; MSG = null; render(); window.scrollTo(0,0); }
+function jahrWechsel(d){ JAHR += d; load(); }
+
+// ------------------------------------------------------------------ Setup / Login
+function renderSetup(){
+  var bl = Object.keys(S.bundeslaender).map(function(k){
+    return '<option value="'+k+'"'+(k==='NW'?' selected':'')+'>'+esc(S.bundeslaender[k])+'</option>'; }).join('');
+  el('root').innerHTML =
+   '<div class="center"><div class="card">'
+   + '<h2>Erste Einrichtung</h2>'
+   + '<div id="fehler"></div>'
+   + '<div class="row one"><div><label>Name der Praxis</label><input id="s_praxis" placeholder="Praxis Dr. Muster"></div></div>'
+   + '<div class="row one"><div><label>Bundesland (für die Feiertage)</label><select id="s_bl">'+bl+'</select></div></div>'
+   + '<div class="row one"><div><label>Benutzername</label><input id="s_user" autocapitalize="off" autocomplete="username"></div></div>'
+   + '<div class="row one"><div><label>Passwort (mind. 10 Zeichen)</label><input id="s_pass" type="password" autocomplete="new-password"></div></div>'
+   + '<button class="btn" onclick="doSetup()">Einrichten</button>'
+   + '<p class="muted" style="margin-top:12px">Dieses Konto ist die Praxisleitung und sieht alle Daten. Weitere Zugänge können später ergänzt werden.</p>'
+   + '</div></div>';
+}
+function doSetup(){
+  api('setup', {praxisname:el('s_praxis').value, bundesland:el('s_bl').value,
+                username:el('s_user').value, passwort:el('s_pass').value})
+   .then(function(){ return api('login', {username:el('s_user').value, passwort:el('s_pass').value}); })
+   .then(load)
+   .catch(function(e){ el('fehler').innerHTML = '<div class="err">'+esc(fehlerText(e))+'</div>'; });
+}
+function renderLogin(){
+  el('root').innerHTML =
+   '<div class="center"><div class="card">'
+   + '<h2>'+esc(S.praxis||'Praxis-Kalender')+'</h2>'
+   + '<div id="fehler"></div>'
+   + '<div class="row one"><div><label>Benutzername</label><input id="l_user" autocapitalize="off" autocomplete="username"></div></div>'
+   + '<div class="row one"><div><label>Passwort</label><input id="l_pass" type="password" autocomplete="current-password" onkeydown="if(event.key===\'Enter\')doLogin()"></div></div>'
+   + '<button class="btn" onclick="doLogin()">Anmelden</button>'
+   + '</div></div>';
+}
+function doLogin(){
+  api('login', {username:el('l_user').value, passwort:el('l_pass').value})
+   .then(load)
+   .catch(function(e){ el('fehler').innerHTML = '<div class="err">'+esc(fehlerText(e))+'</div>'; });
+}
+function logout(){ api('logout', {}).then(function(){ S=null; JAHR=new Date().getFullYear(); load(); }); }
+
+// ------------------------------------------------------------------ Planer-Zellen
+function zelle(m, datum, klass){
+  var a = IDX[m.id] && IDX[m.id][datum];
+  var inner = '';
+  if(a){
+    var t = TY[a.typ] || {farbe:'#888', label:a.typ};
+    var kurz = t.label.substr(0,1).toUpperCase();
+    inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+'">'+ (a.halbtag?'':kurz) +'</span>';
+  }
+  var titel = a ? (TY[a.typ]?TY[a.typ].label:a.typ)+' · '+dmy(a.von)+'–'+dmy(a.bis)+(a.notiz?' · '+a.notiz:'') : dmy(datum);
+  return '<td class="d '+klass+'" title="'+esc(titel)+'" onclick="zelleKlick(\''+m.id+'\',\''+datum+'\')">'+inner+'</td>';
+}
+function zelleKlick(staffId, datum){
+  var a = IDX[staffId] && IDX[staffId][datum];
+  if(a) openEintrag(a);
+  else openEintrag({staff_id:staffId, von:datum, bis:datum, typ:'urlaub'});
+}
+function tagKlass(d, datum){
+  var k = [];
+  var wd = (d.getDay()+6)%7;
+  if(wd>=5) k.push('we');
+  if(S.feiertage[datum]) k.push('ft');
+  if(datum===S.heute) k.push('today');
+  return k.join(' ');
+}
+function legende(){
+  return '<div class="legend">'+S.typen.map(function(t){
+    return '<span class="lg"><i style="background:'+t.farbe+'"></i>'+esc(t.label)+'</span>'; }).join('')
+    + '<span class="lg"><i style="background:var(--ft)"></i>Feiertag</span>'
+    + '<span class="lg"><i style="background:var(--we)"></i>Wochenende</span></div>';
+}
+
+// ------------------------------------------------------------------ Ansicht: Monat
+function viewMonat(){
+  var staff = aktiveStaff();
+  var erster = new Date(JAHR, MONAT, 1), anzahl = new Date(JAHR, MONAT+1, 0).getDate();
+  var h = '<div class="card">';
+  h += '<div class="noprint" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'
+     + '<button class="btn small ghost" onclick="monatWechsel(-1)">&#8249;</button>'
+     + '<b style="flex:1;text-align:center">'+MNAME[MONAT]+' '+JAHR+'</b>'
+     + '<button class="btn small ghost" onclick="monatWechsel(1)">&#8250;</button>'
+     + '<button class="btn small" onclick="openEintrag({})">+ Eintrag</button></div>';
+  if(!staff.length) return h + '<p class="muted">Noch keine Mitarbeiterinnen angelegt. Im Reiter <b>Team</b> anlegen.</p></div>';
+
+  var kopf = '<tr><th class="nm">Mitarbeiter</th>';
+  for(var i=1;i<=anzahl;i++){
+    var d = new Date(JAHR, MONAT, i);
+    kopf += '<th>'+i+'<br>'+WTAG[(d.getDay()+6)%7]+'</th>';
+  }
+  kopf += '</tr>';
+
+  var body = '';
+  staff.forEach(function(m){
+    body += '<tr><th class="nm"><span class="dot" style="display:inline-block;background:'+esc(m.farbe)+'"></span> '+esc(m.name)+'</th>';
+    for(var i=1;i<=anzahl;i++){
+      var d = new Date(JAHR, MONAT, i), datum = iso(d);
+      body += zelle(m, datum, tagKlass(d, datum));
+    }
+    body += '</tr>';
+  });
+  // Zeile: wie viele sind anwesend
+  var sum = '<tr class="sum"><td class="nm" style="position:sticky;left:0;background:#fafbfc;text-align:left;padding-left:10px">anwesend</td>';
+  for(var i=1;i<=anzahl;i++){
+    var d = new Date(JAHR, MONAT, i), datum = iso(d), wd = (d.getDay()+6)%7;
+    if(wd>=5 || S.feiertage[datum]){ sum += '<td>–</td>'; continue; }
+    var da = 0, soll = 0;
+    staff.forEach(function(m){
+      var muster = String(m.muster||'1,1,1,1,1,0,0').split(',').map(Number);
+      if(!muster[wd]) return;
+      if(m.eintritt && datum < m.eintritt) return;
+      if(m.austritt && datum > m.austritt) return;
+      soll++;
+      if(!(IDX[m.id]&&IDX[m.id][datum])) da++;
+    });
+    sum += '<td class="'+(soll>0 && da===0 ? 'low' : '')+'">'+da+'/'+soll+'</td>';
+  }
+  sum += '</tr>';
+
+  h += '<div class="scroll"><table class="plan"><thead>'+kopf+'</thead><tbody>'+body+sum+'</tbody></table></div>';
+  h += legende();
+  h += '<p class="muted" style="margin-top:10px">Auf ein Feld tippen, um einen Eintrag anzulegen oder zu ändern.</p>';
+  return h + '</div>';
+}
+function monatWechsel(d){
+  MONAT += d;
+  if(MONAT < 0){ MONAT = 11; JAHR--; return load(); }
+  if(MONAT > 11){ MONAT = 0; JAHR++; return load(); }
+  render();
+}
+
+// ------------------------------------------------------------------ Ansicht: Jahr
+function viewJahr(){
+  var staff = aktiveStaff();
+  var h = '<div class="card"><div class="noprint" style="display:flex;gap:8px;margin-bottom:12px">'
+        + '<b style="flex:1">Jahresübersicht '+JAHR+'</b>'
+        + '<button class="btn small ghost" onclick="window.print()">Drucken</button>'
+        + '<button class="btn small" onclick="openEintrag({})">+ Eintrag</button></div>';
+  if(!staff.length) return h + '<p class="muted">Noch keine Mitarbeiterinnen angelegt.</p></div>';
+
+  var monKopf = '<tr class="mon-head"><th class="nm"></th>', tagKopf = '<tr><th class="nm">Mitarbeiter</th>';
+  for(var mo=0; mo<12; mo++){
+    var n = new Date(JAHR, mo+1, 0).getDate();
+    monKopf += '<th colspan="'+n+'">'+MKURZ[mo]+'</th>';
+    for(var i=1;i<=n;i++){
+      var d = new Date(JAHR, mo, i), wd=(d.getDay()+6)%7;
+      tagKopf += '<th style="font-size:0.5rem;color:'+(wd>=5?'#aab':'#889')+'">'+i+'</th>';
+    }
+  }
+  monKopf += '</tr>'; tagKopf += '</tr>';
+
+  var body = '';
+  staff.forEach(function(m){
+    var k = S.konten[m.id] || {};
+    body += '<tr><th class="nm">'+esc(m.name)+'<br><span style="font-size:0.6rem;color:var(--mut);font-weight:400">Rest '+num(k.rest||0)+' T.</span></th>';
+    for(var mo=0; mo<12; mo++){
+      var n = new Date(JAHR, mo+1, 0).getDate();
+      for(var i=1;i<=n;i++){
+        var d = new Date(JAHR, mo, i), datum = iso(d);
+        body += zelleSchmal(m, datum, tagKlass(d, datum));
+      }
+    }
+    body += '</tr>';
+  });
+  h += '<div class="scroll"><table class="plan"><thead>'+monKopf+tagKopf+'</thead><tbody>'+body+'</tbody></table></div>';
+  h += legende();
+  return h + '</div>';
+}
+function zelleSchmal(m, datum, klass){
+  var a = IDX[m.id] && IDX[m.id][datum];
+  var stil = 'width:11px;min-width:11px;height:24px';
+  var inner = '';
+  if(a){
+    var t = TY[a.typ] || {farbe:'#888', label:a.typ};
+    inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+';inset:1px;border-radius:2px"></span>';
+  }
+  var titel = a ? (TY[a.typ]?TY[a.typ].label:a.typ)+' · '+dmy(a.von)+'–'+dmy(a.bis) : dmy(datum);
+  return '<td class="d '+klass+'" style="'+stil+'" title="'+esc(titel)+'" onclick="zelleKlick(\''+m.id+'\',\''+datum+'\')">'+inner+'</td>';
+}
+
+// ------------------------------------------------------------------ Ansicht: Heute
+function viewHeute(){
+  var heute = S.heute, h = '';
+  var staff = aktiveStaff();
+  var abw = [], anw = [];
+  staff.forEach(function(m){
+    var a = IDX[m.id] && IDX[m.id][heute];
+    if(a) abw.push([m,a]); else anw.push(m);
+  });
+  h += '<div class="card"><h2>Heute · '+dmy(heute)+(S.feiertage[heute]?' · '+esc(S.feiertage[heute]):'')+'</h2>';
+  h += '<div class="kgrid"><div class="kbox"><div class="v">'+anw.length+'</div><div class="l">anwesend</div></div>'
+     + '<div class="kbox"><div class="v">'+abw.length+'</div><div class="l">abwesend</div></div></div>';
+  if(abw.length){
+    h += abw.map(function(p){
+      var t = TY[p[1].typ]||{farbe:'#888',label:p[1].typ};
+      return '<div class="item"><span class="dot" style="background:'+esc(p[0].farbe)+'"></span>'
+        + '<div class="t"><b>'+esc(p[0].name)+'</b><span>bis '+dmy(p[1].bis)+(p[1].notiz?' · '+esc(p[1].notiz):'')+'</span></div>'
+        + '<span class="pill" style="background:'+t.farbe+'">'+esc(t.label)+'</span></div>';
+    }).join('');
+  } else { h += '<p class="muted">Heute ist niemand abwesend.</p>'; }
+  h += '</div>';
+
+  // Kommende 14 Tage
+  h += '<div class="card"><h2>Nächste 14 Tage</h2>';
+  var zeilen = '';
+  for(var i=1;i<=14;i++){
+    var d = new Date(heute+'T12:00:00'); d.setDate(d.getDate()+i);
+    var datum = iso(d), wd=(d.getDay()+6)%7;
+    var weg = staff.filter(function(m){ return IDX[m.id] && IDX[m.id][datum]; });
+    if(!weg.length && wd < 5) continue;
+    if(wd>=5 && !weg.length) continue;
+    zeilen += '<div class="item"><div class="t"><b>'+WTAG[wd]+' '+dmy(datum)+'</b><span>'
+      + (S.feiertage[datum]?esc(S.feiertage[datum])+' · ':'')
+      + weg.map(function(m){ var a=IDX[m.id][datum]; var t=TY[a.typ]||{label:a.typ};
+          return esc(m.name)+' ('+esc(t.label)+')'; }).join(', ')
+      + '</span></div></div>';
+  }
+  h += zeilen || '<p class="muted">Keine Abwesenheiten in den nächsten 14 Tagen.</p>';
+  return h + '</div>';
+}
+
+// ------------------------------------------------------------------ Ansicht: Urlaubskonto
+function viewKonten(){
+  var h = '<div class="card"><div style="display:flex;gap:8px;margin-bottom:12px" class="noprint">'
+        + '<b style="flex:1">Urlaubskonten '+JAHR+'</b>'
+        + '<a class="btn small ghost" href="api.php?a=export&jahr='+JAHR+'" style="text-decoration:none;text-align:center">CSV</a>'
+        + '<button class="btn small ghost" onclick="window.print()">Drucken</button></div>';
+  var staff = S.staff.filter(function(m){ return m.aktiv; });
+  if(!staff.length) return h+'<p class="muted">Noch keine Mitarbeiterinnen angelegt.</p></div>';
+
+  staff.forEach(function(m){
+    var k = S.konten[m.id] || {anspruch:0,uebertrag:0,genommen:0,geplant:0,rest:0,krank:0,kind:0,fortbildung:0};
+    var gesamt = Math.max(1, k.anspruch + k.uebertrag);
+    h += '<div class="konto">'
+      + '<div class="kh"><span class="dot" style="background:'+esc(m.farbe)+'"></span><b>'+esc(m.name)+'</b>'
+      + '<span class="muted">'+esc(ROLLEN[m.rolle]||m.rolle)+'</span></div>'
+      + '<div class="bar">'
+        + '<i style="background:#1f9d55;width:'+(k.genommen/gesamt*100)+'%"></i>'
+        + '<i style="background:#a7d8d2;width:'+(k.geplant/gesamt*100)+'%"></i>'
+      + '</div>'
+      + '<div class="kgrid">'
+        + kbox(k.anspruch,'Anspruch') + kbox(k.uebertrag,'Übertrag')
+        + kbox(k.genommen,'genommen') + kbox(k.geplant,'geplant')
+        + '<div class="kbox rest'+(k.rest<0?' neg':'')+'"><div class="v">'+num(k.rest)+'</div><div class="l">Rest</div></div>'
+      + '</div>'
+      + '<div class="kgrid">'
+        + kbox(k.krank,'Krank (AT)') + kbox(k.kind,'Kind krank') + kbox(k.fortbildung,'Fortbildung')
+        + kbox(k.sonder||0,'Sonderurlaub')
+      + '</div>';
+    if(k.krank_12m_kalendertage >= 42){
+      h += '<div class="flag"><b>6-Wochen-Grenze erreicht:</b> '+k.krank_12m_kalendertage
+         + ' Krankheits-Kalendertage in den letzten 12 Monaten. Entgeltfortzahlung prüfen (EFZG) und BEM anbieten.</div>';
+    } else if(k.krank_12m_kalendertage >= 30){
+      h += '<div class="flag">'+k.krank_12m_kalendertage+' Krankheitstage in 12 Monaten – 6-Wochen-Grenze (42 Tage) im Blick behalten.</div>';
+    }
+    if(k.kind >= 15){
+      h += '<div class="flag">Kinderkrankentage: '+num(k.kind)+' Tage in '+JAHR+' – gesetzlicher Rahmen (15 je Kind/Elternteil) ausgeschöpft.</div>';
+    }
+    if(k.rest > 0 && !k.hinweis_am){
+      h += '<div class="flag">Noch '+tage(k.rest)+' offen und kein Urlaubs-Hinweis dokumentiert. '
+         + '<a href="#" onclick="hinweisText(\''+m.id+'\');return false;"><b>Hinweisschreiben erzeugen</b></a></div>';
+    }
+    h += '<div class="noprint" style="margin-top:9px">'
+       + '<button class="btn small ghost" onclick="openKonto(\''+m.id+'\')">Übertrag / Anspruch anpassen</button>'
+       + '<button class="btn small ghost" onclick="openEintrag({staff_id:\''+m.id+'\'})">+ Eintrag</button></div>';
+    h += '</div>';
+  });
+  h += '<p class="muted">AT = Arbeitstage nach persönlichem Wochenmuster, Feiertage und Wochenenden sind bereits abgezogen.</p>';
+  return h + '</div>';
+}
+function kbox(v, l){ return '<div class="kbox"><div class="v">'+num(v||0)+'</div><div class="l">'+l+'</div></div>'; }
+
+function openKonto(id){
+  var m = S.staff.filter(function(x){ return x.id===id; })[0];
+  var k = S.konten[id] || {};
+  dialog('Urlaubskonto '+JAHR+' – '+esc(m.name),
+     '<div class="row">'
+   + '<div><label>Übertrag aus '+(JAHR-1)+'</label><input id="k_ueb" type="number" step="0.5" value="'+(k.uebertrag||0)+'"></div>'
+   + '<div><label>Anspruch '+JAHR+' (leer = automatisch)</label><input id="k_ans" type="number" step="0.5" placeholder="'+(k.anspruch||0)+'"></div>'
+   + '</div>'
+   + '<div class="row one"><div><label>Urlaubs-Hinweis erteilt am</label><input id="k_hin" type="date" value="'+(k.hinweis_am||'')+'"></div></div>'
+   + '<p class="muted">Der Übertrag verfällt in der Regel am 31.03. – aber nur, wenn die Mitarbeiterin nachweislich schriftlich auf den Resturlaub hingewiesen wurde (BAG, 20.12.2022). Das Datum hier dokumentiert diesen Hinweis.</p>',
+     function(){
+       return api('save_carry', {staff_id:id, jahr:JAHR, uebertrag:el('k_ueb').value||0,
+         anspruch_override: el('k_ans').value===''?null:el('k_ans').value, hinweis_am: el('k_hin').value});
+     });
+}
+function hinweisText(id){
+  var m = S.staff.filter(function(x){ return x.id===id; })[0];
+  var k = S.konten[id] || {};
+  var txt = S.praxis+'\n\n'+'Hinweis zum Urlaubsanspruch '+JAHR+'\n\n'
+   + 'Liebe/r '+m.name+',\n\n'
+   + 'zum '+dmy(S.heute)+' stehen Dir noch '+num(k.rest)+' Urlaubstage aus dem Jahr '+JAHR+' zu '
+   + '(Jahresanspruch '+num(k.anspruch)+' Tage, Übertrag '+num(k.uebertrag)+' Tage, genommen bzw. verplant '
+   + num((k.genommen||0)+(k.geplant||0))+' Tage).\n\n'
+   + 'Bitte nimm diesen Urlaub bis zum 31.12.'+JAHR+'. Nicht genommener Urlaub verfällt zum 31.12.'+JAHR+' '
+   + 'bzw. – soweit eine Übertragung aus dringenden betrieblichen oder persönlichen Gründen vereinbart wurde – '
+   + 'zum 31.03.'+(JAHR+1)+'. Bitte stimme Deine Urlaubswünsche rechtzeitig mit der Praxisleitung ab.\n\n'
+   + 'Mit freundlichen Grüßen\n'+S.praxis+'\n\n'
+   + '---\nErhalten am: ____________   Unterschrift: ____________________';
+  dialog('Hinweisschreiben', '<textarea id="hin_txt" rows="16" style="font-size:0.8rem">'+esc(txt)+'</textarea>'
+    + '<p class="muted" style="margin-top:8px">Text kopieren, auf Praxisbriefpapier ausdrucken, unterschreiben lassen – und das Datum anschließend im Urlaubskonto eintragen.</p>',
+    function(){
+      var ta = el('hin_txt'); ta.select();
+      try{ document.execCommand('copy'); }catch(e){}
+      return api('save_carry', {staff_id:id, jahr:JAHR, uebertrag:(S.konten[id]||{}).uebertrag||0,
+        anspruch_override:null, hinweis_am:S.heute});
+    }, 'Kopieren &amp; als erteilt markieren');
+}
+
+// ------------------------------------------------------------------ Ansicht: Team
+function viewTeam(){
+  var h = '<div class="card"><div style="display:flex;gap:8px;margin-bottom:12px"><b style="flex:1">Team</b>'
+        + '<button class="btn small" onclick="openStaff(null)">+ Mitarbeiterin</button></div>';
+  if(!S.staff.length) h += '<p class="muted">Noch niemand angelegt.</p>';
+  S.staff.forEach(function(m){
+    var k = S.konten[m.id]||{};
+    var mus = String(m.muster||'').split(',').map(Number);
+    var tageTxt = WTAG.filter(function(w,i){ return mus[i] > 0; }).join(' ');
+    h += '<div class="item"><span class="dot" style="background:'+esc(m.farbe)+'"></span>'
+      + '<div class="t"><b>'+esc(m.name)+(m.aktiv?'':' <span class="muted">(inaktiv)</span>')+'</b>'
+      + '<span>'+esc(ROLLEN[m.rolle]||m.rolle)+' · '+esc(tageTxt||'–')+' · '+num(m.anspruch)+' Urlaubstage'
+      + (m.eintritt?' · seit '+dmy(m.eintritt):'')+(m.austritt?' · bis '+dmy(m.austritt):'')+'</span></div>'
+      + '<button class="btn small ghost" onclick="openStaff(\''+m.id+'\')">Bearbeiten</button></div>';
+  });
+  return h + '</div>';
+}
+function openStaff(id){
+  var m = id ? S.staff.filter(function(x){ return x.id===id; })[0]
+             : {name:'',rolle:'mfa',kuerzel:'',farbe:'#1f9d55',eintritt:'',austritt:'',
+                muster:'1,1,1,1,1,0,0',anspruch:25,aktiv:1,sortierung:S.staff.length};
+  var mus = String(m.muster).split(',').map(Number);
+  var rollen = Object.keys(ROLLEN).map(function(r){
+    return '<option value="'+r+'"'+(m.rolle===r?' selected':'')+'>'+ROLLEN[r]+'</option>'; }).join('');
+  var wd = WTAG.map(function(w,i){
+    var v = mus[i]||0, cls = v===1?'on':(v===0.5?'half':'');
+    return '<button type="button" class="'+cls+'" data-i="'+i+'" onclick="musterKlick(this)">'+w+'</button>'; }).join('');
+  dialog((id?'Bearbeiten':'Neue Mitarbeiterin'),
+     '<div class="row"><div><label>Name</label><input id="m_name" value="'+esc(m.name)+'"></div>'
+   + '<div><label>Rolle</label><select id="m_rolle">'+rollen+'</select></div></div>'
+   + '<div class="row"><div><label>Kürzel</label><input id="m_kuerzel" maxlength="4" value="'+esc(m.kuerzel||'')+'"></div>'
+   + '<div><label>Farbe</label><input id="m_farbe" type="color" value="'+esc(m.farbe||'#1f9d55')+'" style="height:44px;padding:4px"></div></div>'
+   + '<div class="row one"><div><label>Arbeitstage (1× tippen = ganzer Tag, 2× = halber Tag)</label><div class="wd" id="m_muster">'+wd+'</div></div></div>'
+   + '<div class="row"><div><label>Urlaubstage pro Jahr</label><input id="m_anspruch" type="number" step="0.5" value="'+m.anspruch+'"></div>'
+   + '<div><label>Reihenfolge</label><input id="m_sort" type="number" value="'+(m.sortierung||0)+'"></div></div>'
+   + '<div class="row"><div><label>Eintritt</label><input id="m_eintritt" type="date" value="'+esc(m.eintritt||'')+'"></div>'
+   + '<div><label>Austritt</label><input id="m_austritt" type="date" value="'+esc(m.austritt||'')+'"></div></div>'
+   + '<div class="row one"><div><label><input type="checkbox" id="m_aktiv" '+(m.aktiv?'checked':'')+' style="width:auto;margin-right:6px">im Plan anzeigen</label></div></div>'
+   + '<p class="muted">Teilzeit: nur die tatsächlichen Arbeitstage markieren. Der Urlaubsanspruch wird in <b>Tagen</b> geführt – Faustregel bei Teilzeit: Vollzeittage × (Arbeitstage pro Woche ÷ 5).</p>'
+   + (id ? '<button class="btn danger" style="margin-top:14px" onclick="delStaff(\''+id+'\')">Mitarbeiterin löschen</button>' : ''),
+     function(){
+       var mu = [];
+       Array.prototype.forEach.call(document.querySelectorAll('#m_muster button'), function(b){
+         mu.push(b.classList.contains('on') ? 1 : (b.classList.contains('half') ? 0.5 : 0)); });
+       return api('save_staff', {id:id||'', name:el('m_name').value, rolle:el('m_rolle').value,
+         kuerzel:el('m_kuerzel').value, farbe:el('m_farbe').value, muster:mu.join(','),
+         anspruch:el('m_anspruch').value, sortierung:el('m_sort').value,
+         eintritt:el('m_eintritt').value, austritt:el('m_austritt').value,
+         aktiv:el('m_aktiv').checked?1:0});
+     });
+}
+function musterKlick(b){
+  if(b.classList.contains('on')){ b.classList.remove('on'); b.classList.add('half'); }
+  else if(b.classList.contains('half')){ b.classList.remove('half'); }
+  else { b.classList.add('on'); }
+}
+function delStaff(id){
+  if(!confirm('Mitarbeiterin und alle zugehörigen Einträge wirklich löschen?')) return;
+  api('del_staff', {id:id}).then(function(){ closeDialog(); return load(); })
+   .then(function(){ zeige('Gelöscht.', true); })
+   .catch(function(e){ alert(fehlerText(e)); });
+}
+
+// ------------------------------------------------------------------ Ansicht: Einstellungen
+function viewEinst(){
+  var bl = Object.keys(S.bundeslaender).map(function(k){
+    return '<option value="'+k+'"'+(k===S.bundesland?' selected':'')+'>'+esc(S.bundeslaender[k])+'</option>'; }).join('');
+  var ft = Object.keys(S.feiertage).map(function(d){
+    return '<div class="item"><div class="t"><b>'+dmy(d)+'</b><span>'+esc(S.feiertage[d])+'</span></div></div>'; }).join('');
+  return '<div class="card"><h2>Praxis</h2>'
+   + '<div class="row"><div><label>Name der Praxis</label><input id="e_praxis" value="'+esc(S.praxis)+'"></div>'
+   + '<div><label>Bundesland</label><select id="e_bl">'+bl+'</select></div></div>'
+   + '<button class="btn" onclick="saveEinst()">Speichern</button></div>'
+   + '<div class="card"><h2>Passwort ändern</h2>'
+   + '<div class="row"><div><label>Aktuelles Passwort</label><input id="p_alt" type="password"></div>'
+   + '<div><label>Neues Passwort (mind. 10 Zeichen)</label><input id="p_neu" type="password"></div></div>'
+   + '<button class="btn ghost" onclick="savePasswort()">Passwort ändern</button></div>'
+   + '<div class="card"><h2>Daten</h2>'
+   + '<a class="btn ghost" href="api.php?a=export&jahr='+JAHR+'" style="text-decoration:none;text-align:center">Abwesenheiten '+JAHR+' als CSV</a>'
+   + '<button class="btn ghost" onclick="recalc()">Arbeitstage neu berechnen</button>'
+   + '<p class="muted" style="margin-top:10px"><b>Datenschutz:</b> Hier stehen Beschäftigtendaten und Krankheitszeiten – '
+   + 'besondere Kategorien nach Art. 9 DSGVO. Keine Diagnosen eintragen, Zugang nur für die Praxisleitung, '
+   + 'Aufruf nur über HTTPS, und Einträge ausgeschiedener Mitarbeiterinnen nach Ablauf der Aufbewahrungsfrist löschen.</p></div>'
+   + '<div class="card"><h2>Feiertage '+JAHR+' · '+esc(S.bundeslaender[S.bundesland]||'')+'</h2>'+ft+'</div>';
+}
+function saveEinst(){
+  api('save_settings', {praxisname:el('e_praxis').value, bundesland:el('e_bl').value})
+   .then(load).then(function(){ zeige('Gespeichert.', true); })
+   .catch(function(e){ zeige(fehlerText(e)); });
+}
+function savePasswort(){
+  api('passwort', {alt:el('p_alt').value, neu:el('p_neu').value})
+   .then(function(){ zeige('Passwort geändert.', true); })
+   .catch(function(e){ zeige(fehlerText(e)); });
+}
+function recalc(){
+  api('recalc', {}).then(load).then(function(){ zeige('Neu berechnet.', true); })
+   .catch(function(e){ zeige(fehlerText(e)); });
+}
+
+// ------------------------------------------------------------------ Eintrag anlegen / ändern
+function openEintrag(a){
+  a = a || {};
+  var staff = aktiveStaff();
+  if(!staff.length){ alert('Bitte zuerst im Reiter Team eine Mitarbeiterin anlegen.'); return; }
+  var heute = S.heute;
+  var sel = staff.map(function(m){
+    return '<option value="'+m.id+'"'+(a.staff_id===m.id?' selected':'')+'>'+esc(m.name)+'</option>'; }).join('');
+  var typen = S.typen.map(function(t){
+    return '<option value="'+t.key+'"'+((a.typ||'urlaub')===t.key?' selected':'')+'>'+esc(t.label)+'</option>'; }).join('');
+  dialog(a.id ? 'Eintrag bearbeiten' : 'Neuer Eintrag',
+     '<div class="row one"><div><label>Mitarbeiterin</label><select id="a_staff" onchange="vorschau()">'+sel+'</select></div></div>'
+   + '<div class="row one"><div><label>Art</label><select id="a_typ" onchange="vorschau()">'+typen+'</select></div></div>'
+   + '<div class="row"><div><label>Von</label><input id="a_von" type="date" value="'+esc(a.von||heute)+'" onchange="vonGeaendert()"></div>'
+   + '<div><label>Bis</label><input id="a_bis" type="date" value="'+esc(a.bis||a.von||heute)+'" onchange="vorschau()"></div></div>'
+   + '<div class="row one"><div><label><input type="checkbox" id="a_halb" '+(a.halbtag?'checked':'')+' onchange="vorschau()" style="width:auto;margin-right:6px">halber Tag (nur bei einem einzelnen Tag)</label></div></div>'
+   + '<div class="row one"><div><label>Notiz (keine Diagnosen!)</label><input id="a_notiz" maxlength="120" value="'+esc(a.notiz||'')+'"></div></div>'
+   + '<div class="row one"><div><label><input type="checkbox" id="a_nachweis" '+(a.nachweis?'checked':'')+' style="width:auto;margin-right:6px">Nachweis liegt vor (AU / Zertifikat)</label></div></div>'
+   + '<div id="a_vorschau" class="ok" style="display:none"></div>'
+   + (a.id ? '<button class="btn danger" onclick="delEintrag(\''+a.id+'\')">Eintrag löschen</button>' : ''),
+     function(){
+       return api('save_absence', {id:a.id||'', staff_id:el('a_staff').value, typ:el('a_typ').value,
+         von:el('a_von').value, bis:el('a_bis').value, halbtag:el('a_halb').checked?1:0,
+         notiz:el('a_notiz').value, nachweis:el('a_nachweis').checked?1:0, status:'genehmigt'});
+     });
+  vorschau();
+}
+function vonGeaendert(){
+  var v = el('a_von').value, b = el('a_bis');
+  if(!b.value || b.value < v) b.value = v;
+  vorschau();
+}
+function vorschau(){
+  var box = el('a_vorschau'); if(!box) return;
+  var sid = el('a_staff').value, typ = el('a_typ').value;
+  var von = el('a_von').value, bis = el('a_bis').value || von;
+  if(!von || !bis){ box.style.display='none'; return; }
+  api('preview', {staff_id:sid, von:von, bis:bis, halbtag:el('a_halb').checked?1:0})
+   .then(function(r){
+      var txt = '<b>'+num(r.tage)+'</b> '+(r.tage===1?'Arbeitstag':'Arbeitstage')
+              + ' · '+r.kalendertage+' '+(r.kalendertage===1?'Kalendertag':'Kalendertage');
+      var k = S.konten[sid];
+      if(typ === 'urlaub' && k){
+        var rest = k.rest - r.tage;
+        txt += ' · Resturlaub danach: <b>'+num(rest)+'</b> Tage';
+        if(rest < 0) txt += ' &#9888; mehr als der Anspruch';
+      }
+      if(r.tage === 0) txt += '<br>Hinweis: in diesem Zeitraum wird laut Wochenmuster nicht gearbeitet '
+              + '(Wochenende, Feiertag oder freier Tag) – der Eintrag zählt 0 Tage.';
+      // Wer ist im selben Zeitraum schon weg?
+      var kollegen = [];
+      aktiveStaff().forEach(function(m){
+        if(m.id === sid) return;
+        var d = new Date(von+'T12:00:00'), e = new Date(bis+'T12:00:00');
+        while(d <= e){ if(IDX[m.id] && IDX[m.id][iso(d)]){ kollegen.push(m.name); break; } d.setDate(d.getDate()+1); }
+      });
+      if(kollegen.length) txt += '<br>&#9888; gleichzeitig abwesend: '+esc(kollegen.join(', '));
+      box.innerHTML = txt; box.style.display = 'block';
+      box.className = (kollegen.length || r.tage === 0 ? 'err' : 'ok');
+   }).catch(function(e){ box.className='err'; box.innerHTML = esc(fehlerText(e)); box.style.display='block'; });
+}
+function delEintrag(id){
+  if(!confirm('Eintrag löschen?')) return;
+  api('del_absence', {id:id}).then(function(){ closeDialog(); return load(); })
+   .then(function(){ zeige('Eintrag gelöscht.', true); })
+   .catch(function(e){ alert(fehlerText(e)); });
+}
+
+// ------------------------------------------------------------------ Dialog
+function dialog(titel, inhalt, onSave, saveLabel){
+  closeDialog();
+  var d = document.createElement('div');
+  d.className = 'ov'; d.id = 'ov';
+  d.innerHTML = '<div class="dlg" onclick="event.stopPropagation()"><h3>'+titel+'</h3>'
+    + '<div id="dlg_fehler"></div>' + inhalt
+    + '<button class="btn" id="dlg_save">'+(saveLabel||'Speichern')+'</button>'
+    + '<button class="btn ghost" onclick="closeDialog()">Abbrechen</button></div>';
+  d.onclick = closeDialog;
+  document.body.appendChild(d);
+  el('dlg_save').onclick = function(){
+    el('dlg_save').disabled = true;
+    Promise.resolve(onSave()).then(function(){ closeDialog(); return load(); })
+      .then(function(){ zeige('Gespeichert.', true); })
+      .catch(function(e){
+        var b = el('dlg_fehler'); if(b) b.innerHTML = '<div class="err">'+esc(fehlerText(e))+'</div>';
+        var s = el('dlg_save'); if(s) s.disabled = false;
+      });
+  };
+}
+function closeDialog(){ var o = el('ov'); if(o) o.remove(); }
+
+load();
+</script>
+</body>
+</html>
