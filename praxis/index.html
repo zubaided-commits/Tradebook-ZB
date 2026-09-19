@@ -56,6 +56,8 @@ table.plan th.nm{position:sticky;left:0;z-index:3;background:#fff;text-align:lef
 table.plan thead th.nm{z-index:4}
 td.d{width:26px;min-width:26px;height:30px;text-align:center;cursor:pointer;position:relative}
 td.d.we{background:var(--we)}
+td.d.frei{background:repeating-linear-gradient(135deg,#fff,#fff 3px,#eceff2 3px,#eceff2 6px)}
+td.d.halbfrei::after{content:'';position:absolute;right:0;bottom:0;width:0;height:0;border-left:7px solid transparent;border-bottom:7px solid #d5dbe0}
 td.d.ft{background:var(--ft)}
 td.d.today{outline:2px solid var(--accent);outline-offset:-2px;z-index:1}
 td.d .mark{position:absolute;inset:2px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.55rem;font-weight:700}
@@ -275,7 +277,8 @@ function zelle(m, datum, klass){
   if(a){
     var t = TY[a.typ] || {farbe:'#888', label:a.typ};
     var kurz = t.label.substr(0,1).toUpperCase();
-    inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+'">'+ (a.halbtag?'':kurz) +'</span>';
+    var blass = klass.indexOf('frei') >= 0 ? ';opacity:0.3' : '';
+    inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+blass+'">'+ (a.halbtag?'':kurz) +'</span>';
   }
   var titel = a ? (TY[a.typ]?TY[a.typ].label:a.typ)+' · '+dmy(a.von)+'–'+dmy(a.bis)+(a.notiz?' · '+a.notiz:'') : dmy(datum);
   return '<td class="d '+klass+'" title="'+esc(titel)+'" onclick="zelleKlick(\''+m.id+'\',\''+datum+'\')">'+inner+'</td>';
@@ -284,6 +287,16 @@ function zelleKlick(staffId, datum){
   var a = IDX[staffId] && IDX[staffId][datum];
   if(a) openEintrag(a);
   else openEintrag({staff_id:staffId, von:datum, bis:datum, typ:'urlaub'});
+}
+function musterKlass(m, d, datum){
+  var wd = (d.getDay()+6)%7;
+  if(S.feiertage[datum] || wd>=5) return '';
+  if(m.eintritt && datum < m.eintritt) return ' frei';
+  if(m.austritt && datum > m.austritt) return ' frei';
+  var mu = String(m.muster||'1,1,1,1,1,0,0').split(',').map(Number);
+  if(!mu[wd]) return ' frei';
+  if(mu[wd] === 0.5) return ' halbfrei';
+  return '';
 }
 function tagKlass(d, datum){
   var k = [];
@@ -297,7 +310,8 @@ function legende(){
   return '<div class="legend">'+S.typen.map(function(t){
     return '<span class="lg"><i style="background:'+t.farbe+'"></i>'+esc(t.label)+'</span>'; }).join('')
     + '<span class="lg"><i style="background:var(--ft)"></i>Feiertag</span>'
-    + '<span class="lg"><i style="background:var(--we)"></i>Wochenende</span></div>';
+    + '<span class="lg"><i style="background:var(--we)"></i>Wochenende</span>'
+    + '<span class="lg"><i style="background:repeating-linear-gradient(135deg,#fff,#fff 2px,#eceff2 2px,#eceff2 4px)"></i>kein Arbeitstag (Teilzeit)</span></div>';
 }
 
 // ------------------------------------------------------------------ Ansicht: Monat
@@ -324,7 +338,7 @@ function viewMonat(){
     body += '<tr><th class="nm"><span class="dot" style="display:inline-block;background:'+esc(m.farbe)+'"></span> '+esc(m.name)+'</th>';
     for(var i=1;i<=anzahl;i++){
       var d = new Date(JAHR, MONAT, i), datum = iso(d);
-      body += zelle(m, datum, tagKlass(d, datum));
+      body += zelle(m, datum, tagKlass(d, datum) + musterKlass(m, d, datum));
     }
     body += '</tr>';
   });
@@ -386,7 +400,7 @@ function viewJahr(){
       var n = new Date(JAHR, mo+1, 0).getDate();
       for(var i=1;i<=n;i++){
         var d = new Date(JAHR, mo, i), datum = iso(d);
-        body += zelleSchmal(m, datum, tagKlass(d, datum));
+        body += zelleSchmal(m, datum, tagKlass(d, datum) + musterKlass(m, d, datum));
       }
     }
     body += '</tr>';
@@ -401,7 +415,8 @@ function zelleSchmal(m, datum, klass){
   var inner = '';
   if(a){
     var t = TY[a.typ] || {farbe:'#888', label:a.typ};
-    inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+';inset:1px;border-radius:2px"></span>';
+    inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+';inset:1px;border-radius:2px'
+          + (klass.indexOf('frei')>=0?';opacity:0.3':'')+'"></span>';
   }
   var titel = a ? (TY[a.typ]?TY[a.typ].label:a.typ)+' · '+dmy(a.von)+'–'+dmy(a.bis) : dmy(datum);
   return '<td class="d '+klass+'" style="'+stil+'" title="'+esc(titel)+'" onclick="zelleKlick(\''+m.id+'\',\''+datum+'\')">'+inner+'</td>';
