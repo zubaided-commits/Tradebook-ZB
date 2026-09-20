@@ -40,13 +40,17 @@ body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSys
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(15,28,20,0.04)}
 .card h2{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--mut);margin-bottom:12px;font-weight:700}
 label{display:block;font-size:0.68rem;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px}
-input,select,textarea{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:1rem;font-family:inherit;background:#fff;color:var(--ink);outline:none}
+input,select,textarea{width:100%;min-width:0;max-width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:1rem;font-family:inherit;background:#fff;color:var(--ink);outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--accent)}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px}
+.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:11px;align-items:stretch}
 .row.one{grid-template-columns:1fr}
-.row.three{grid-template-columns:1fr 1fr 1fr}
-.row>div{min-width:0}
-input[type=date]{min-width:0}
+.row.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.row>div{min-width:0;max-width:100%;display:flex;flex-direction:column}
+/* Eingabefeld sitzt immer unten - egal ob die Beschriftung ein- oder zweizeilig ist */
+.row>div>input,.row>div>select,.row>div>textarea,.row>div>.datum,.row>div>.wd{margin-top:auto}
+.row>div>label{margin-bottom:5px}
+ input[type=date]{min-width:0;-webkit-appearance:none;appearance:none;text-align:left}
+input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0}
 .btn{display:block;width:100%;padding:13px;border:none;border-radius:11px;background:var(--accent);color:#fff;font-size:0.92rem;font-weight:700;font-family:inherit;cursor:pointer;margin-top:6px}
 .btn:active{opacity:0.85}
 .btn.ghost{background:var(--accent-soft);color:var(--accent)}
@@ -179,6 +183,11 @@ td.d .klammer{position:absolute;right:1px;top:1px;width:0;height:0;
   .row, .row.three{grid-template-columns:1fr}
 }
 @media (min-width:760px){ .ov{align-items:center} .dlg{border-radius:20px} }
+.zt-nr{flex:1;font-size:0.68rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em}
+.zt-weg{background:none;border:none;color:var(--mut);font-size:0.74rem;font-family:inherit;
+  cursor:pointer;padding:3px 6px;text-decoration:underline}
+.zt-weg:hover{color:var(--bad)}
+.zeitzeile + .zeitzeile{border-top:1px dashed var(--line);padding-top:10px}
 /* Datumsfeld mit Leeren-Knopf */
 .datum{display:flex;gap:7px;align-items:center}
 .datum input{flex:1}
@@ -712,8 +721,9 @@ function openKonto(id){
   dialog('Urlaubskonto '+JAHR+' – '+esc(m.name),
      '<div class="row">'
    + '<div><label>Übertrag aus '+(JAHR-1)+'</label><input id="k_ueb" type="number" step="0.5" value="'+(k.uebertrag||0)+'"></div>'
-   + '<div><label>Anspruch '+JAHR+' (leer = automatisch)</label><input id="k_ans" type="number" step="0.5" placeholder="'+(k.anspruch||0)+'"></div>'
+   + '<div><label>Anspruch '+JAHR+'</label><input id="k_ans" type="number" step="0.5" placeholder="'+(k.anspruch||0)+'"></div>'
    + '</div>'
+   + '<p class="muted" style="margin:-4px 0 11px">Anspruch leer lassen = automatisch aus den Stammdaten.</p>'
    + '<div class="row one"><div><label>Urlaubs-Hinweis erteilt am</label><div class="datum">'
    + '<input id="k_hin" type="date" value="'+(k.hinweis_am||'')+'">'
    + '<button type="button" onclick="leeren(\'k_hin\')">Leeren</button></div></div></div>'
@@ -1062,8 +1072,14 @@ function viewEinst(){
   }
   var bl = Object.keys(S.bundeslaender).map(function(k){
     return '<option value="'+k+'"'+(k===S.bundesland?' selected':'')+'>'+esc(S.bundeslaender[k])+'</option>'; }).join('');
-  var ft = Object.keys(S.feiertage).map(function(d){
-    return '<div class="item"><div class="t"><b>'+dmy(d)+'</b><span>'+esc(S.feiertage[d])+'</span></div></div>'; }).join('');
+  var ft = feiertagGruppen().map(function(g){
+    var tage = Math.round((new Date(g.bis+'T12:00:00') - new Date(g.von+'T12:00:00'))/86400000) + 1;
+    var kopf = (tage === 1)
+      ? wochentag(g.von)+', '+dmy(g.von)
+      : wochentag(g.von)+', '+dmy(g.von)+' – '+wochentag(g.bis)+', '+dmy(g.bis)
+        + ' <span style="color:var(--accent)">('+tage+' Tage am Stück)</span>';
+    return '<div class="item"><div class="t"><b>'+kopf+'</b><span>'+esc(g.namen.join(' · '))+'</span></div></div>';
+  }).join('');
   return '<div class="card"><h2>Praxis</h2>'
    + '<div class="row"><div><label>Name der Praxis</label><input id="e_praxis" value="'+esc(S.praxis)+'"></div>'
    + '<div><label>Bundesland</label><select id="e_bl">'+bl+'</select></div></div>'
@@ -1096,7 +1112,32 @@ function viewEinst(){
    + '<p class="muted" style="margin-top:10px"><b>Datenschutz:</b> Hier stehen Beschäftigtendaten und Krankheitszeiten – '
    + 'besondere Kategorien nach Art. 9 DSGVO. Keine Diagnosen eintragen, Zugang nur für die Praxisleitung, '
    + 'Aufruf nur über HTTPS, und Einträge ausgeschiedener Mitarbeiterinnen nach Ablauf der Aufbewahrungsfrist löschen.</p></div>'
-   + '<div class="card"><h2>Feiertage '+JAHR+' · '+esc(S.bundeslaender[S.bundesland]||'')+'</h2>'+ft+'</div>';
+   + '<div class="card"><h2>Feiertage '+JAHR+' · '+esc(S.bundeslaender[S.bundesland]||'')+'</h2>'
+   + '<p class="muted" style="margin-bottom:10px">'+Object.keys(S.feiertage).length+' gesetzliche Feiertage. '
+   + 'Sie werden bei allen Berechnungen automatisch abgezogen und im Plan hell hinterlegt. '
+   + 'Zusammenhängende Tage stehen als Zeitraum.</p>'+ft+'</div>';
+}
+/** Aufeinanderfolgende Feiertage zu einem Zeitraum zusammenfassen. */
+function feiertagGruppen(){
+  var gruppen = [];
+  Object.keys(S.feiertage).sort().forEach(function(d){
+    var letzte = gruppen[gruppen.length-1];
+    if(letzte){
+      var naechster = new Date(letzte.bis+'T12:00:00');
+      naechster.setDate(naechster.getDate()+1);
+      if(iso(naechster) === d){
+        letzte.bis = d;
+        letzte.namen.push(S.feiertage[d]);
+        return;
+      }
+    }
+    gruppen.push({von:d, bis:d, namen:[S.feiertage[d]]});
+  });
+  return gruppen;
+}
+function wochentag(datum){
+  var d = new Date(datum+'T12:00:00');
+  return WTAG[(d.getDay()+6)%7];
 }
 function saveEinst(){
   api('save_settings', {praxisname:el('e_praxis').value, bundesland:el('e_bl').value,
@@ -1193,9 +1234,8 @@ function openEintrag(a){
    + '<div class="row one"><div><label>'+(istL?'2. ':'1. ')+'Was?</label>'
    + '<div class="typegrid" id="a_typen">'+chips+'</div>'
    + '<input type="hidden" id="a_typ" value="'+esc(typ)+'"></div></div>'
-   + '<div class="row"><div><label>'+(istL?'3. ':'2. ')+'Von</label>'
-   + '<input id="a_von" type="date" value="'+esc(a.von||heute)+'" onchange="vonGeaendert()"></div>'
-   + '<div><label>Bis</label><input id="a_bis" type="date" value="'+esc(a.bis||a.von||heute)+'" onchange="bisGeaendert()"></div></div>'
+   + '<label style="margin-bottom:7px">'+(istL?'3. ':'2. ')+'Wann?</label>'
+   + '<div id="a_zeit">' + zeitraumZeile(0, a.von||heute, a.bis||a.von||heute) + '</div>'
    + '<div style="display:flex;gap:7px;margin-bottom:11px;flex-wrap:wrap">'
    +   '<button type="button" class="btn small ghost" onclick="spanne(0)">1 Tag</button>'
    +   '<button type="button" class="btn small ghost" onclick="spanne(6)">1 Woche</button>'
@@ -1204,33 +1244,46 @@ function openEintrag(a){
    +   '<button type="button" class="btn small ghost" onclick="eintragZuruecksetzen()" '
    +     'style="margin-left:auto">Zurücksetzen</button>'
    + '</div>'
+   + (a.id ? '' :
+       '<button type="button" class="btn ghost" style="margin:0 0 12px" onclick="zeitraumHinzu()">'
+     + '+ weiterer Zeitraum</button>'
+     + '<p class="muted" style="margin:-6px 0 12px">Mehrere Abschnitte auf einmal möglich – zum Beispiel '
+     + 'eine Woche im Oktober, fünf Tage im November und drei im Dezember. Es entsteht je Abschnitt '
+     + 'ein Eintrag, die Tage werden zusammengezählt.</p>')
    + '<div class="row one"><div><label><input type="checkbox" id="a_halb" '+(a.halbtag?'checked':'')
    + ' onchange="vorschau()" style="width:auto;margin-right:6px">nur ein halber Tag</label></div></div>'
    + '<div class="row one"><div><label>Notiz – freiwillig, keine Diagnosen</label>'
    + '<input id="a_notiz" maxlength="120" value="'+esc(a.notiz||'')+'"></div></div>'
-   + nachweisBereich(a, typ, istL)
+   + '<div id="a_nachweisbox">' + nachweisBereich(a, typ, istL) + '</div>'
    + '<div id="a_vorschau" class="ok" style="display:none"></div>'
    + (darfLoeschen ? '<button class="btn danger" onclick="delEintrag(\''+a.id+'\')">Eintrag löschen</button>' : ''),
      function(){
-       return api('save_absence', {id:a.id||'', staff_id:el('a_staff').value, typ:el('a_typ').value,
-         von:el('a_von').value, bis:el('a_bis').value, halbtag:el('a_halb').checked?1:0,
-         notiz:el('a_notiz').value,
-         nachweis:(el('a_nachweis') && el('a_nachweis').checked)?1:0,
-         status:'genehmigt'})
-       .then(function(r){
-         // Ausgewählte Nachweise an den (ggf. gerade erst angelegten) Eintrag hängen
-         var feld = el('a_datei');
-         var ziel = a.id || (r.ids && r.ids[0]);
-         if(!feld || !feld.files || !feld.files.length || !ziel) return r;
-         var art = el('a_datei_art') ? el('a_datei_art').value : 'sonstiges';
-         var kette = Promise.resolve();
-         Array.prototype.forEach.call(feld.files, function(datei){
-           kette = kette.then(function(){ return apiUpload(ziel, art, datei); });
+       var liste = zeitraeume();
+       if(!liste.length) return Promise.reject({error:'datum_ungueltig'});
+       var halb = el('a_halb').checked && liste.length === 1 && liste[0].von === liste[0].bis;
+       var basis = {staff_id: el('a_staff').value, typ: el('a_typ').value,
+                    notiz: el('a_notiz').value,
+                    nachweis: (el('a_nachweis') && el('a_nachweis').checked) ? 1 : 0,
+                    status: 'genehmigt'};
+       // Bestehenden Eintrag ändern: nur der erste Zeitraum
+       if(a.id){
+         return api('save_absence', Object.assign({}, basis, {id:a.id, von:liste[0].von,
+                    bis:liste[0].bis, halbtag: halb ? 1 : 0}))
+           .then(function(){ return dateienHochladen(a.id); });
+       }
+       // Neu: je Zeitraum ein Eintrag, Nachweise hängen am ersten
+       var ersteId = null, kette = Promise.resolve();
+       liste.forEach(function(z){
+         kette = kette.then(function(){
+           return api('save_absence', Object.assign({}, basis, {id:'', von:z.von, bis:z.bis,
+                      halbtag: halb ? 1 : 0}))
+             .then(function(r){ if(!ersteId && r.ids && r.ids[0]) ersteId = r.ids[0]; });
          });
-         return kette;
        });
+       return kette.then(function(){ return dateienHochladen(ersteId); });
      },
      istL ? 'Speichern' : 'Antrag senden');
+  nachweisSichtbarkeit();
   vorschau();
 }
 /** Abschnitt "Nachweise" im Eintragsdialog: vorhandene Dateien + Auswahlfeld. */
@@ -1304,18 +1357,61 @@ function personGewechselt(){
   }
   vorschau();
 }
+/** Eine Zeile "Von - Bis" im Eintragsdialog. Die erste behält die Kennungen a_von / a_bis. */
+function zeitraumZeile(i, von, bis){
+  var erste = (i === 0);
+  return '<div class="zeitzeile" style="position:relative">'
+    + (erste ? '' : '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+      + '<span class="zt-nr">'+(i+1)+'. Zeitraum</span>'
+      + '<button type="button" class="zt-weg" onclick="zeitraumWeg(this)">entfernen</button></div>')
+    + '<div class="row"><div><label>'+(erste ? 'Von' : 'Von')+'</label>'
+    +   '<input class="zvon"'+(erste?' id="a_von"':'')+' type="date" value="'+esc(von||'')+'" '
+    +   'onchange="vonGeaendert(this)"></div>'
+    + '<div><label>Bis</label>'
+    +   '<input class="zbis"'+(erste?' id="a_bis"':'')+' type="date" value="'+esc(bis||von||'')+'" '
+    +   'onchange="bisGeaendert(this)"></div></div>'
+    + '</div>';
+}
+function zeitraumHinzu(){
+  var box = el('a_zeit');
+  if(!box) return;
+  var zeilen = box.querySelectorAll('.zeitzeile');
+  var letzte = zeilen[zeilen.length-1];
+  // Vorschlag: eine Woche nach dem bisherigen Ende
+  var bis = letzte.querySelector('.zbis').value || S.heute;
+  var d = new Date(bis+'T12:00:00'); d.setDate(d.getDate()+7);
+  var start = iso(d);
+  box.insertAdjacentHTML('beforeend', zeitraumZeile(zeilen.length, start, start));
+  vorschau();
+}
+function zeitraumWeg(btn){
+  var zeile = btn.closest('.zeitzeile');
+  if(zeile) zeile.remove();
+  vorschau();
+}
+/** Alle eingetragenen Zeiträume als Liste. */
+function zeitraeume(){
+  return Array.prototype.map.call(document.querySelectorAll('#a_zeit .zeitzeile'), function(z){
+    return {von: z.querySelector('.zvon').value, bis: z.querySelector('.zbis').value};
+  }).filter(function(z){ return z.von && z.bis; });
+}
 function typWahl(b){
   Array.prototype.forEach.call(document.querySelectorAll('#a_typen button'), function(x){
     x.classList.remove('on'); });
   b.classList.add('on');
   el('a_typ').value = b.getAttribute('data-typ');
   artAnpassen();
+  nachweisSichtbarkeit();
   vorschau();
 }
 function spanne(plus){
-  var v = el('a_von').value || S.heute;
+  var zeilen = document.querySelectorAll('#a_zeit .zeitzeile');
+  var z = zeilen[zeilen.length-1];
+  if(!z) return;
+  var vf = z.querySelector('.zvon'), bf = z.querySelector('.zbis');
+  var v = vf.value || naechsterArbeitstag(el('a_staff').value);
   var d = new Date(v+'T12:00:00'); d.setDate(d.getDate()+plus);
-  el('a_von').value = v; el('a_bis').value = iso(d);
+  vf.value = v; bf.value = iso(d);
   if(plus > 0) el('a_halb').checked = false;
   vorschau();
 }
@@ -1326,22 +1422,28 @@ function leeren(id){
   e.value = '';
   vorschau();
 }
-function vonGeaendert(){
-  var v = el('a_von'), b = el('a_bis');
+function vonGeaendert(feld){
+  var zeile = feld && feld.closest ? feld.closest('.zeitzeile') : null;
+  var v = zeile ? zeile.querySelector('.zvon') : el('a_von');
+  var b = zeile ? zeile.querySelector('.zbis') : el('a_bis');
   // Leeres Datum ist hier nicht möglich - zurück auf den Vorschlag
   if(!v.value) v.value = naechsterArbeitstag(el('a_staff').value);
   if(!b.value || b.value < v.value) b.value = v.value;
   vorschau();
 }
-function bisGeaendert(){
-  var v = el('a_von'), b = el('a_bis');
-  if(!b.value) b.value = v.value;
-  if(b.value < v.value) b.value = v.value;
+function bisGeaendert(feld){
+  var zeile = feld && feld.closest ? feld.closest('.zeitzeile') : null;
+  var v = zeile ? zeile.querySelector('.zvon') : el('a_von');
+  var b = zeile ? zeile.querySelector('.zbis') : el('a_bis');
+  if(!b.value || b.value < v.value) b.value = v.value;
   vorschau();
 }
 /** Den ganzen Eintrag auf Anfang zurücksetzen. */
 function eintragZuruecksetzen(){
   var tag = naechsterArbeitstag(el('a_staff').value);
+  Array.prototype.forEach.call(document.querySelectorAll('#a_zeit .zeitzeile'), function(z, i){
+    if(i > 0) z.remove();
+  });
   el('a_von').value = tag;
   el('a_bis').value = tag;
   el('a_halb').checked = false;
@@ -1353,32 +1455,82 @@ function eintragZuruecksetzen(){
 function vorschau(){
   var box = el('a_vorschau'); if(!box) return;
   var sid = el('a_staff').value, typ = el('a_typ').value;
-  var von = el('a_von').value, bis = el('a_bis').value || von;
-  if(!von || !bis){ box.style.display='none'; return; }
-  api('preview', {staff_id:sid, von:von, bis:bis, halbtag:el('a_halb').checked?1:0})
-   .then(function(r){
-      var txt = '<b>'+num(r.tage)+'</b> '+(r.tage===1?'Arbeitstag':'Arbeitstage')
-              + ' · '+r.kalendertage+' '+(r.kalendertage===1?'Kalendertag':'Kalendertage');
-      var k = S.konten[sid];
-      if(typ === 'urlaub' && k){
-        var rest = k.rest - r.tage;
-        txt += ' · Resturlaub danach: <b>'+num(rest)+'</b> Tage';
-        if(rest < 0) txt += ' &#9888; mehr als der Anspruch';
+  var liste = zeitraeume();
+  if(!liste.length){ box.style.display = 'none'; return; }
+  var halb = el('a_halb').checked && liste.length === 1 && liste[0].von === liste[0].bis;
+
+  Promise.all(liste.map(function(z){
+    return api('preview', {staff_id:sid, von:z.von, bis:z.bis, halbtag: halb ? 1 : 0});
+  })).then(function(res){
+    var tage = 0, kal = 0;
+    res.forEach(function(r){ tage += r.tage; kal += r.kalendertage; });
+    var txt = '';
+    if(liste.length > 1){
+      txt += '<b>'+liste.length+' Zeiträume</b> · ';
+      txt += liste.map(function(z, i){
+        return zeitraum(z.von, z.bis)+' ('+num(res[i].tage)+' AT)'; }).join(' · ') + '<br>';
+    }
+    txt += '<b>'+num(tage)+'</b> '+(tage === 1 ? 'Arbeitstag' : 'Arbeitstage')
+         + ' · '+kal+' '+(kal === 1 ? 'Kalendertag' : 'Kalendertage');
+    var k = S.konten[sid];
+    if(typ === 'urlaub' && k){
+      var rest = k.rest - tage;
+      txt += ' · Resturlaub danach: <b>'+num(rest)+'</b> Tage';
+      if(rest < 0) txt += ' &#9888; mehr als der Anspruch';
+    }
+    if(tage === 0) txt += '<br>Hinweis: in diesem Zeitraum wird laut Wochenmuster nicht gearbeitet '
+                        + '(Wochenende, Feiertag oder freier Tag) – der Eintrag zählt 0 Tage.';
+
+    // Überschneiden sich die eigenen Zeiträume?
+    var doppelt = false;
+    for(var i = 0; i < liste.length && !doppelt; i++){
+      for(var j = i+1; j < liste.length; j++){
+        if(liste[i].von <= liste[j].bis && liste[j].von <= liste[i].bis){ doppelt = true; break; }
       }
-      if(r.tage === 0) txt += '<br>Hinweis: in diesem Zeitraum wird laut Wochenmuster nicht gearbeitet '
-              + '(Wochenende, Feiertag oder freier Tag) – der Eintrag zählt 0 Tage.';
-      // Wer ist im selben Zeitraum schon weg?
-      var kollegen = [];
-      aktiveStaff().forEach(function(m){
-        if(m.id === sid) return;
-        var d = new Date(von+'T12:00:00'), e = new Date(bis+'T12:00:00');
-        while(d <= e){ if(IDX[m.id] && IDX[m.id][iso(d)]){ kollegen.push(m.name); break; } d.setDate(d.getDate()+1); }
+    }
+    if(doppelt) txt += '<br>&#9888; Zwei Zeiträume überschneiden sich.';
+
+    // Wer ist im selben Zeitraum schon abwesend?
+    var kollegen = {};
+    aktiveStaff().forEach(function(m){
+      if(m.id === sid) return;
+      liste.forEach(function(z){
+        var d = new Date(z.von+'T12:00:00'), e = new Date(z.bis+'T12:00:00');
+        while(d <= e){ if(IDX[m.id] && IDX[m.id][iso(d)]){ kollegen[m.name] = 1; break; } d.setDate(d.getDate()+1); }
       });
-      if(kollegen.length) txt += '<br>&#9888; gleichzeitig abwesend: '+esc(kollegen.join(', '));
-      box.innerHTML = txt; box.style.display = 'block';
-      box.className = (kollegen.length || r.tage === 0 ? 'err' : 'ok');
-   }).catch(function(e){ box.className='err'; box.innerHTML = esc(fehlerText(e)); box.style.display='block'; });
+    });
+    var namen = Object.keys(kollegen);
+    if(namen.length) txt += '<br>&#9888; gleichzeitig abwesend: '+esc(namen.join(', '));
+
+    box.innerHTML = txt;
+    box.style.display = 'block';
+    box.className = (namen.length || doppelt || tage === 0) ? 'err' : 'ok';
+  }).catch(function(e){
+    box.className = 'err'; box.innerHTML = esc(fehlerText(e)); box.style.display = 'block';
+  });
 }
+
+/** Ausgewählte Dateien an einen Eintrag hängen. */
+function dateienHochladen(zielId){
+  var feld = el('a_datei');
+  if(!feld || !feld.files || !feld.files.length || !zielId) return Promise.resolve();
+  var art = el('a_datei_art') ? el('a_datei_art').value : 'sonstiges';
+  var kette = Promise.resolve();
+  Array.prototype.forEach.call(feld.files, function(datei){
+    kette = kette.then(function(){ return apiUpload(zielId, art, datei); });
+  });
+  return kette;
+}
+
+/** Nachweis-Feld nur bei Arten, die einen Beleg brauchen. */
+function nachweisSichtbarkeit(){
+  var box = el('a_nachweisbox');
+  if(!box) return;
+  var t = TY[el('a_typ').value] || {};
+  var schonDa = !!box.querySelector('.datei');
+  box.style.display = (t.nachweis || schonDa) ? '' : 'none';
+}
+
 function delEintrag(id){
   if(!confirm('Eintrag löschen?')) return;
   api('del_absence', {id:id}).then(function(){ closeDialog(); return load(); })

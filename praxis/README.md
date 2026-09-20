@@ -86,9 +86,22 @@ beim Überschreiten von 42 Krankheits-Kalendertagen in zwölf Monaten.
 | **Kalender** | Der Plan des ganzen Teams, nur zum Ansehen. |
 | **Mein Urlaub** | Eigenes Urlaubskonto, eigene Einträge, **Urlaub beantragen**, eigenes Passwort ändern. |
 
+### Mehrere Zeiträume auf einmal
+
+Ein Eintrag kann aus mehreren Abschnitten bestehen. Beispiel: eine Woche im
+Oktober, fünf Tage im November, drei im Dezember. Im Eintragsdialog auf
+**+ weiterer Zeitraum** tippen, so oft wie nötig. Die Vorschau zählt alle
+Abschnitte zusammen und zeigt den Resturlaub danach; gespeichert wird je
+Abschnitt ein Eintrag, damit sich jeder einzeln ändern oder löschen lässt.
+
+Wird ein bestehender Eintrag geöffnet, ist nur sein eigener Zeitraum zu sehen –
+weitere Abschnitte legt man über einen neuen Eintrag an.
+
 ### Krankenschein und Nachweise hochladen
 
-An jedem Eintrag hängt ein Feld **Nachweis**. Dort lassen sich PDF-Dateien und Fotos
+Das Feld **Nachweis** erscheint nur bei Arten, die einen Beleg brauchen:
+**Krank (AU)**, **Kind krank** und **Fortbildung**. Bei Urlaub, Überstunden oder
+Berufsschule bleibt es ausgeblendet. Dort lassen sich PDF-Dateien und Fotos
 anhängen – ein abfotografierter Krankenschein reicht:
 
 * **Krankenschein / AU (selbst)** – bei „Krank (AU)"
@@ -252,6 +265,10 @@ als Eintrag „Praxis geschlossen“ erfassen.
 
 ### Hamburg
 Voreingestellt ist **Hamburg**: neun bundesweite Feiertage plus Reformationstag (31.10.).
+
+Unter *Einstellungen* stehen alle Feiertage des Jahres mit Wochentag. Fallen
+mehrere direkt aufeinander – etwa der 1. und 2. Weihnachtstag – erscheinen sie
+als ein Zeitraum mit der Zahl der Tage.
 
 ## 8. Nächste Ausbaustufen
 
