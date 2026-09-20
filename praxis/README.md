@@ -50,16 +50,34 @@ alle Daten bleiben auf dem eigenen Server.
 
 ## 2. Bedienung
 
-### Für die Praxisleitung – vier Reiter
+### Für die Praxisleitung – fünf Reiter
 
 | Reiter | Inhalt |
 |---|---|
 | **Kalender** | Oben der Heute-Streifen (wer ist da, wer fehlt) und offene Anträge. Darunter der Plan, umschaltbar zwischen **Monat** und **Ganzes Jahr**. Auf ein Feld tippen legt einen Eintrag an. |
 | **Urlaub** | Urlaubskonten aller: Anspruch, Übertrag, genommen, geplant, Rest – dazu Krank-, Kind-krank- und Fortbildungstage. |
+| **Lohn** | Fehlzeiten-Auswertung für die Lohnabrechnung, monatsweise oder fürs ganze Jahr, mit CSV-Export. |
 | **Team** | Personen anlegen und ändern; darunter die **Zugänge** zum Anmelden. |
 | **Einstellungen** | Praxisname, Bundesland, eigenes Passwort, CSV-Export. |
 
 Der grüne Knopf **+ Eintrag** unten rechts ist immer erreichbar.
+
+### Reiter „Lohn" – Auswertung für die Steuerberatung
+
+Fehlzeiten je Person für einen Monat oder ein ganzes Jahr, mit CSV-Export für
+DATEV oder Excel und einer Druckansicht. Enthalten ist genau das, was die
+Lohnabrechnung braucht:
+
+* Urlaub, bezahlter Sonderurlaub, **unbezahlter Urlaub**
+* Krankheitstage als Arbeits- **und** Kalendertage, dazu jeder Zeitraum einzeln –
+  für die U1-Erstattung und die Sechs-Wochen-Frist der Entgeltfortzahlung
+* Kind-krank-Tage, Mutterschutz und Elternzeit
+* Fortbildung, Berufsschule, Überstundenabbau
+* Urlaubsstand zum Jahresende für die Rückstellung
+
+Automatische Hinweise: bei unbezahltem Urlaub ab fünf zusammenhängenden
+Arbeitstagen (Unterbrechung im Lohnkonto, Meldung zur Sozialversicherung) und
+beim Überschreiten von 42 Krankheits-Kalendertagen in zwölf Monaten.
 
 ### Für Mitarbeiterinnen mit Zugang – zwei Reiter
 
@@ -93,16 +111,17 @@ vergangenen Krank-, Kind-krank- und Fortbildungstage ohne Beleg.
 
 ## 3. Wer darf was
 
-| | Praxisleitung | Mitarbeiterin | ohne Zugang |
-|---|---|---|---|
-| Plan ansehen | ✔ | ✔ | – |
-| Für **jede** Person eintragen, ändern, löschen | ✔ | – | – |
-| Für sich selbst Urlaub **beantragen** | ✔ (direkt gültig) | ✔ (Leitung genehmigt) | – |
-| Eigenes Urlaubskonto | ✔ alle | ✔ nur das eigene | – |
-| Nachweise hochladen | für alle | nur eigene | – |
-| Nachweise ansehen und löschen | alle | nur eigene | – |
-| Personen anlegen, Zugänge vergeben | ✔ | – | – |
-| Praxis-Einstellungen | ✔ | – | – |
+| | Praxisleitung | Mitarbeiterin | Steuerberatung | ohne Zugang |
+|---|---|---|---|---|
+| Plan ansehen | ✔ | ✔ | – | – |
+| Für **jede** Person eintragen, ändern, löschen | ✔ | – | – | – |
+| Für sich selbst Urlaub **beantragen** | ✔ (direkt gültig) | ✔ (Leitung genehmigt) | – | – |
+| Urlaubskonto | ✔ alle | ✔ nur das eigene | ✔ nur Jahreswerte | – |
+| Nachweise hochladen | für alle | nur eigene | – | – |
+| Nachweise ansehen | alle | nur eigene | nur wenn freigegeben | – |
+| Fehlzeiten-Auswertung (Lohn) | ✔ | – | ✔ | – |
+| Personen anlegen, Zugänge vergeben | ✔ | – | – | – |
+| Praxis-Einstellungen | ✔ | – | – | – |
 
 **Eine Person braucht keinen Zugang.** Die Leitung trägt Urlaub, Krankheit und alles
 Weitere für sie ein – das ist der Normalfall für die meisten Praxen.
@@ -115,6 +134,10 @@ alle bereits eingetragenen Tage gehören dann automatisch zum Konto dieser Perso
 es geht nichts verloren.
 
 * **Rolle „Leitung"** darf alles – sinnvoll für die Ärztin und die Praxismanagerin.
+* **Rolle „Steuerberatung"** sieht ausschließlich den Reiter *Lohnabrechnung*: keinen
+  Kalender, keine Notizen, keine Zugänge, keine Einstellungen, standardmäßig auch
+  keine hochgeladenen Krankenscheine. Diese Person muss **nicht** im Team stehen –
+  Zugang einfach unter *Team → Zugänge → + Zugang* anlegen und die Rolle wählen.
 * **Rolle „Mitarbeiterin"** sieht den Plan, das eigene Konto und kann Urlaub beantragen.
 * **Anmelden erlaubt** abschalten sperrt den Zugang, ohne etwas zu löschen (z. B. bei
   längerer Abwesenheit oder nach dem Austritt).
@@ -151,6 +174,19 @@ pro Woche also 16,8 ≈ 17 Tage.
 
 ---
 
+### Bedienung unterwegs
+
+* Der Dialog lässt sich **nach unten wischen**, um ihn zu schließen – oder über
+  den Griff oben, den Knopf „Abbrechen", einen Tipp neben das Fenster, oder mit
+  der Escape-Taste am Rechner.
+* Optionale Datumsfelder (Eintritt, Austritt, Hinweisdatum) haben einen Knopf
+  **Leeren**; im Eintrag setzt **Zurücksetzen** das ganze Formular auf Anfang.
+* Der Monatsplaner passt seine Spaltenbreite an den Bildschirm an: am iPad und am
+  Rechner füllt er die Breite, am Handy bleibt er lesbar und lässt sich seitlich
+  schieben.
+* Über *Teilen → Zum Home-Bildschirm* legen Sie den Kalender wie eine App aufs
+  iPad oder Handy; er öffnet dann ohne Browserleiste.
+
 ## 4. Datenschutz
 
 Hier stehen Beschäftigtendaten und Krankheitszeiten – **besondere Kategorien nach
@@ -186,6 +222,10 @@ Krankenscheine und Atteste sind besonders schutzbedürftig. Deshalb:
   Frist für Ihre Praxis passt, klären Sie bitte mit Steuerberatung bzw.
   Datenschutzbeauftragtem.
 * Die AU selbst enthält keine Diagnose – bitte auch keine in die Notiz schreiben.
+* Die **Steuerberatung** sieht die Nachweise nur, wenn die Praxisleitung das unter
+  *Einstellungen* ausdrücklich freigibt. Für Lohnabrechnung und U1-Erstattung
+  genügen in aller Regel die Zeiträume; der Krankenschein selbst gehört in die
+  Personalakte der Praxis.
 * In das Verzeichnis der Verarbeitungstätigkeiten aufnehmen (Zweck: Urlaubs- und
   Fehlzeitenverwaltung; Rechtsgrundlage: § 26 BDSG / Art. 6 Abs. 1 b DSGVO).
 

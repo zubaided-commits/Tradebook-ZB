@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#16653f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Praxis-Kalender">
+<meta name="format-detection" content="telephone=no">
 <title>Praxis-Kalender · Dr. med. Victoria Yar</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -52,12 +57,19 @@ input[type=date]{min-width:0}
 .ok{background:var(--accent-soft);color:var(--accent);padding:10px 12px;border-radius:10px;font-size:0.8rem;margin-bottom:11px}
 /* ---- Planer-Raster ---- */
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px;background:#fff}
-table.plan{border-collapse:separate;border-spacing:0;font-size:0.7rem}
+table.plan{border-collapse:separate;border-spacing:0;font-size:0.72rem;table-layout:fixed}
+@media (min-width:900px){ table.plan{--namew:190px} table.plan thead th{font-size:0.66rem} }
 table.plan th,table.plan td{border-right:1px solid #eef1f4;border-bottom:1px solid #eef1f4}
 table.plan thead th{position:sticky;top:0;background:#fff;z-index:2;font-weight:700;color:var(--mut);padding:4px 0;text-align:center;font-size:0.6rem;line-height:1.25}
-table.plan th.nm{position:sticky;left:0;z-index:3;background:#fff;text-align:left;padding:7px 10px;min-width:118px;max-width:118px;font-size:0.72rem;color:var(--ink);box-shadow:1px 0 0 var(--line)}
+table.plan th.nm{position:sticky;left:0;z-index:3;background:#fff;text-align:left;padding:8px 10px;
+  width:var(--namew,118px);min-width:var(--namew,118px);max-width:var(--namew,118px);
+  font-size:0.76rem;line-height:1.25;color:var(--ink);box-shadow:1px 0 0 var(--line);
+  overflow:hidden;text-overflow:ellipsis}
+table.plan thead th.nm{white-space:nowrap}
+table.plan tbody th.nm{white-space:normal}
 table.plan thead th.nm{z-index:4}
-td.d{width:26px;min-width:26px;height:30px;text-align:center;cursor:pointer;position:relative}
+td.d{width:var(--cell,26px);min-width:var(--cell,26px);height:var(--rowh,34px);
+  text-align:center;cursor:pointer;position:relative}
 td.d.we{background:var(--we)}
 td.d.frei{background:repeating-linear-gradient(135deg,#fff,#fff 3px,#e8efea 3px,#e8efea 6px)}
 td.d.halbfrei::after{content:'';position:absolute;right:0;bottom:0;width:0;height:0;border-left:7px solid transparent;border-bottom:7px solid #d5dbe0}
@@ -65,7 +77,7 @@ td.d.ft{background:var(--ft)}
 td.d.today{outline:2px solid var(--accent);outline-offset:-2px;z-index:1}
 td.d .mark{position:absolute;inset:2px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.55rem;font-weight:700}
 td.d .mark.half{clip-path:polygon(0 0,100% 0,0 100%)}
-tr.sum td{height:22px;font-size:0.58rem;color:var(--mut);text-align:center;font-weight:700;background:#f4f8f5}
+tr.sum td{height:24px;font-size:0.58rem;color:var(--mut);text-align:center;font-weight:700;background:#f4f8f5}
 tr.sum td.low{background:#fee2e2;color:var(--bad)}
 .mon-head th{font-size:0.58rem;color:var(--accent);background:#fff;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid var(--line)}
 /* ---- Grosser Knopf unten rechts ---- */
@@ -149,14 +161,29 @@ td.d .klammer{position:absolute;right:1px;top:1px;width:0;height:0;
 .pill{font-size:0.6rem;font-weight:700;color:#fff;padding:3px 8px;border-radius:20px;white-space:nowrap}
 /* ---- Dialog ---- */
 .ov{position:fixed;inset:0;background:rgba(15,23,32,0.55);display:flex;align-items:flex-end;justify-content:center;z-index:100;padding:0}
-.dlg{background:#fff;border-radius:18px 18px 0 0;padding:18px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
-.dlg h3{font-family:var(--serif);font-size:1.35rem;font-weight:600;margin-bottom:14px}
+.dlg{background:#fff;border-radius:20px 20px 0 0;padding:6px 18px 18px;width:100%;max-width:560px;
+  max-height:92vh;overflow-y:auto;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));
+  transition:transform 0.22s ease}
+.dlg.zieht{transition:none}
+.griff{position:sticky;top:0;z-index:5;background:#fff;margin:0 -18px 6px;padding:9px 0 11px;
+  display:flex;justify-content:center;cursor:grab;touch-action:none}
+.griff i{display:block;width:44px;height:5px;border-radius:3px;background:#cfd8d3}
+
+.dlg h3{font-family:var(--serif);font-size:1.3rem;font-weight:600;margin-bottom:14px}
 .wd{display:flex;gap:5px}
 .wd button{flex:1;padding:9px 0;border:1.5px solid var(--line);border-radius:9px;background:#fff;font-size:0.7rem;font-weight:700;cursor:pointer;font-family:inherit;color:var(--mut)}
 .wd button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .wd button.half{background:#b8d9c8;border-color:#b8d9c8;color:#0f1c14}
 .center{max-width:400px;margin:8vh auto;padding:0 16px}
-@media (min-width:760px){ .ov{align-items:center} .dlg{border-radius:18px} }
+@media (max-width:620px){
+  .row, .row.three{grid-template-columns:1fr}
+}
+@media (min-width:760px){ .ov{align-items:center} .dlg{border-radius:20px} }
+/* Datumsfeld mit Leeren-Knopf */
+.datum{display:flex;gap:7px;align-items:center}
+.datum input{flex:1}
+.datum button{flex:0 0 auto;background:var(--accent-soft);border:none;color:var(--accent);
+  border-radius:10px;padding:11px 13px;font-size:0.78rem;font-weight:700;font-family:inherit;cursor:pointer}
 @media print{
   .top,.tabs,.noprint,.btn{display:none !important}
   body{background:#fff}
@@ -284,7 +311,7 @@ function load(){
   return api('state&jahr='+JAHR).then(function(d){
     S = d;
     if(S.typen){ TY = {}; S.typen.forEach(function(t){ TY[t.key]=t; }); }
-    if(S.staff) buildIndex();
+    buildIndex();
     render();
   }).catch(function(e){
     document.getElementById('root').innerHTML =
@@ -296,15 +323,15 @@ function buildIndex(){
   IDX = {};
   HATDATEI = {};
   (S.dateien||[]).forEach(function(f){ HATDATEI[f.absence_id] = (HATDATEI[f.absence_id]||0) + 1; });
-  S.staff.forEach(function(m){ IDX[m.id] = {}; });
-  S.absences.forEach(function(a){
+  (S.staff||[]).forEach(function(m){ IDX[m.id] = {}; });
+  (S.absences||[]).forEach(function(a){
     if(a.status==='abgelehnt' || a.status==='storniert') return;
     if(!IDX[a.staff_id]) return;
     var d = new Date(a.von+'T12:00:00'), e = new Date(a.bis+'T12:00:00');
     while(d <= e){ IDX[a.staff_id][iso(d)] = a; d.setDate(d.getDate()+1); }
   });
 }
-function aktiveStaff(){ return S.staff.filter(function(m){ return m.aktiv; }); }
+function aktiveStaff(){ return (S.staff||[]).filter(function(m){ return m.aktiv; }); }
 
 // ------------------------------------------------------------------ Rendern
 function render(){
@@ -319,28 +346,32 @@ function render(){
      +   '<div class="yearpick"><button onclick="jahrWechsel(-1)">&#8249;</button><span>'+JAHR+'</span><button onclick="jahrWechsel(1)">&#8250;</button></div>'
      +   '<button class="iconbtn" onclick="logout()">Abmelden</button>'
      + '</div>';
-  var tabs = S.leitung
-    ? [['plan','Kalender'],['konten','Urlaub'],['team','Team'],['einst','Einstellungen']]
-    : [['plan','Kalender'],['meins','Mein Urlaub']];
-  if(tabs.filter(function(t){ return t[0]===VIEW; }).length === 0) VIEW = 'plan';
+  var tabs = S.steuerberater
+    ? [['lohn','Lohnabrechnung'],['einst','Mein Zugang']]
+    : (S.leitung
+        ? [['plan','Kalender'],['konten','Urlaub'],['lohn','Lohn'],['team','Team'],['einst','Einstellungen']]
+        : [['plan','Kalender'],['meins','Mein Urlaub']]);
+  if(tabs.filter(function(t){ return t[0]===VIEW; }).length === 0) VIEW = tabs[0][0];
   h += '<div class="tabs">'+tabs.map(function(t){
     var badge = (t[0]==='plan' && S.leitung && S.offene_antraege) ? '<span class="badge">'+S.offene_antraege+'</span>' : '';
     return '<div class="tab'+(VIEW===t[0]?' on':'')+'" onclick="setView(\''+t[0]+'\')">'+t[1]+badge+'</div>';
   }).join('')+'</div>';
   h += '<div class="wrap">';
   if(MSG) h += '<div id="msg" class="'+(MSG.gut?'ok':'err')+'">'+esc(MSG.text)+'</div>';
-  if(VIEW==='plan')        h += viewPlan();
+  if(VIEW==='lohn')        h += viewLohn();
+  else if(VIEW==='plan')   h += viewPlan();
   else if(VIEW==='konten') h += viewKonten();
   else if(VIEW==='team')   h += viewTeam();
   else if(VIEW==='meins')  h += viewMeins();
   else                     h += viewEinst();
   h += '</div>';
-  if(VIEW === 'plan' || VIEW === 'konten'){
+  if((VIEW === 'plan' || VIEW === 'konten') && S.leitung){
     h += '<button class="fab noprint" onclick="openEintrag({})">+ '
        + (S.leitung ? 'Eintrag' : 'Urlaub beantragen') + '</button>';
   }
   h += '</div>';
   el('root').innerHTML = h;
+  rasterAnpassen();
 }
 function setView(v){ VIEW = v; MSG = null; render(); window.scrollTo(0,0); }
 function jahrWechsel(d){ JAHR += d; load(); }
@@ -559,7 +590,8 @@ function viewMonat(){
   }
   sum += '</tr>';
 
-  h += '<div class="scroll"><table class="plan"><thead>'+kopf+'</thead><tbody>'+body+sum+'</tbody></table></div>';
+  h += '<div class="scroll"><table class="plan" data-tage="'+anzahl+'" data-min="26">'
+     + '<thead>'+kopf+'</thead><tbody>'+body+sum+'</tbody></table></div>';
   h += legende();
   h += '<div class="hilfe">Auf ein Feld tippen legt einen Eintrag an oder öffnet einen vorhandenen. '
      + 'Der grüne Knopf unten rechts geht immer. '
@@ -604,13 +636,15 @@ function viewJahr(){
     }
     body += '</tr>';
   });
-  h += '<div class="scroll"><table class="plan"><thead>'+monKopf+tagKopf+'</thead><tbody>'+body+'</tbody></table></div>';
+  var tageImJahr = (new Date(JAHR,1,29).getMonth() === 1) ? 366 : 365;
+  h += '<div class="scroll"><table class="plan" data-tage="'+tageImJahr+'" data-min="11">'
+     + '<thead>'+monKopf+tagKopf+'</thead><tbody>'+body+'</tbody></table></div>';
   h += legende();
   return h + '</div>';
 }
 function zelleSchmal(m, datum, klass){
   var a = IDX[m.id] && IDX[m.id][datum];
-  var stil = 'width:11px;min-width:11px;height:24px';
+  var stil = '';
   var inner = '';
   if(a){
     var t = TY[a.typ] || {farbe:'#888', label:a.typ};
@@ -680,7 +714,9 @@ function openKonto(id){
    + '<div><label>Übertrag aus '+(JAHR-1)+'</label><input id="k_ueb" type="number" step="0.5" value="'+(k.uebertrag||0)+'"></div>'
    + '<div><label>Anspruch '+JAHR+' (leer = automatisch)</label><input id="k_ans" type="number" step="0.5" placeholder="'+(k.anspruch||0)+'"></div>'
    + '</div>'
-   + '<div class="row one"><div><label>Urlaubs-Hinweis erteilt am</label><input id="k_hin" type="date" value="'+(k.hinweis_am||'')+'"></div></div>'
+   + '<div class="row one"><div><label>Urlaubs-Hinweis erteilt am</label><div class="datum">'
+   + '<input id="k_hin" type="date" value="'+(k.hinweis_am||'')+'">'
+   + '<button type="button" onclick="leeren(\'k_hin\')">Leeren</button></div></div></div>'
    + '<p class="muted">Der Übertrag verfällt in der Regel am 31.03. – aber nur, wenn die Mitarbeiterin nachweislich schriftlich auf den Resturlaub hingewiesen wurde (BAG, 20.12.2022). Das Datum hier dokumentiert diesen Hinweis.</p>',
      function(){
        return api('save_carry', {staff_id:id, jahr:JAHR, uebertrag:el('k_ueb').value||0,
@@ -711,6 +747,9 @@ function hinweisText(id){
 }
 
 // ------------------------------------------------------------------ Ansicht: Team
+function rolleName(r){
+  return r === 'leitung' ? 'Leitung' : (r === 'steuerberater' ? 'Steuerberatung' : 'Mitarbeiterin');
+}
 function viewTeam(){
   var h = '<div class="card"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
         + '<b style="flex:1;font-size:1.05rem">Team</b>'
@@ -724,7 +763,7 @@ function viewTeam(){
     var u = S.users.filter(function(x){ return x.staff_id === m.id; })[0];
     var zugang = u
       ? '<span class="zugang">Zugang: <b>'+esc(u.username)+'</b>'
-        + (u.rolle==='leitung' ? ' (Leitung)' : '') + (u.aktiv ? '' : ' – gesperrt') + '</span>'
+        + (u.rolle!=='mitarbeiter' ? ' ('+rolleName(u.rolle)+')' : '') + (u.aktiv ? '' : ' – gesperrt') + '</span>'
       : '<span class="zugang">kein Zugang</span>';
     h += '<div class="item"><span class="dot" style="background:'+esc(m.farbe)+'"></span>'
       + '<div class="t"><b>'+esc(m.name)+(m.aktiv?'':' <span class="muted">(nicht im Plan)</span>')+'</b>'
@@ -745,11 +784,12 @@ function viewTeam(){
      + '<button class="btn small" onclick="openUser(null)">+ Zugang</button></div>'
      + '<p class="muted" style="margin-bottom:12px">Wer sich anmelden darf. '
      + '<b>Leitung</b> darf alles – eintragen, ändern, löschen, Zugänge vergeben. '
-     + '<b>Mitarbeiterin</b> sieht den Plan, ihr eigenes Urlaubskonto und kann Urlaub beantragen.</p>';
+     + '<b>Mitarbeiterin</b> sieht den Plan, ihr eigenes Urlaubskonto und kann Urlaub beantragen. '
+     + '<b>Steuerberatung</b> sieht nur die Fehlzeiten-Auswertung für die Lohnabrechnung.</p>';
   if(!frei.length && !S.users.length) h += '<p class="muted">Keine Zugänge.</p>';
   frei.forEach(function(u){
     h += '<div class="item"><div class="t"><b>'+esc(u.anzeige||u.username)+'</b>'
-      + '<span>'+esc(u.username)+' · '+(u.rolle==='leitung'?'Leitung':'Mitarbeiterin')
+      + '<span>'+esc(u.username)+' · '+rolleName(u.rolle)
       + (u.aktiv?'':' · gesperrt')+'</span></div>'
       + '<button class="btn small ghost" onclick="openUser(\''+u.id+'\')">Ändern</button></div>';
   });
@@ -772,10 +812,12 @@ function openUser(id, staffId){
    + '<select id="u_staff">'+auswahl+'</select></div></div>'
    + '<div class="row"><div><label>Benutzername</label>'
    + '<input id="u_user" autocapitalize="off" value="'+esc(u.username)+'" placeholder="z. B. sara"></div>'
-   + '<div><label>Rolle</label><select id="u_rolle">'
+   + '<div><label>Rolle</label><select id="u_rolle" onchange="rolleGewechselt()">'
    + '<option value="mitarbeiter"'+(u.rolle==='mitarbeiter'?' selected':'')+'>Mitarbeiterin</option>'
    + '<option value="leitung"'+(u.rolle==='leitung'?' selected':'')+'>Leitung (darf alles)</option>'
+   + '<option value="steuerberater"'+(u.rolle==='steuerberater'?' selected':'')+'>Steuerberatung (nur Auswertung)</option>'
    + '</select></div></div>'
+   + '<div id="u_rollentext" class="hilfe" style="margin:0 0 11px"></div>'
    + '<div class="row one"><div><label>'+(id?'Neues Passwort (leer = unverändert)':'Passwort (mind. 10 Zeichen)')+'</label>'
    + '<input id="u_pass" type="text" autocomplete="off" placeholder="'+(id?'unverändert':'z. B. Praxis-Sonne-2026')+'"></div></div>'
    + '<div class="row one"><div><label><input type="checkbox" id="u_aktiv" '+(u.aktiv?'checked':'')
@@ -786,9 +828,29 @@ function openUser(id, staffId){
    + '<b>Einstellungen</b> ändern soll.</p>'
    + (id ? '<button class="btn danger" style="margin-top:14px" onclick="delUser(\''+id+'\')">Zugang löschen</button>' : ''),
      function(){
+       var r = el('u_rolle').value;
        return api('save_user', {id:id||'', username:el('u_user').value, passwort:el('u_pass').value,
-         rolle:el('u_rolle').value, staff_id:el('u_staff').value, aktiv:el('u_aktiv').checked?1:0});
+         rolle:r, staff_id: r === 'steuerberater' ? '' : el('u_staff').value,
+         aktiv:el('u_aktiv').checked?1:0});
      });
+  rolleGewechselt();
+}
+/** Kurz erklären, was die gewählte Rolle darf. */
+function rolleGewechselt(){
+  var box = el('u_rollentext'), r = el('u_rolle') ? el('u_rolle').value : '';
+  if(!box) return;
+  var text = {
+    mitarbeiter: 'Sieht den Plan des Teams, das eigene Urlaubskonto und kann Urlaub beantragen. '
+               + 'Lädt eigene Krankenscheine hoch. Ändert nichts bei anderen.',
+    leitung:     'Darf alles: für jede Person eintragen, ändern, löschen, Zugänge vergeben, Einstellungen ändern.',
+    steuerberater: 'Sieht ausschließlich die Fehlzeiten-Auswertung für die Lohnabrechnung – Urlaub, Krankheitstage, '
+               + 'unbezahlter Urlaub, Kind krank, Mutterschutz, Urlaubsstand. Keine Notizen, keine Krankenscheine '
+               + '(sofern nicht unter Einstellungen freigegeben), kein Kalender, keine Zugänge. Die Person '
+               + 'muss dafür <b>nicht</b> im Team stehen.'
+  }[r] || '';
+  box.innerHTML = text;
+  var staffFeld = el('u_staff');
+  if(staffFeld) staffFeld.parentNode.style.display = (r === 'steuerberater') ? 'none' : '';
 }
 function vorschlagName(name){
   var titel = ['dr','dr.','prof','prof.','med','med.','dipl','frau','herr'];
@@ -823,8 +885,12 @@ function openStaff(id){
    + '<div class="row one"><div><label>Arbeitstage (1× tippen = ganzer Tag, 2× = halber Tag)</label><div class="wd" id="m_muster">'+wd+'</div></div></div>'
    + '<div class="row"><div><label>Urlaubstage pro Jahr</label><input id="m_anspruch" type="number" step="0.5" value="'+m.anspruch+'"></div>'
    + '<div><label>Reihenfolge</label><input id="m_sort" type="number" value="'+(m.sortierung||0)+'"></div></div>'
-   + '<div class="row"><div><label>Eintritt</label><input id="m_eintritt" type="date" value="'+esc(m.eintritt||'')+'"></div>'
-   + '<div><label>Austritt</label><input id="m_austritt" type="date" value="'+esc(m.austritt||'')+'"></div></div>'
+   + '<div class="row"><div><label>Eintritt</label><div class="datum">'
+   + '<input id="m_eintritt" type="date" value="'+esc(m.eintritt||'')+'">'
+   + '<button type="button" onclick="leeren(\'m_eintritt\')">Leeren</button></div></div>'
+   + '<div><label>Austritt (leer = arbeitet weiter)</label><div class="datum">'
+   + '<input id="m_austritt" type="date" value="'+esc(m.austritt||'')+'">'
+   + '<button type="button" onclick="leeren(\'m_austritt\')">Leeren</button></div></div></div>'
    + '<div class="row one"><div><label><input type="checkbox" id="m_aktiv" '+(m.aktiv?'checked':'')+' style="width:auto;margin-right:6px">im Plan anzeigen</label></div></div>'
    + '<p class="muted">Teilzeit: nur die tatsächlichen Arbeitstage markieren. Der Urlaubsanspruch wird in <b>Tagen</b> geführt – Faustregel bei Teilzeit: Vollzeittage × (Arbeitstage pro Woche ÷ 5).</p>'
    + (id ? '<button class="btn danger" style="margin-top:14px" onclick="delStaff(\''+id+'\')">Mitarbeiterin löschen</button>' : ''),
@@ -849,6 +915,95 @@ function delStaff(id){
   api('del_staff', {id:id}).then(function(){ closeDialog(); return load(); })
    .then(function(){ zeige('Gelöscht.', true); })
    .catch(function(e){ alert(fehlerText(e)); });
+}
+
+// ------------------------------------------------------------------ Ansicht: Lohnabrechnung
+var MONATWAHL = new Date().getMonth() + 1;   // 0 = ganzes Jahr
+var REPORT = null;
+
+function ladeReport(){
+  return api('report&jahr='+JAHR+'&monat='+MONATWAHL).then(function(r){ REPORT = r; render(); })
+    .catch(function(e){ zeige(fehlerText(e)); });
+}
+function monatWahl(m){ MONATWAHL = parseInt(m, 10); REPORT = null; ladeReport(); }
+
+function viewLohn(){
+  if(!REPORT || REPORT.jahr !== JAHR || REPORT.monat !== MONATWAHL){
+    ladeReport();
+    return '<div class="card"><p class="muted">Auswertung wird geladen …</p></div>';
+  }
+  var opts = '<option value="0"'+(MONATWAHL===0?' selected':'')+'>Ganzes Jahr '+JAHR+'</option>'
+    + MNAME.map(function(n,i){
+        return '<option value="'+(i+1)+'"'+(MONATWAHL===i+1?' selected':'')+'>'+n+' '+JAHR+'</option>'; }).join('');
+
+  var h = '<div class="card"><div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:6px">'
+    + '<b style="flex:1;font-size:1.05rem">Fehlzeiten für die Lohnabrechnung</b></div>'
+    + '<div class="row"><div><label>Zeitraum</label>'
+    + '<select onchange="monatWahl(this.value)">'+opts+'</select></div>'
+    + '<div style="display:flex;align-items:flex-end;gap:8px">'
+    + '<a class="btn ghost" style="margin:0;text-decoration:none;text-align:center" '
+    +   'href="api.php?a=report_csv&jahr='+JAHR+'&monat='+MONATWAHL+'">CSV für DATEV / Excel</a>'
+    + '<button class="btn ghost" style="margin:0" onclick="window.print()">Drucken</button></div></div>'
+    + '<p class="muted">Zeitraum '+dmy(REPORT.von)+' bis '+dmy(REPORT.bis)+' · AT = Arbeitstage nach '
+    + 'persönlichem Wochenmuster, KT = Kalendertage. Enthält keine Notizen und keine Diagnosen.</p></div>';
+
+  var leer = true;
+  REPORT.zeilen.forEach(function(z){
+    if(z.leer && !z.konto.genommen && !z.konto.geplant) return;
+    leer = false;
+    h += '<div class="konto"><div class="kh"><b>'+esc(z.name)+'</b>'
+       + '<span class="muted">'+esc(ROLLEN[z.rolle]||z.rolle)
+       + (z.eintritt ? ' · Eintritt '+dmy(z.eintritt) : '')
+       + (z.austritt ? ' · Austritt '+dmy(z.austritt) : '')+'</span></div>';
+    h += '<div class="kgrid">'
+       + kbox(z.urlaub,'Urlaub (AT)')
+       + kbox(z.krank_at,'Krank (AT)')
+       + '<div class="kbox"><div class="v">'+z.krank_kt+'</div><div class="l">Krank (KT)</div></div>'
+       + kbox(z.kind_at,'Kind krank (AT)')
+       + kbox(z.unbezahlt,'Unbezahlt (AT)')
+       + '</div>';
+    var weitere = '';
+    if(z.sonderurlaub) weitere += kbox(z.sonderurlaub,'Sonderurlaub (AT)');
+    if(z.mutterschutz_kt) weitere += '<div class="kbox"><div class="v">'+z.mutterschutz_kt
+       + '</div><div class="l">Mutterschutz (KT)</div></div>';
+    if(z.fortbildung) weitere += kbox(z.fortbildung,'Fortbildung (AT)');
+    if(z.berufsschule) weitere += kbox(z.berufsschule,'Berufsschule (AT)');
+    if(z.ueberstunden) weitere += kbox(z.ueberstunden,'Überstunden (AT)');
+    if(weitere) h += '<div class="kgrid">'+weitere+'</div>';
+
+    if(z.perioden.length){
+      h += '<p class="muted" style="margin:8px 0 5px"><b>Einzelne Zeiträume</b></p>';
+      z.perioden.forEach(function(pz){
+        var t = TY[pz.typ] || {label:pz.typ, farbe:'#888'};
+        h += '<div class="antrag"><span class="dot" style="background:'+t.farbe+'"></span>'
+          + '<div class="t">'+esc(t.label)+' · '+zeitraum(pz.von,pz.bis)+'<br>'
+          + '<span class="muted">'+num(pz.arbeitstage)+' AT · '+pz.kalendertage+' KT · '
+          + (pz.nachweis ? 'Nachweis liegt vor' : 'kein Nachweis hinterlegt')+'</span></div>'
+          + (pz.dateien||[]).map(function(f){
+              return '<a class="btn small ghost" style="text-decoration:none" target="_blank" rel="noopener" '
+                   + 'href="api.php?a=datei&id='+esc(f.id)+'">Nachweis öffnen</a>'; }).join('')
+          + '</div>';
+      });
+    }
+    h += '<div class="kgrid" style="margin-top:8px">'
+       + kbox(z.konto.anspruch,'Anspruch Jahr') + kbox(z.konto.uebertrag,'Übertrag')
+       + kbox(z.konto.genommen,'genommen') + kbox(z.konto.geplant,'geplant')
+       + '<div class="kbox rest"><div class="v">'+num(z.konto.rest)+'</div><div class="l">Rest 31.12.</div></div>'
+       + '</div>';
+    (z.hinweise||[]).forEach(function(hw){ h += '<div class="flag">'+esc(hw)+'</div>'; });
+    h += '</div>';
+  });
+  if(leer) h += '<div class="card"><p class="muted">In diesem Zeitraum sind keine Fehlzeiten erfasst.</p></div>';
+
+  h += '<div class="card"><h2>Was in dieser Auswertung steht</h2><p class="muted">'
+     + '<b>Enthalten:</b> Urlaub, bezahlter Sonderurlaub, unbezahlter Urlaub, Krankheitstage (Arbeits- und '
+     + 'Kalendertage, je Zeitraum einzeln – für die U1-Erstattung und die Sechs-Wochen-Frist), Kind-krank-Tage, '
+     + 'Mutterschutz und Elternzeit, Fortbildung, Berufsschule, Überstundenabbau sowie der Urlaubsstand '
+     + 'für die Rückstellung zum Jahresende.<br><br>'
+     + '<b>Nicht enthalten:</b> Notizen, Diagnosen, Zugangsdaten, Praxis-Einstellungen. '
+     + 'Hochgeladene Krankenscheine sind für die Steuerberatung standardmäßig gesperrt – die Praxisleitung '
+     + 'kann sie unter Einstellungen bei Bedarf freigeben.</p></div>';
+  return h;
 }
 
 // ------------------------------------------------------------------ Ansicht: Mein Urlaub (Mitarbeiterin)
@@ -897,6 +1052,14 @@ function viewMeins(){
 
 // ------------------------------------------------------------------ Ansicht: Einstellungen
 function viewEinst(){
+  if(S.steuerberater){
+    return '<div class="card"><h2>Mein Zugang</h2>'
+      + '<p class="muted" style="margin-bottom:12px">Angemeldet als <b>'+esc(S.nutzer.name)+'</b> '
+      + '(Steuerberatung). Dieser Zugang sieht ausschließlich die Fehlzeiten-Auswertung.</p>'
+      + '<div class="row"><div><label>Aktuelles Passwort</label><input id="p_alt" type="password"></div>'
+      + '<div><label>Neues Passwort (mind. 10 Zeichen)</label><input id="p_neu" type="password"></div></div>'
+      + '<button class="btn ghost" onclick="savePasswort()">Passwort ändern</button></div>';
+  }
   var bl = Object.keys(S.bundeslaender).map(function(k){
     return '<option value="'+k+'"'+(k===S.bundesland?' selected':'')+'>'+esc(S.bundeslaender[k])+'</option>'; }).join('');
   var ft = Object.keys(S.feiertage).map(function(d){
@@ -908,6 +1071,10 @@ function viewEinst(){
    + ' style="width:auto;margin-right:6px">Mitarbeiterinnen sehen im Plan auch die <b>Art</b> der Abwesenheit</label>'
    + '<p class="muted">Ausgeschaltet sehen sie nur, <i>dass</i> jemand fehlt – nicht, ob Urlaub oder Krankheit. '
    + 'Das eigene Konto sieht jede Person immer vollständig.</p></div></div>'
+   + '<div class="row one"><div><label><input type="checkbox" id="e_stb" '+(S.stb_nachweise?'checked':'')
+   + ' style="width:auto;margin-right:6px">Die Steuerberatung darf hochgeladene <b>Krankenscheine öffnen</b></label>'
+   + '<p class="muted">Standardmäßig aus. Für die Lohnabrechnung und die U1-Erstattung genügen in aller Regel '
+   + 'die Zeiträume – der Krankenschein selbst gehört in die Personalakte der Praxis.</p></div></div>'
    + '<button class="btn" onclick="saveEinst()">Speichern</button></div>'
    + '<div class="card"><h2>Passwort ändern</h2>'
    + '<div class="row"><div><label>Aktuelles Passwort</label><input id="p_alt" type="password"></div>'
@@ -933,7 +1100,8 @@ function viewEinst(){
 }
 function saveEinst(){
   api('save_settings', {praxisname:el('e_praxis').value, bundesland:el('e_bl').value,
-                        details_sichtbar: el('e_det') && el('e_det').checked ? 1 : 0})
+                        details_sichtbar: el('e_det') && el('e_det').checked ? 1 : 0,
+                        stb_nachweise: el('e_stb') && el('e_stb').checked ? 1 : 0})
    .then(load).then(function(){ zeige('Gespeichert.', true); })
    .catch(function(e){ zeige(fehlerText(e)); });
 }
@@ -999,10 +1167,17 @@ function openEintrag(a){
   }
 
   // 1. Wer
+  // Gehört der Eintrag zu einer nicht mehr aktiven Person, bleibt sie in der Liste
+  var auswahl = staff.slice();
+  if(sid && !auswahl.filter(function(m){ return m.id === sid; }).length){
+    var weg = S.staff.filter(function(m){ return m.id === sid; })[0];
+    if(weg) auswahl.unshift(weg);
+  }
   var wer = istL
     ? '<div class="row one"><div><label>1. Für wen?</label><select id="a_staff" onchange="personGewechselt()">'
-      + staff.map(function(m){
-          return '<option value="'+m.id+'"'+(sid===m.id?' selected':'')+'>'+esc(m.name)+'</option>'; }).join('')
+      + auswahl.map(function(m){
+          return '<option value="'+m.id+'"'+(sid===m.id?' selected':'')+'>'+esc(m.name)
+               + (m.aktiv ? '' : ' (nicht im Plan)')+'</option>'; }).join('')
       + '</select></div></div>'
     : '<input type="hidden" id="a_staff" value="'+esc(sid)+'">';
 
@@ -1020,12 +1195,14 @@ function openEintrag(a){
    + '<input type="hidden" id="a_typ" value="'+esc(typ)+'"></div></div>'
    + '<div class="row"><div><label>'+(istL?'3. ':'2. ')+'Von</label>'
    + '<input id="a_von" type="date" value="'+esc(a.von||heute)+'" onchange="vonGeaendert()"></div>'
-   + '<div><label>Bis</label><input id="a_bis" type="date" value="'+esc(a.bis||a.von||heute)+'" onchange="vorschau()"></div></div>'
+   + '<div><label>Bis</label><input id="a_bis" type="date" value="'+esc(a.bis||a.von||heute)+'" onchange="bisGeaendert()"></div></div>'
    + '<div style="display:flex;gap:7px;margin-bottom:11px;flex-wrap:wrap">'
    +   '<button type="button" class="btn small ghost" onclick="spanne(0)">1 Tag</button>'
    +   '<button type="button" class="btn small ghost" onclick="spanne(6)">1 Woche</button>'
    +   '<button type="button" class="btn small ghost" onclick="spanne(13)">2 Wochen</button>'
    +   '<button type="button" class="btn small ghost" onclick="spanne(20)">3 Wochen</button>'
+   +   '<button type="button" class="btn small ghost" onclick="eintragZuruecksetzen()" '
+   +     'style="margin-left:auto">Zurücksetzen</button>'
    + '</div>'
    + '<div class="row one"><div><label><input type="checkbox" id="a_halb" '+(a.halbtag?'checked':'')
    + ' onchange="vorschau()" style="width:auto;margin-right:6px">nur ein halber Tag</label></div></div>'
@@ -1142,10 +1319,36 @@ function spanne(plus){
   if(plus > 0) el('a_halb').checked = false;
   vorschau();
 }
-function vonGeaendert(){
-  var v = el('a_von').value, b = el('a_bis');
-  if(!b.value || b.value < v) b.value = v;
+/** Optionales Datumsfeld leeren (der Reset im iOS-Kalender lässt es sonst stehen). */
+function leeren(id){
+  var e = el(id);
+  if(!e) return;
+  e.value = '';
   vorschau();
+}
+function vonGeaendert(){
+  var v = el('a_von'), b = el('a_bis');
+  // Leeres Datum ist hier nicht möglich - zurück auf den Vorschlag
+  if(!v.value) v.value = naechsterArbeitstag(el('a_staff').value);
+  if(!b.value || b.value < v.value) b.value = v.value;
+  vorschau();
+}
+function bisGeaendert(){
+  var v = el('a_von'), b = el('a_bis');
+  if(!b.value) b.value = v.value;
+  if(b.value < v.value) b.value = v.value;
+  vorschau();
+}
+/** Den ganzen Eintrag auf Anfang zurücksetzen. */
+function eintragZuruecksetzen(){
+  var tag = naechsterArbeitstag(el('a_staff').value);
+  el('a_von').value = tag;
+  el('a_bis').value = tag;
+  el('a_halb').checked = false;
+  el('a_notiz').value = '';
+  if(el('a_datei')) el('a_datei').value = '';
+  var urlaub = document.querySelector('#a_typen button[data-typ="urlaub"]');
+  if(urlaub) typWahl(urlaub); else vorschau();
 }
 function vorschau(){
   var box = el('a_vorschau'); if(!box) return;
@@ -1188,12 +1391,15 @@ function dialog(titel, inhalt, onSave, saveLabel){
   closeDialog();
   var d = document.createElement('div');
   d.className = 'ov'; d.id = 'ov';
-  d.innerHTML = '<div class="dlg" onclick="event.stopPropagation()"><h3>'+titel+'</h3>'
+  d.innerHTML = '<div class="dlg" onclick="event.stopPropagation()">'
+    + '<div class="griff" title="Nach unten wischen zum Schließen"><i></i></div>'
+    + '<h3>'+titel+'</h3>'
     + '<div id="dlg_fehler"></div>' + inhalt
     + (onSave ? '<button class="btn" id="dlg_save">'+(saveLabel||'Speichern')+'</button>' : '')
     + '<button class="btn ghost" onclick="closeDialog()">'+(onSave?'Abbrechen':'Schließen')+'</button></div>';
   d.onclick = closeDialog;
   document.body.appendChild(d);
+  wischenAktivieren(d.querySelector('.dlg'));
   if(!onSave) return;
   el('dlg_save').onclick = function(){
     el('dlg_save').disabled = true;
@@ -1206,6 +1412,58 @@ function dialog(titel, inhalt, onSave, saveLabel){
   };
 }
 function closeDialog(){ var o = el('ov'); if(o) o.remove(); }
+
+/** Blatt nach unten wischen schließt den Dialog - wie bei iOS gewohnt. */
+function wischenAktivieren(blatt){
+  if(!blatt) return;
+  var startY = 0, weg = 0, zieht = false;
+  function darfZiehen(e){
+    // Nur am Griff, oder wenn der Inhalt schon ganz oben steht
+    var amGriff = e.target.closest && e.target.closest('.griff');
+    return !!amGriff || blatt.scrollTop <= 0;
+  }
+  blatt.addEventListener('touchstart', function(e){
+    if(e.touches.length !== 1 || !darfZiehen(e)) return;
+    startY = e.touches[0].clientY; weg = 0; zieht = true;
+    blatt.classList.add('zieht');
+  }, {passive:true});
+  blatt.addEventListener('touchmove', function(e){
+    if(!zieht) return;
+    weg = e.touches[0].clientY - startY;
+    if(weg < 0){ weg = 0; return; }
+    blatt.style.transform = 'translateY('+weg+'px)';
+  }, {passive:true});
+  blatt.addEventListener('touchend', function(){
+    if(!zieht) return;
+    zieht = false;
+    blatt.classList.remove('zieht');
+    if(weg > 90){ blatt.style.transform = 'translateY(100%)'; setTimeout(closeDialog, 180); }
+    else { blatt.style.transform = ''; }
+  });
+  // Am Rechner: Escape schließt
+  document.addEventListener('keydown', function esc(e){
+    if(e.key === 'Escape'){ closeDialog(); document.removeEventListener('keydown', esc); }
+  });
+}
+
+/** Spaltenbreite des Planers an die Bildschirmbreite anpassen. */
+function rasterAnpassen(){
+  Array.prototype.forEach.call(document.querySelectorAll('.scroll table.plan'), function(t){
+    var box = t.parentNode;
+    var tage = parseInt(t.getAttribute('data-tage') || '0', 10);
+    if(!tage) return;
+    var minB = parseInt(t.getAttribute('data-min') || '26', 10);
+    var nameB = parseInt(getComputedStyle(t).getPropertyValue('--namew')) || 118;
+    var frei = box.clientWidth - nameB - 4;
+    var breite = Math.floor(frei / tage);
+    t.style.setProperty('--cell', Math.max(minB, breite) + 'px');
+    t.style.setProperty('--rowh', window.innerWidth >= 900 ? '38px' : '34px');
+    // Rest-Pixel gleichmäßig verteilen, damit rechts nichts frei bleibt
+    t.style.width = (breite > minB) ? '100%' : '';
+  });
+}
+window.addEventListener('resize', function(){ clearTimeout(window._rt); window._rt = setTimeout(rasterAnpassen, 120); });
+window.addEventListener('orientationchange', function(){ setTimeout(rasterAnpassen, 250); });
 
 load();
 </script>

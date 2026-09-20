@@ -171,7 +171,8 @@ function logAction(string $aktion, string $details = ''): void {
 // ---------------------------------------------------------------- Stammdaten: Abwesenheitsarten
 const TYPEN = [
   ['key'=>'urlaub',       'label'=>'Urlaub',                'farbe'=>'#16653f', 'konto'=>'urlaub',      'nachweis'=>false],
-  ['key'=>'sonderurlaub', 'label'=>'Sonderurlaub',          'farbe'=>'#8b5cf6', 'konto'=>'sonder',      'nachweis'=>false],
+  ['key'=>'sonderurlaub', 'label'=>'Sonderurlaub (bezahlt)','farbe'=>'#8b5cf6','konto'=>'sonder',      'nachweis'=>false],
+  ['key'=>'unbezahlt',    'label'=>'Unbezahlter Urlaub',    'farbe'=>'#78716c', 'konto'=>'unbezahlt',   'nachweis'=>false],
   ['key'=>'krank',        'label'=>'Krank (AU)',            'farbe'=>'#e02424', 'konto'=>'krank',       'nachweis'=>true],
   ['key'=>'kind_krank',   'label'=>'Kind krank',            'farbe'=>'#f59e0b', 'konto'=>'kind',        'nachweis'=>true],
   ['key'=>'fortbildung',  'label'=>'Fortbildung',           'farbe'=>'#2563eb', 'konto'=>'fortbildung', 'nachweis'=>true],
@@ -336,7 +337,7 @@ function konten(int $jahr): array {
       ? (float)$c['anspruch_override'] : anspruchJahr($m, $jahr);
     $uebertrag = $c ? (float)$c['uebertrag'] : 0.0;
     $k = ['genommen'=>0.0,'geplant'=>0.0,'krank'=>0.0,'krank_kal'=>0,'kind'=>0.0,
-          'fortbildung'=>0.0,'sonder'=>0.0,'stunden'=>0.0];
+          'fortbildung'=>0.0,'sonder'=>0.0,'stunden'=>0.0,'unbezahlt'=>0.0];
     foreach ($abs as $a) {
       if ($a['staff_id'] !== $m['id'] || $a['status'] === 'abgelehnt' || $a['status'] === 'storniert') continue;
       $tage = anteilImJahr($a, $m, $jahr);
@@ -347,6 +348,7 @@ function konten(int $jahr): array {
         case 'fortbildung': $k['fortbildung'] += $tage; break;
         case 'sonder':      $k['sonder'] += $tage; break;
         case 'stunden':     $k['stunden'] += $tage; break;
+        case 'unbezahlt':   $k['unbezahlt'] += $tage; break;
       }
     }
     $res[$m['id']] = [
@@ -360,12 +362,29 @@ function konten(int $jahr): array {
       'fortbildung'=> round($k['fortbildung'], 1),
       'sonder'     => round($k['sonder'], 1),
       'stunden'    => round($k['stunden'], 1),
+      'unbezahlt'  => round($k['unbezahlt'], 1),
       'krank_12m_kalendertage' => (int)($krank12[$m['id']] ?? 0),
       'hinweis_am' => $c['hinweis_am'] ?? '',
     ];
   }
   return $res;
 }
+/** Anteil einer Abwesenheit, der in ein beliebiges Fenster faellt (Arbeitstage). */
+function anteilImZeitraum(array $a, array $staff, string $von, string $bis): float {
+  $v = max($a['von'], $von);
+  $b = min($a['bis'], $bis);
+  if ($b < $v) return 0.0;
+  $r = arbeitstage($staff, $v, $b, (bool)$a['halbtag'] && $v === $b && $a['von'] === $a['bis']);
+  return $r['tage'];
+}
+/** Kalendertage einer Abwesenheit innerhalb eines Fensters. */
+function kalenderImZeitraum(array $a, string $von, string $bis): int {
+  $v = max($a['von'], $von);
+  $b = min($a['bis'], $bis);
+  if ($b < $v) return 0;
+  return (int)round((strtotime($b) - strtotime($v)) / 86400) + 1;
+}
+
 /** Anteil einer (ggf. jahresuebergreifenden) Abwesenheit, der in $jahr faellt. */
 function anteilImJahr(array $a, array $staff, int $jahr): float {
   if (substr($a['von'], 0, 4) === (string)$jahr && substr($a['bis'], 0, 4) === (string)$jahr) {
@@ -443,8 +462,104 @@ function dateienFuer(?string $absenceId = null): array {
   return $out;
 }
 /** Darf die angemeldete Person diesen Nachweis sehen oder hochladen? */
-function darfNachweis(string $staffId): bool {
+/** Darf hochladen oder loeschen? Die Steuerberatung nie. */
+function darfNachweisAendern(string $staffId): bool {
+  if (istSteuerberater()) return false;
   return istLeitung() || ($staffId !== '' && $staffId === eigeneStaffId());
+}
+function darfNachweis(string $staffId): bool {
+  if (istLeitung()) return true;
+  if (istSteuerberater()) return setting('stb_nachweise', '0') === '1';
+  return $staffId !== '' && $staffId === eigeneStaffId();
+}
+
+// ---------------------------------------------------------------- Auswertung fuer die Lohnabrechnung
+/**
+ * Fehlzeiten je Mitarbeiterin fuer einen Monat oder ein ganzes Jahr.
+ * Enthaelt ausschliesslich das, was die Lohnabrechnung braucht - keine Notizen,
+ * keine Diagnosen, keine Angaben zu anderen Bereichen.
+ */
+function reportDaten(int $jahr, int $monat): array {
+  $von = $monat ? sprintf('%04d-%02d-01', $jahr, $monat) : sprintf('%04d-01-01', $jahr);
+  $bis = $monat ? date('Y-m-t', (int)strtotime($von))     : sprintf('%04d-12-31', $jahr);
+
+  $pdo = db();
+  $staff = $pdo->query("SELECT * FROM " . t('staff') . " ORDER BY sortierung, name")->fetchAll();
+  $st = $pdo->prepare("SELECT * FROM " . t('absences') . " WHERE bis >= ? AND von <= ? ORDER BY von");
+  $st->execute([$von, $bis]);
+  $abs = $st->fetchAll();
+
+  $dateien = [];
+  foreach (db()->query("SELECT id, absence_id, dateiname FROM " . t('files'))->fetchAll() as $f) {
+    $dateien[$f['absence_id']][] = ['id' => $f['id'], 'name' => $f['dateiname']];
+  }
+  $konten = konten($jahr);
+
+  $zeilen = [];
+  foreach ($staff as $m) {
+    $z = [
+      'name' => $m['name'], 'rolle' => $m['rolle'],
+      'eintritt' => $m['eintritt'], 'austritt' => $m['austritt'],
+      'urlaub' => 0.0, 'sonderurlaub' => 0.0, 'unbezahlt' => 0.0,
+      'krank_at' => 0.0, 'krank_kt' => 0, 'kind_at' => 0.0, 'kind_kt' => 0,
+      'mutterschutz_kt' => 0, 'fortbildung' => 0.0, 'berufsschule' => 0.0, 'ueberstunden' => 0.0,
+      'perioden' => [], 'hinweise' => [],
+    ];
+    foreach ($abs as $a) {
+      if ($a['staff_id'] !== $m['id']) continue;
+      if (in_array($a['status'], ['abgelehnt', 'storniert'], true)) continue;
+      $at = anteilImZeitraum($a, $m, $von, $bis);
+      $kt = kalenderImZeitraum($a, $von, $bis);
+      switch ($a['typ']) {
+        case 'urlaub':       $z['urlaub'] += $at; break;
+        case 'sonderurlaub': $z['sonderurlaub'] += $at; break;
+        case 'unbezahlt':    $z['unbezahlt'] += $at; break;
+        case 'krank':        $z['krank_at'] += $at; $z['krank_kt'] += $kt; break;
+        case 'kind_krank':   $z['kind_at'] += $at;  $z['kind_kt'] += $kt; break;
+        case 'mutterschutz': $z['mutterschutz_kt'] += $kt; break;
+        case 'fortbildung':  $z['fortbildung'] += $at; break;
+        case 'berufsschule': $z['berufsschule'] += $at; break;
+        case 'ueberstunden': $z['ueberstunden'] += $at; break;
+      }
+      // Zeitraeume, die in der Lohnabrechnung einzeln gebraucht werden
+      if (in_array($a['typ'], ['krank', 'kind_krank', 'unbezahlt', 'mutterschutz'], true) && ($at > 0 || $kt > 0)) {
+        $z['perioden'][] = [
+          'id' => $a['id'], 'typ' => $a['typ'],
+          'von' => $a['von'], 'bis' => $a['bis'],
+          'arbeitstage' => round((float)$a['tage'], 1),
+          'kalendertage' => (int)$a['kalendertage'],
+          'nachweis' => (isset($dateien[$a['id']]) || (int)$a['nachweis'] === 1) ? 1 : 0,
+          'dateien' => darfNachweis((string)$m['id']) ? ($dateien[$a['id']] ?? []) : [],
+          'im_zeitraum_at' => round($at, 1),
+        ];
+        if ($a['typ'] === 'unbezahlt' && (float)$a['tage'] >= 5) {
+          $z['hinweise'][] = 'Unbezahlter Urlaub ab ' . $a['von'] . ': mindestens fünf zusammenhängende '
+            . 'Arbeitstage – Unterbrechung im Lohnkonto und Meldung zur Sozialversicherung prüfen.';
+        }
+      }
+    }
+    foreach (['urlaub','sonderurlaub','unbezahlt','krank_at','kind_at','fortbildung','berufsschule','ueberstunden'] as $f) {
+      $z[$f] = round($z[$f], 1);
+    }
+    $k = $konten[$m['id']] ?? [];
+    $z['konto'] = [
+      'anspruch'  => $k['anspruch']  ?? 0,
+      'uebertrag' => $k['uebertrag'] ?? 0,
+      'genommen'  => $k['genommen']  ?? 0,
+      'geplant'   => $k['geplant']   ?? 0,
+      'rest'      => $k['rest']      ?? 0,
+    ];
+    if (($k['krank_12m_kalendertage'] ?? 0) >= 42) {
+      $z['hinweise'][] = ($k['krank_12m_kalendertage']) . ' Krankheits-Kalendertage in den letzten '
+        . '12 Monaten – Ende der Entgeltfortzahlung nach sechs Wochen prüfen.';
+    }
+    $hat = $z['urlaub'] || $z['sonderurlaub'] || $z['unbezahlt'] || $z['krank_at'] || $z['kind_at']
+        || $z['mutterschutz_kt'] || $z['fortbildung'] || $z['berufsschule'] || $z['ueberstunden'];
+    $z['leer'] = $hat ? 0 : 1;
+    $zeilen[] = $z;
+  }
+  return ['von' => $von, 'bis' => $bis, 'jahr' => $jahr, 'monat' => $monat,
+          'praxis' => setting('praxisname', 'Praxis'), 'zeilen' => $zeilen];
 }
 
 // ---------------------------------------------------------------- Sitzung / Auth
@@ -472,6 +587,8 @@ function istLeitung(): bool {
   return in_array($_SESSION['user_rolle'] ?? '', ['leitung', 'admin'], true);
 }
 function requireLeitung(): void { requireLogin(); if (!istLeitung()) fail('keine_berechtigung', 403); }
+/** Steuerberatung: sieht ausschliesslich die Lohn-Auswertung, sonst nichts. */
+function istSteuerberater(): bool { return ($_SESSION['user_rolle'] ?? '') === 'steuerberater'; }
 /** Mit welcher Mitarbeiterin ist das angemeldete Konto verknuepft? */
 function eigeneStaffId(): string { return (string)($_SESSION['user_staff'] ?? ''); }
 function requireLogin(): void { if (!angemeldet()) fail('nicht_angemeldet', 401); }
@@ -503,6 +620,24 @@ case 'state': {
   }
   if (!angemeldet()) out(['setup' => false, 'angemeldet' => false,
     'praxis' => setting('praxisname', 'Praxis'), 'app' => $GLOBALS['CFG']['app']['name']]);
+
+  if (istSteuerberater()) {
+    $liste = [];
+    foreach (db()->query("SELECT * FROM " . t('staff') . " ORDER BY sortierung, name")->fetchAll() as $m) {
+      $liste[] = ['id' => $m['id'], 'name' => $m['name'], 'rolle' => $m['rolle'],
+                  'eintritt' => $m['eintritt'], 'austritt' => $m['austritt'], 'aktiv' => (int)$m['aktiv']];
+    }
+    out([
+      'setup' => false, 'angemeldet' => true,
+      'nutzer' => ['name' => $_SESSION['user_name'], 'rolle' => 'steuerberater', 'staff_id' => ''],
+      'leitung' => false, 'steuerberater' => true,
+      'csrf' => $_SESSION['csrf'],
+      'praxis' => setting('praxisname', 'Praxis'),
+      'jahr' => $jahr, 'heute' => today(),
+      'typen' => TYPEN, 'staff' => $liste,
+      'stb_nachweise' => setting('stb_nachweise', '0') === '1' ? 1 : 0,
+    ]);
+  }
 
   $pdo = db();
   $staff = $pdo->query("SELECT * FROM " . t('staff') . " ORDER BY sortierung, name")->fetchAll();
@@ -552,6 +687,7 @@ case 'state': {
     'offene_antraege' => $offen,
     'users' => $istL ? listUsers() : [],
     'details_sichtbar' => $details ? 1 : 0,
+    'stb_nachweise' => setting('stb_nachweise', '0') === '1' ? 1 : 0,
     'csrf' => $_SESSION['csrf'],
     'praxis' => setting('praxisname', 'Praxis'),
     'bundesland' => $bl,
@@ -686,6 +822,7 @@ case 'del_staff': {
   if ($id === '') fail('id_fehlt');
   $pdo = db();
   dateienLoeschen('staff_id', $id);
+  $pdo->prepare("UPDATE " . t('users') . " SET staff_id = '' WHERE staff_id = ?")->execute([$id]);
   $pdo->prepare("DELETE FROM " . t('absences') . " WHERE staff_id = ?")->execute([$id]);
   $pdo->prepare("DELETE FROM " . t('carry') . " WHERE staff_id = ?")->execute([$id]);
   $pdo->prepare("DELETE FROM " . t('staff') . " WHERE id = ?")->execute([$id]);
@@ -716,6 +853,7 @@ case 'save_absence': {
   if ((strtotime($bis) - strtotime($von)) / 86400 > 400) fail('zeitraum_zu_lang');
   $halbtag = !empty($d['halbtag']) && $von === $bis;
 
+  if (istSteuerberater()) fail('keine_berechtigung', 403);
   // Mitarbeiterinnen duerfen nur fuer sich selbst und nur als Antrag eintragen
   if (!istLeitung()) {
     if ($typ === 'geschlossen') fail('keine_berechtigung', 403);
@@ -779,6 +917,7 @@ case 'del_absence': {
   requirePost(); requireLogin(); requireCsrf();
   $id = s(body(), 'id');
   if ($id === '') fail('id_fehlt');
+  if (istSteuerberater()) fail('keine_berechtigung', 403);
   if (!istLeitung()) {
     $st = db()->prepare("SELECT * FROM " . t('absences') . " WHERE id = ?");
     $st->execute([$id]);
@@ -827,6 +966,7 @@ case 'save_settings': {
     neuBerechnen(null);                      // Feiertage aendern die Arbeitstage
   }
   if (isset($d['details_sichtbar'])) setSetting('details_sichtbar', !empty($d['details_sichtbar']) ? '1' : '0');
+  if (isset($d['stb_nachweise'])) setSetting('stb_nachweise', !empty($d['stb_nachweise']) ? '1' : '0');
   logAction('einstellungen_gespeichert');
   out(['ok' => true]);
 }
@@ -869,7 +1009,7 @@ case 'save_user': {
   $user  = mb_strtolower(s($d, 'username'));
   $pass  = s($d, 'passwort');
   $rolle = s($d, 'rolle', 'mitarbeiter');
-  if (!in_array($rolle, ['leitung', 'mitarbeiter'], true)) fail('rolle_ungueltig');
+  if (!in_array($rolle, ['leitung', 'mitarbeiter', 'steuerberater'], true)) fail('rolle_ungueltig');
   $sid   = s($d, 'staff_id');
   if ($sid !== '' && !ladeStaff($sid)) fail('mitarbeiter_unbekannt');
   $aktiv = !empty($d['aktiv']) ? 1 : 0;
@@ -969,7 +1109,7 @@ case 'upload': {
   $st->execute([$absenceId]);
   $eintrag = $st->fetch();
   if (!$eintrag) fail('eintrag_unbekannt', 404);
-  if (!darfNachweis((string)$eintrag['staff_id'])) fail('keine_berechtigung', 403);
+  if (!darfNachweisAendern((string)$eintrag['staff_id'])) fail('keine_berechtigung', 403);
 
   // Datei groesser als post_max_size: PHP liefert ein leeres $_FILES
   if (empty($_FILES['datei'])) {
@@ -1056,7 +1196,7 @@ case 'del_datei': {
   $st->execute([$id]);
   $f = $st->fetch();
   if (!$f) fail('datei_unbekannt', 404);
-  if (!darfNachweis((string)$f['staff_id'])) fail('keine_berechtigung', 403);
+  if (!darfNachweisAendern((string)$f['staff_id'])) fail('keine_berechtigung', 403);
   @unlink(nachweisOrdner() . '/' . basename((string)$f['pfad']));
   db()->prepare("DELETE FROM " . t('files') . " WHERE id = ?")->execute([$id]);
   // Haken zuruecksetzen, wenn kein Nachweis mehr haengt
@@ -1085,6 +1225,57 @@ case 'aufraeumen': {
   out(['ok' => true, 'geloescht' => count($weg)]);
 }
 
+case 'report': {
+  requireLogin();
+  if (!istLeitung() && !istSteuerberater()) fail('keine_berechtigung', 403);
+  $jahr  = (int)($_GET['jahr'] ?? date('Y'));
+  $monat = (int)($_GET['monat'] ?? 0);
+  if ($jahr < 2000 || $jahr > 2100) $jahr = (int)date('Y');
+  if ($monat < 0 || $monat > 12) $monat = 0;
+  out(reportDaten($jahr, $monat));
+}
+
+case 'report_csv': {
+  requireLogin();
+  if (!istLeitung() && !istSteuerberater()) fail('keine_berechtigung', 403);
+  $jahr  = (int)($_GET['jahr'] ?? date('Y'));
+  $monat = (int)($_GET['monat'] ?? 0);
+  if ($monat < 0 || $monat > 12) $monat = 0;
+  $d = reportDaten($jahr, $monat);
+  header_remove('Content-Type');
+  header('Content-Type: text/csv; charset=utf-8');
+  header('Content-Disposition: attachment; filename="fehlzeiten-' . $jahr
+         . ($monat ? '-' . sprintf('%02d', $monat) : '') . '.csv"');
+  $o = fopen('php://output', 'w');
+  fwrite($o, "\xEF\xBB\xBF");
+  fputcsv($o, ['Zeitraum', $d['von'] . ' bis ' . $d['bis']], ';', '"', '');
+  fputcsv($o, [], ';', '"', '');
+  fputcsv($o, ['Mitarbeiter','Rolle','Eintritt','Austritt','Urlaub (AT)','Sonderurlaub (AT)',
+               'Unbezahlt (AT)','Krank (AT)','Krank (KT)','Kind krank (AT)','Mutterschutz/Elternzeit (KT)',
+               'Fortbildung (AT)','Berufsschule (AT)','Ueberstundenabbau (AT)',
+               'Urlaubsanspruch','Uebertrag','genommen','geplant','Resturlaub'], ';', '"', '');
+  foreach ($d['zeilen'] as $z) {
+    fputcsv($o, [$z['name'], $z['rolle'], $z['eintritt'], $z['austritt'], $z['urlaub'], $z['sonderurlaub'],
+                 $z['unbezahlt'], $z['krank_at'], $z['krank_kt'], $z['kind_at'], $z['mutterschutz_kt'],
+                 $z['fortbildung'], $z['berufsschule'], $z['ueberstunden'],
+                 $z['konto']['anspruch'], $z['konto']['uebertrag'], $z['konto']['genommen'],
+                 $z['konto']['geplant'], $z['konto']['rest']], ';', '"', '');
+  }
+  fputcsv($o, [], ';', '"', '');
+  fputcsv($o, ['Einzelne Zeitraeume (Krankheit, Kind krank, unbezahlt, Mutterschutz)'], ';', '"', '');
+  fputcsv($o, ['Mitarbeiter','Art','Von','Bis','Arbeitstage','Kalendertage','Nachweis'], ';', '"', '');
+  foreach ($d['zeilen'] as $z) {
+    foreach ($z['perioden'] as $pz) {
+      $label = $pz['typ'];
+      foreach (TYPEN as $ty) if ($ty['key'] === $pz['typ']) $label = $ty['label'];
+      fputcsv($o, [$z['name'], $label, $pz['von'], $pz['bis'], $pz['arbeitstage'],
+                   $pz['kalendertage'], $pz['nachweis'] ? 'ja' : 'nein'], ';', '"', '');
+    }
+  }
+  fclose($o);
+  exit;
+}
+
 default:
   fail('unbekannte_aktion', 404);
 }
@@ -1107,7 +1298,9 @@ function listUsers(): array {
                        FROM " . t('users') . " ORDER BY rolle, username")->fetchAll();
   foreach ($rows as &$r) {
     $r['aktiv'] = (int)($r['aktiv'] ?? 1);
-    $r['rolle'] = in_array($r['rolle'], ['leitung','admin'], true) ? 'leitung' : 'mitarbeiter';
+    if (in_array($r['rolle'], ['leitung','admin'], true)) $r['rolle'] = 'leitung';
+    elseif ($r['rolle'] === 'steuerberater')                $r['rolle'] = 'steuerberater';
+    else                                                    $r['rolle'] = 'mitarbeiter';
     $r['staff_id'] = (string)($r['staff_id'] ?? '');
   }
   return $rows;
