@@ -114,6 +114,7 @@ function ensureSchema(): void {
   // Nachtraeglich ergaenzte Spalten (bestehende Installationen)
   ensureColumn('users', 'staff_id', $txt);
   ensureColumn('users', 'aktiv', 'INT DEFAULT 1');
+  ensureColumn('absences', 'mail_am', $txt);
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('abs') . "_von ON " . t('absences') . " (von)");
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('abs') . "_staff ON " . t('absences') . " (staff_id)");
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('fil') . "_abs ON " . t('files') . " (absence_id)");
@@ -473,15 +474,164 @@ function darfNachweis(string $staffId): bool {
   return $staffId !== '' && $staffId === eigeneStaffId();
 }
 
+// ---------------------------------------------------------------- E-Mail (Krankmeldung an die Steuerberatung)
+/** Einstellungen fuer den Versand. config.php hat Vorrang vor den Werten aus der Oberflaeche. */
+function mailKonfig(): array {
+  global $CFG;
+  $c = $CFG['mail'] ?? [];
+  return [
+    'aktiv'    => setting('mail_aktiv', '0') === '1',
+    'host'     => (string)($c['host'] ?? setting('mail_host', 'smtp.ionos.de')),
+    'port'     => (int)   ($c['port'] ?? setting('mail_port', '587')),
+    'user'     => (string)($c['user'] ?? setting('mail_user', '')),
+    'pass'     => (string)($c['pass'] ?? setting('mail_pass', '')),
+    'von'      => (string)($c['von']  ?? setting('mail_von', '')),
+    'von_name' => setting('mail_von_name', setting('praxisname', 'Praxis')),
+    'an'       => setting('mail_an', ''),
+    'cc'       => setting('mail_cc', ''),
+  ];
+}
+function mailAdressen(string $roh): array {
+  $out = [];
+  foreach (preg_split('/[,;\s]+/', $roh) as $a) {
+    $a = trim($a);
+    if ($a !== '' && filter_var($a, FILTER_VALIDATE_EMAIL)) $out[] = $a;
+  }
+  return array_values(array_unique($out));
+}
+function mimeKopf(string $text): string {
+  return preg_match('/[^\x20-\x7E]/', $text)
+    ? '=?UTF-8?B?' . base64_encode($text) . '?=' : $text;
+}
+/** Kleiner SMTP-Client: Port 465 direkt ueber SSL, sonst STARTTLS. */
+function smtpSenden(array $c, array $an, array $cc, string $betreff, string $text): array {
+  if ($c['host'] === '' || $c['user'] === '' || $c['pass'] === '' || $c['von'] === '') {
+    return ['ok' => false, 'fehler' => 'E-Mail-Zugangsdaten unvollständig'];
+  }
+  if (!$an) return ['ok' => false, 'fehler' => 'Keine Empfängeradresse hinterlegt'];
+
+  $ziel = ($c['port'] === 465 ? 'ssl://' : '') . $c['host'] . ':' . $c['port'];
+  $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true,
+                                          'SNI_enabled' => true, 'peer_name' => $c['host']]]);
+  $fp = @stream_socket_client($ziel, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $ctx);
+  if (!$fp) return ['ok' => false, 'fehler' => 'Verbindung zum Mailserver nicht möglich (' . $errstr . ')'];
+  stream_set_timeout($fp, 15);
+
+  $lesen = function () use ($fp) {
+    $antwort = '';
+    while (($zeile = fgets($fp, 1024)) !== false) {
+      $antwort .= $zeile;
+      if (strlen($zeile) < 4 || $zeile[3] !== '-') break;
+    }
+    return $antwort;
+  };
+  $senden = function (string $befehl) use ($fp, $lesen) { fwrite($fp, $befehl . "\r\n"); return $lesen(); };
+  $code = fn(string $a) => (int)substr(trim($a), 0, 3);
+
+  $schluss = function (string $fehler) use ($fp) { @fclose($fp); return ['ok' => false, 'fehler' => $fehler]; };
+
+  if ($code($lesen()) !== 220) return $schluss('Mailserver meldet sich nicht');
+  $host = $_SERVER['HTTP_HOST'] ?? 'praxis';
+  if ($code($senden('EHLO ' . $host)) !== 250) return $schluss('EHLO abgelehnt');
+  if ($c['port'] !== 465) {
+    if ($code($senden('STARTTLS')) !== 220) return $schluss('STARTTLS nicht möglich');
+    if (!@stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+      return $schluss('Verschlüsselung fehlgeschlagen');
+    }
+    if ($code($senden('EHLO ' . $host)) !== 250) return $schluss('EHLO nach STARTTLS abgelehnt');
+  }
+  if ($code($senden('AUTH LOGIN')) !== 334) return $schluss('Anmeldung nicht möglich');
+  if ($code($senden(base64_encode($c['user']))) !== 334) return $schluss('Benutzername abgelehnt');
+  if ($code($senden(base64_encode($c['pass']))) !== 235) return $schluss('Passwort abgelehnt');
+  if ($code($senden('MAIL FROM:<' . $c['von'] . '>')) !== 250) return $schluss('Absender abgelehnt');
+  foreach (array_merge($an, $cc) as $e) {
+    $r = $code($senden('RCPT TO:<' . $e . '>'));
+    if ($r !== 250 && $r !== 251) return $schluss('Empfänger abgelehnt: ' . $e);
+  }
+  if ($code($senden('DATA')) !== 354) return $schluss('DATA abgelehnt');
+
+  $kopf = 'From: ' . mimeKopf($c['von_name']) . ' <' . $c['von'] . '>' . "\r\n"
+        . 'To: ' . implode(', ', $an) . "\r\n"
+        . ($cc ? 'Cc: ' . implode(', ', $cc) . "\r\n" : '')
+        . 'Subject: ' . mimeKopf($betreff) . "\r\n"
+        . 'Date: ' . date('r') . "\r\n"
+        . 'Message-ID: <' . bin2hex(random_bytes(12)) . '@' . $c['host'] . '>' . "\r\n"
+        . 'MIME-Version: 1.0' . "\r\n"
+        . 'Content-Type: text/plain; charset=UTF-8' . "\r\n"
+        . 'Content-Transfer-Encoding: base64' . "\r\n"
+        . 'Auto-Submitted: auto-generated' . "\r\n\r\n";
+  fwrite($fp, $kopf . chunk_split(base64_encode($text), 76, "\r\n") . "\r\n.\r\n");
+  if ($code($lesen()) !== 250) return $schluss('Nachricht wurde nicht angenommen');
+  $senden('QUIT');
+  @fclose($fp);
+  return ['ok' => true];
+}
+
+/** Text der Krankmeldung - ohne Diagnose, ohne Anhang. */
+function krankMailText(array $m, array $a): array {
+  $c = mailKonfig();
+  $art = $a['typ'] === 'kind_krank' ? 'Kind krank (Betreuung eines erkrankten Kindes)'
+                                    : 'Arbeitsunfähigkeit';
+  $zeitraum = $a['von'] === $a['bis']
+    ? date('d.m.Y', (int)strtotime($a['von']))
+    : date('d.m.Y', (int)strtotime($a['von'])) . ' bis ' . date('d.m.Y', (int)strtotime($a['bis']));
+  $betreff = 'Krankmeldung ' . $m['name'] . ' – ' . $zeitraum;
+  $text = setting('praxisname', 'Praxis') . "\n\n"
+    . "Krankmeldung zur Lohnabrechnung\n"
+    . str_repeat('-', 40) . "\n\n"
+    . "Mitarbeiterin/Mitarbeiter: " . $m['name'] . "\n"
+    . "Art: " . $art . "\n"
+    . "Zeitraum: " . $zeitraum . "\n"
+    . "Arbeitstage: " . rtrim(rtrim(number_format((float)$a['tage'], 1, ',', ''), '0'), ',') . "\n"
+    . "Kalendertage: " . (int)$a['kalendertage'] . "\n"
+    . "Nachweis liegt in der Praxis vor: " . (((int)$a['nachweis'] === 1) ? 'ja' : 'noch nicht') . "\n"
+    . "Gemeldet am: " . date('d.m.Y') . "\n\n"
+    . "Die Arbeitsunfähigkeitsbescheinigung wird aus Datenschutzgründen nicht mitgeschickt; "
+    . "sie liegt in der Praxis vor. Diese Nachricht enthält keine Diagnose.\n\n"
+    . "Automatisch erzeugt vom Praxis-Kalender.";
+  return ['betreff' => $betreff, 'text' => $text];
+}
+
+/** Krankmeldung verschicken und das Datum am Eintrag vermerken. */
+function krankMailSenden(string $absenceId, bool $erneut = false): array {
+  $c = mailKonfig();
+  if (!$c['aktiv']) return ['ok' => false, 'fehler' => 'Versand ist ausgeschaltet', 'still' => true];
+  $st = db()->prepare("SELECT * FROM " . t('absences') . " WHERE id = ?");
+  $st->execute([$absenceId]);
+  $a = $st->fetch();
+  if (!$a) return ['ok' => false, 'fehler' => 'Eintrag nicht gefunden'];
+  if (!in_array($a['typ'], ['krank', 'kind_krank'], true)) {
+    return ['ok' => false, 'fehler' => 'Nur Krankmeldungen werden verschickt', 'still' => true];
+  }
+  if (!$erneut && !empty($a['mail_am'])) return ['ok' => true, 'schon' => true];
+  $m = ladeStaff((string)$a['staff_id']);
+  if (!$m) return ['ok' => false, 'fehler' => 'Person nicht gefunden'];
+
+  $inhalt = krankMailText($m, $a);
+  $r = smtpSenden($c, mailAdressen($c['an']), mailAdressen($c['cc']), $inhalt['betreff'], $inhalt['text']);
+  if ($r['ok']) {
+    db()->prepare("UPDATE " . t('absences') . " SET mail_am = ? WHERE id = ?")
+       ->execute([date('c'), $absenceId]);
+    logAction('krankmeldung_versandt', $m['name'] . ' ' . $a['von']);
+  } else {
+    logAction('krankmeldung_fehlgeschlagen', ($r['fehler'] ?? '?'));
+  }
+  return $r;
+}
+
 // ---------------------------------------------------------------- Auswertung fuer die Lohnabrechnung
 /**
  * Fehlzeiten je Mitarbeiterin fuer einen Monat oder ein ganzes Jahr.
  * Enthaelt ausschliesslich das, was die Lohnabrechnung braucht - keine Notizen,
  * keine Diagnosen, keine Angaben zu anderen Bereichen.
  */
-function reportDaten(int $jahr, int $monat): array {
-  $von = $monat ? sprintf('%04d-%02d-01', $jahr, $monat) : sprintf('%04d-01-01', $jahr);
-  $bis = $monat ? date('Y-m-t', (int)strtotime($von))     : sprintf('%04d-12-31', $jahr);
+function reportDaten(int $jahr, int $monat, string $vonFrei = '', string $bisFrei = ''): array {
+  if ($vonFrei !== '' && $bisFrei !== '' && isDate($vonFrei) && isDate($bisFrei) && $bisFrei >= $vonFrei) {
+    $von = $vonFrei; $bis = $bisFrei;
+  } else {
+    $von = $monat ? sprintf('%04d-%02d-01', $jahr, $monat) : sprintf('%04d-01-01', $jahr);
+    $bis = $monat ? date('Y-m-t', (int)strtotime($von))     : sprintf('%04d-12-31', $jahr);
+  }
 
   $pdo = db();
   $staff = $pdo->query("SELECT * FROM " . t('staff') . " ORDER BY sortierung, name")->fetchAll();
@@ -502,7 +652,9 @@ function reportDaten(int $jahr, int $monat): array {
       'eintritt' => $m['eintritt'], 'austritt' => $m['austritt'],
       'urlaub' => 0.0, 'sonderurlaub' => 0.0, 'unbezahlt' => 0.0,
       'krank_at' => 0.0, 'krank_kt' => 0, 'kind_at' => 0.0, 'kind_kt' => 0,
-      'mutterschutz_kt' => 0, 'fortbildung' => 0.0, 'berufsschule' => 0.0, 'ueberstunden' => 0.0,
+      'mutterschutz_kt' => 0, 'mutterschutz_at' => 0.0, 'sonstiges' => 0.0,
+      'fortbildung' => 0.0, 'berufsschule' => 0.0, 'ueberstunden' => 0.0,
+      'abwesend_at' => 0.0, 'abwesend_kt' => 0,
       'perioden' => [], 'hinweise' => [],
     ];
     foreach ($abs as $a) {
@@ -516,12 +668,15 @@ function reportDaten(int $jahr, int $monat): array {
         case 'unbezahlt':    $z['unbezahlt'] += $at; break;
         case 'krank':        $z['krank_at'] += $at; $z['krank_kt'] += $kt; break;
         case 'kind_krank':   $z['kind_at'] += $at;  $z['kind_kt'] += $kt; break;
-        case 'mutterschutz': $z['mutterschutz_kt'] += $kt; break;
+        case 'mutterschutz': $z['mutterschutz_kt'] += $kt; $z['mutterschutz_at'] += $at; break;
+        case 'abwesend':     $z['sonstiges'] += $at; break;
         case 'fortbildung':  $z['fortbildung'] += $at; break;
         case 'berufsschule': $z['berufsschule'] += $at; break;
         case 'ueberstunden': $z['ueberstunden'] += $at; break;
       }
       // Zeitraeume, die in der Lohnabrechnung einzeln gebraucht werden
+      // Gesamte Abwesenheit von der Praxis (ohne Praxisschliessung)
+      if ($a['typ'] !== 'geschlossen') { $z['abwesend_at'] += $at; $z['abwesend_kt'] += $kt; }
       if (in_array($a['typ'], ['krank', 'kind_krank', 'unbezahlt', 'mutterschutz'], true) && ($at > 0 || $kt > 0)) {
         $z['perioden'][] = [
           'id' => $a['id'], 'typ' => $a['typ'],
@@ -538,7 +693,8 @@ function reportDaten(int $jahr, int $monat): array {
         }
       }
     }
-    foreach (['urlaub','sonderurlaub','unbezahlt','krank_at','kind_at','fortbildung','berufsschule','ueberstunden'] as $f) {
+    foreach (['urlaub','sonderurlaub','unbezahlt','krank_at','kind_at','fortbildung','berufsschule',
+              'ueberstunden','sonstiges','mutterschutz_at','abwesend_at'] as $f) {
       $z[$f] = round($z[$f], 1);
     }
     $k = $konten[$m['id']] ?? [];
@@ -553,9 +709,7 @@ function reportDaten(int $jahr, int $monat): array {
       $z['hinweise'][] = ($k['krank_12m_kalendertage']) . ' Krankheits-Kalendertage in den letzten '
         . '12 Monaten – Ende der Entgeltfortzahlung nach sechs Wochen prüfen.';
     }
-    $hat = $z['urlaub'] || $z['sonderurlaub'] || $z['unbezahlt'] || $z['krank_at'] || $z['kind_at']
-        || $z['mutterschutz_kt'] || $z['fortbildung'] || $z['berufsschule'] || $z['ueberstunden'];
-    $z['leer'] = $hat ? 0 : 1;
+    $z['leer'] = ($z['abwesend_at'] > 0 || $z['abwesend_kt'] > 0) ? 0 : 1;
     $zeilen[] = $z;
   }
   return ['von' => $von, 'bis' => $bis, 'jahr' => $jahr, 'monat' => $monat,
@@ -655,29 +809,43 @@ case 'state': {
     $x['halbtag'] = (int)$x['halbtag'];
     $x['kalendertage'] = (int)$x['kalendertage'];
     $x['nachweis'] = (int)$x['nachweis'];
+    $x['mail_am'] = (string)($x['mail_am'] ?? '');
   }
   unset($x);
   $bl = setting('bundesland', 'HH') ?? 'HH';
-  $istL    = istLeitung();
-  $eigene  = eigeneStaffId();
-  $details = setting('details_sichtbar', '1') === '1';
+  $istL   = istLeitung();
+  $eigene = eigeneStaffId();
+  // 'urlaub' (Vorgabe): von anderen ist nur Urlaub sichtbar - fuer die eigene Planung.
+  // 'alle': von anderen sind alle Arten sichtbar.
+  $sicht = setting('mitarbeiter_sicht', 'urlaub');
 
-  // Mitarbeiterinnen sehen fremde Eintraege ohne Notiz, auf Wunsch auch ohne Art
   if (!$istL) {
-    foreach ($abs as &$x) {
-      if ($x['staff_id'] !== $eigene) {
-        $x['notiz'] = '';
-        if (!$details) $x['typ'] = 'abwesend';
+    $gefiltert = [];
+    foreach ($abs as $x) {
+      if ($x['staff_id'] === $eigene) { $gefiltert[] = $x; continue; }
+      // Fremde Eintraege: nie Notizen, nie Nachweise
+      $x['notiz'] = '';
+      $x['nachweis'] = 0;
+      if ($sicht === 'alle') { $gefiltert[] = $x; continue; }
+      // Nur genehmigter Urlaub und Praxisschliessungen sind fuer die Planung sichtbar
+      if (in_array($x['typ'], ['urlaub', 'geschlossen'], true)
+          && in_array($x['status'], ['genehmigt', 'gemeldet'], true)) {
+        $gefiltert[] = $x;
       }
     }
-    unset($x);
+    $abs = $gefiltert;
   }
 
   $kt = konten($jahr);
   if (!$istL) $kt = isset($kt[$eigene]) ? [$eigene => $kt[$eigene]] : [];
 
-  $offen = 0;
-  foreach ($abs as $x) if ($x['status'] === 'beantragt') $offen++;
+  $offen = 0; $gemeldet = 0;
+  if ($istL) {
+    foreach ($abs as $x) {
+      if ($x['status'] === 'beantragt') $offen++;
+      elseif ($x['status'] === 'gemeldet') $gemeldet++;
+    }
+  }
 
   out([
     'setup' => false, 'angemeldet' => true,
@@ -685,9 +853,23 @@ case 'state': {
                  'staff_id' => $eigene],
     'leitung' => $istL,
     'offene_antraege' => $offen,
+    'krankmeldungen' => $gemeldet,
+    'krankmeldung_mail' => mailKonfig()['aktiv'] ? 1 : 0,
+    'mitarbeiter_sicht' => $sicht,
     'users' => $istL ? listUsers() : [],
-    'details_sichtbar' => $details ? 1 : 0,
     'stb_nachweise' => setting('stb_nachweise', '0') === '1' ? 1 : 0,
+    'mail' => $istL ? [
+      'aktiv' => setting('mail_aktiv', '0') === '1' ? 1 : 0,
+      'host' => setting('mail_host', 'smtp.ionos.de'),
+      'port' => (int)setting('mail_port', '587'),
+      'user' => setting('mail_user', ''),
+      'von' => setting('mail_von', ''),
+      'von_name' => setting('mail_von_name', setting('praxisname', 'Praxis')),
+      'an' => setting('mail_an', ''),
+      'cc' => setting('mail_cc', ''),
+      'pass_gesetzt' => setting('mail_pass', '') !== '' ? 1 : 0,
+      'aus_config' => isset($GLOBALS['CFG']['mail']) ? 1 : 0,
+    ] : null,
     'csrf' => $_SESSION['csrf'],
     'praxis' => setting('praxisname', 'Praxis'),
     'bundesland' => $bl,
@@ -832,8 +1014,11 @@ case 'del_staff': {
 
 case 'preview': {
   requireLogin();
+  if (istSteuerberater()) fail('keine_berechtigung', 403);
   $d = body() ?: $_GET;
-  $staff = ladeStaff(s($d, 'staff_id'));
+  $sid = s($d, 'staff_id');
+  if (!istLeitung() && $sid !== eigeneStaffId()) fail('keine_berechtigung', 403);
+  $staff = ladeStaff($sid);
   if (!$staff) fail('mitarbeiter_unbekannt');
   $von = s($d, 'von'); $bis = s($d, 'bis') ?: $von;
   if (!isDate($von) || !isDate($bis)) fail('datum_ungueltig');
@@ -860,7 +1045,8 @@ case 'save_absence': {
     $eigene = eigeneStaffId();
     if ($eigene === '') fail('kein_mitarbeiter_verknuepft', 403);
     $d['staff_id'] = $eigene;
-    $d['status'] = 'beantragt';
+    // Urlaub & Co. sind Antraege, eine Krankmeldung ist eine Meldung - sofort verbindlich
+    $d['status'] = in_array($typ, ['krank', 'kind_krank'], true) ? 'gemeldet' : 'beantragt';
     if ($id !== '') {
       $st = db()->prepare("SELECT * FROM " . t('absences') . " WHERE id = ?");
       $st->execute([$id]);
@@ -885,7 +1071,7 @@ case 'save_absence': {
 
   $pdo = db();
   $status = s($d, 'status', 'genehmigt');
-  if (!in_array($status, ['beantragt','genehmigt','abgelehnt','storniert'], true)) $status = 'genehmigt';
+  if (!in_array($status, ['beantragt','gemeldet','genehmigt','abgelehnt','storniert'], true)) $status = 'genehmigt';
   $notiz = mb_substr(s($d, 'notiz'), 0, 300);
   $nachweis = !empty($d['nachweis']) ? 1 : 0;
   $gespeichert = [];
@@ -910,7 +1096,16 @@ case 'save_absence': {
     }
   }
   logAction('eintrag_gespeichert', "$typ $von..$bis");
-  out(['ok' => true, 'ids' => $gespeichert]);
+
+  // Krankmeldung noch am selben Tag an die Steuerberatung schicken
+  $mail = null;
+  if (in_array($typ, ['krank', 'kind_krank'], true)) {
+    foreach ($gespeichert as $gid) {
+      $r = krankMailSenden($gid);
+      if (empty($r['still']) && empty($r['schon'])) $mail = $r;
+    }
+  }
+  out(['ok' => true, 'ids' => $gespeichert, 'mail' => $mail]);
 }
 
 case 'del_absence': {
@@ -965,8 +1160,28 @@ case 'save_settings': {
     setSetting('bundesland', $b);
     neuBerechnen(null);                      // Feiertage aendern die Arbeitstage
   }
-  if (isset($d['details_sichtbar'])) setSetting('details_sichtbar', !empty($d['details_sichtbar']) ? '1' : '0');
+  if (isset($d['mitarbeiter_sicht'])) {
+    $w = s($d, 'mitarbeiter_sicht', 'urlaub');
+    setSetting('mitarbeiter_sicht', in_array($w, ['urlaub', 'alle'], true) ? $w : 'urlaub');
+  }
   if (isset($d['stb_nachweise'])) setSetting('stb_nachweise', !empty($d['stb_nachweise']) ? '1' : '0');
+
+  // E-Mail-Versand
+  if (isset($d['mail_aktiv'])) setSetting('mail_aktiv', !empty($d['mail_aktiv']) ? '1' : '0');
+  foreach (['mail_host' => 190, 'mail_user' => 190, 'mail_von' => 190, 'mail_von_name' => 80,
+            'mail_an' => 400, 'mail_cc' => 400] as $feld => $laenge) {
+    if (isset($d[$feld])) setSetting($feld, mb_substr(s($d, $feld), 0, $laenge));
+  }
+  if (isset($d['mail_port'])) {
+    $port = (int)f($d, 'mail_port', 587);
+    setSetting('mail_port', (string)(in_array($port, [25, 465, 587, 2525], true) ? $port : 587));
+  }
+  // Passwort nur ersetzen, wenn eines eingegeben wurde - es wird nie zurueckgeliefert
+  if (isset($d['mail_pass']) && s($d, 'mail_pass') !== '') setSetting('mail_pass', s($d, 'mail_pass'));
+  if (!empty($d['mail_pass_loeschen'])) setSetting('mail_pass', '');
+  foreach (['mail_an', 'mail_cc'] as $feld) {
+    if (isset($d[$feld]) && s($d, $feld) !== '' && !mailAdressen(s($d, $feld))) fail('adresse_ungueltig');
+  }
   logAction('einstellungen_gespeichert');
   out(['ok' => true]);
 }
@@ -1232,7 +1447,7 @@ case 'report': {
   $monat = (int)($_GET['monat'] ?? 0);
   if ($jahr < 2000 || $jahr > 2100) $jahr = (int)date('Y');
   if ($monat < 0 || $monat > 12) $monat = 0;
-  out(reportDaten($jahr, $monat));
+  out(reportDaten($jahr, $monat, s($_GET, 'von'), s($_GET, 'bis')));
 }
 
 case 'report_csv': {
@@ -1241,7 +1456,7 @@ case 'report_csv': {
   $jahr  = (int)($_GET['jahr'] ?? date('Y'));
   $monat = (int)($_GET['monat'] ?? 0);
   if ($monat < 0 || $monat > 12) $monat = 0;
-  $d = reportDaten($jahr, $monat);
+  $d = reportDaten($jahr, $monat, s($_GET, 'von'), s($_GET, 'bis'));
   header_remove('Content-Type');
   header('Content-Type: text/csv; charset=utf-8');
   header('Content-Disposition: attachment; filename="fehlzeiten-' . $jahr
@@ -1250,14 +1465,16 @@ case 'report_csv': {
   fwrite($o, "\xEF\xBB\xBF");
   fputcsv($o, ['Zeitraum', $d['von'] . ' bis ' . $d['bis']], ';', '"', '');
   fputcsv($o, [], ';', '"', '');
-  fputcsv($o, ['Mitarbeiter','Rolle','Eintritt','Austritt','Urlaub (AT)','Sonderurlaub (AT)',
+  fputcsv($o, ['Mitarbeiter','Rolle','Eintritt','Austritt','Abwesend gesamt (AT)','Abwesend gesamt (KT)',
+               'Urlaub (AT)','Sonderurlaub (AT)',
                'Unbezahlt (AT)','Krank (AT)','Krank (KT)','Kind krank (AT)','Mutterschutz/Elternzeit (KT)',
-               'Fortbildung (AT)','Berufsschule (AT)','Ueberstundenabbau (AT)',
+               'Fortbildung (AT)','Berufsschule (AT)','Ueberstundenabbau (AT)','Sonstiges (AT)',
                'Urlaubsanspruch','Uebertrag','genommen','geplant','Resturlaub'], ';', '"', '');
   foreach ($d['zeilen'] as $z) {
-    fputcsv($o, [$z['name'], $z['rolle'], $z['eintritt'], $z['austritt'], $z['urlaub'], $z['sonderurlaub'],
+    fputcsv($o, [$z['name'], $z['rolle'], $z['eintritt'], $z['austritt'],
+                 $z['abwesend_at'], $z['abwesend_kt'], $z['urlaub'], $z['sonderurlaub'],
                  $z['unbezahlt'], $z['krank_at'], $z['krank_kt'], $z['kind_at'], $z['mutterschutz_kt'],
-                 $z['fortbildung'], $z['berufsschule'], $z['ueberstunden'],
+                 $z['fortbildung'], $z['berufsschule'], $z['ueberstunden'], $z['sonstiges'],
                  $z['konto']['anspruch'], $z['konto']['uebertrag'], $z['konto']['genommen'],
                  $z['konto']['geplant'], $z['konto']['rest']], ';', '"', '');
   }
@@ -1274,6 +1491,28 @@ case 'report_csv': {
   }
   fclose($o);
   exit;
+}
+
+case 'mail_test': {
+  requirePost(); requireLeitung(); requireCsrf();
+  $c = mailKonfig();
+  $an = mailAdressen($c['an']);
+  $cc = mailAdressen($c['cc']);
+  if (!$an) fail('keine_empfaenger');
+  $text = setting('praxisname', 'Praxis') . "\n\nTestnachricht des Praxis-Kalenders.\n\n"
+        . "Wenn Sie diese E-Mail erhalten, funktioniert der Versand der Krankmeldungen.\n"
+        . "Gesendet am " . date('d.m.Y H:i') . " Uhr.";
+  $r = smtpSenden($c, $an, $cc, 'Test: Krankmeldungen aus dem Praxis-Kalender', $text);
+  logAction('mail_test', $r['ok'] ? 'erfolgreich' : ('fehlgeschlagen: ' . ($r['fehler'] ?? '?')));
+  if (!$r['ok']) out(['ok' => false, 'fehler' => $r['fehler'] ?? 'unbekannt'], 200);
+  out(['ok' => true, 'an' => $an, 'cc' => $cc]);
+}
+
+case 'mail_erneut': {
+  requirePost(); requireLeitung(); requireCsrf();
+  $r = krankMailSenden(s(body(), 'id'), true);
+  if (!$r['ok']) out(['ok' => false, 'fehler' => $r['fehler'] ?? 'unbekannt'], 200);
+  out(['ok' => true]);
 }
 
 default:

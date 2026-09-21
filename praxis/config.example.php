@@ -27,6 +27,17 @@ return [
     'prefix' => 'praxis_',
   ],
 
+  // E-Mail-Versand der Krankmeldungen (optional).
+  // Die Zugangsdaten koennen auch bequem in der Anwendung unter
+  // Einstellungen eingetragen werden - dieser Block hat dann Vorrang.
+  // 'mail' => [
+  //   'host' => 'smtp.ionos.de',
+  //   'port' => 587,              // 587 = STARTTLS, 465 = SSL
+  //   'user' => 'praxis@ihre-domain.de',
+  //   'pass' => 'Postfach-Passwort',
+  //   'von'  => 'praxis@ihre-domain.de',
+  // ],
+
   'app' => [
     'name'     => 'Praxis-Kalender',
     'timezone' => 'Europe/Berlin',

@@ -56,7 +56,7 @@ alle Daten bleiben auf dem eigenen Server.
 |---|---|
 | **Kalender** | Oben der Heute-Streifen (wer ist da, wer fehlt) und offene Anträge. Darunter der Plan, umschaltbar zwischen **Monat** und **Ganzes Jahr**. Auf ein Feld tippen legt einen Eintrag an. |
 | **Urlaub** | Urlaubskonten aller: Anspruch, Übertrag, genommen, geplant, Rest – dazu Krank-, Kind-krank- und Fortbildungstage. |
-| **Lohn** | Fehlzeiten-Auswertung für die Lohnabrechnung, monatsweise oder fürs ganze Jahr, mit CSV-Export. |
+| **Auswertung** | Abwesenheiten und Fehlzeiten: **bis heute**, ganzes Jahr, ein Monat oder ein **eigener Zeitraum**. Ganz oben steht je Person „abwesend gesamt", darunter die Aufschlüsselung. Mit CSV-Export. |
 | **Team** | Personen anlegen und ändern; darunter die **Zugänge** zum Anmelden. |
 | **Einstellungen** | Praxisname, Bundesland, eigenes Passwort, CSV-Export. |
 
@@ -122,13 +122,49 @@ Im Kalender zeigt eine kleine Ecke in der Tagesspalte, dass ein Nachweis hinterl
 ist. Die Leitung sieht außerdem oben die Liste **„Nachweis fehlt noch"** – alle
 vergangenen Krank-, Kind-krank- und Fortbildungstage ohne Beleg.
 
+### Krankmeldung per E-Mail an die Steuerberatung
+
+Meldet sich jemand krank – ob selbst eingetragen oder von der Leitung erfasst –
+geht **am selben Tag automatisch** eine Nachricht an die Steuerberatung, mit der
+Praxisleitung in Kopie.
+
+Die Nachricht enthält: Name, Art (Arbeitsunfähigkeit oder Kind krank), Zeitraum,
+Arbeits- und Kalendertage, ob ein Nachweis in der Praxis vorliegt, und das
+Meldedatum. **Ohne Krankenschein im Anhang und ohne Diagnose.**
+
+Einrichtung unter *Einstellungen → Krankmeldung per E-Mail*:
+
+| Feld | Wert bei IONOS |
+|---|---|
+| Postausgangsserver | `smtp.ionos.de` |
+| Port | 587 (STARTTLS) oder 465 (SSL) |
+| Postfach / Benutzername | die volle E-Mail-Adresse des Praxis-Postfachs |
+| Passwort | Passwort dieses Postfachs |
+| Absenderadresse | dasselbe Postfach – sonst weist IONOS die Nachricht ab |
+| An | Adresse der Steuerberatung |
+| Kopie an (Cc) | Adresse von Frau Dr. Yar |
+
+Mit **Testnachricht senden** lässt sich das sofort prüfen. In der Karte
+*Krankmeldungen* steht bei jeder Meldung, ob sie versendet wurde; über
+**Erneut senden** geht sie noch einmal raus.
+
+Die Zugangsdaten lassen sich auch in `config.php` hinterlegen (Block `mail`),
+dann stehen sie nicht in der Datenbank. Das ist die sicherere Variante und hat
+Vorrang vor den Feldern in der Oberfläche.
+
+> Hinweis: E-Mail ist auf dem Transportweg verschlüsselt, aber nicht
+> Ende-zu-Ende. Deshalb enthält die Nachricht bewusst nur das Nötigste und
+> niemals eine Diagnose oder den Krankenschein.
+
 ## 3. Wer darf was
 
 | | Praxisleitung | Mitarbeiterin | Steuerberatung | ohne Zugang |
 |---|---|---|---|---|
-| Plan ansehen | ✔ | ✔ | – | – |
+| Plan ansehen | ✔ komplett | ✔ nur **Urlaub** der anderen | – | – |
 | Für **jede** Person eintragen, ändern, löschen | ✔ | – | – | – |
 | Für sich selbst Urlaub **beantragen** | ✔ (direkt gültig) | ✔ (Leitung genehmigt) | – | – |
+| Sich selbst **krank melden** | ✔ | ✔ (gilt sofort, danach gesperrt) | – | – |
+| Eigenen Antrag ändern/zurückziehen | ✔ | nur solange **offen** | – | – |
 | Urlaubskonto | ✔ alle | ✔ nur das eigene | ✔ nur Jahreswerte | – |
 | Nachweise hochladen | für alle | nur eigene | – | – |
 | Nachweise ansehen | alle | nur eigene | nur wenn freigegeben | – |
@@ -151,7 +187,16 @@ es geht nichts verloren.
   Kalender, keine Notizen, keine Zugänge, keine Einstellungen, standardmäßig auch
   keine hochgeladenen Krankenscheine. Diese Person muss **nicht** im Team stehen –
   Zugang einfach unter *Team → Zugänge → + Zugang* anlegen und die Rolle wählen.
-* **Rolle „Mitarbeiterin"** sieht den Plan, das eigene Konto und kann Urlaub beantragen.
+* **Rolle „Mitarbeiterin"**: sieht im Plan von den Kolleginnen **nur genehmigten
+  Urlaub** – damit sie ihren eigenen planen kann. Krankheit, Kind krank,
+  Fortbildung, Notizen und Nachweise der anderen bleiben verborgen. Die eigenen
+  Daten sieht sie vollständig.
+  * **Urlaub und ähnliche Wünsche** gehen als *Antrag* an die Leitung. Solange er
+    offen ist, kann sie ihn ändern oder zurückziehen; **sobald er genehmigt ist,
+    nicht mehr** – dann nur noch die Praxisleitung.
+  * Eine **Krankmeldung** gilt sofort und ist danach für sie gesperrt: ändern
+    oder löschen kann sie nur die Praxisleitung.
+  * Umstellbar unter *Einstellungen → Was Mitarbeiterinnen von anderen sehen*.
 * **Anmelden erlaubt** abschalten sperrt den Zugang, ohne etwas zu löschen (z. B. bei
   längerer Abwesenheit oder nach dem Austritt).
 * Ein Zugang kann auch **ohne Person** bestehen (reines Verwaltungskonto).

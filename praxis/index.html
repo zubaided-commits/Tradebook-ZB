@@ -81,6 +81,7 @@ td.d.ft{background:var(--ft)}
 td.d.today{outline:2px solid var(--accent);outline-offset:-2px;z-index:1}
 td.d .mark{position:absolute;inset:2px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.55rem;font-weight:700}
 td.d .mark.half{clip-path:polygon(0 0,100% 0,0 100%)}
+td.d .mark.offen{opacity:0.55;box-shadow:inset 0 0 0 2px #fff, inset 0 0 0 4px currentColor}
 tr.sum td{height:24px;font-size:0.58rem;color:var(--mut);text-align:center;font-weight:700;background:#f4f8f5}
 tr.sum td.low{background:#fee2e2;color:var(--bad)}
 .mon-head th{font-size:0.58rem;color:var(--accent);background:#fff;text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid var(--line)}
@@ -305,7 +306,9 @@ var FEHLER = {
   eigener_zugang:'Den eigenen Zugang können Sie nicht löschen.',
   zugang_deaktiviert:'Dieser Zugang ist gesperrt. Bitte an die Praxisleitung wenden.',
   kein_mitarbeiter_verknuepft:'Ihr Zugang ist noch keiner Person im Plan zugeordnet.',
-  keine_berechtigung:'Dafür fehlt Ihnen die Berechtigung.'
+  keine_berechtigung:'Dafür fehlt Ihnen die Berechtigung.',
+  keine_empfaenger:'Bitte zuerst die Adresse der Steuerberatung eintragen.',
+  adresse_ungueltig:'Bitte eine gültige E-Mail-Adresse eintragen.'
 };
 function fehlerText(e){
   if(!e) return 'Unbekannter Fehler.';
@@ -358,7 +361,7 @@ function render(){
   var tabs = S.steuerberater
     ? [['lohn','Lohnabrechnung'],['einst','Mein Zugang']]
     : (S.leitung
-        ? [['plan','Kalender'],['konten','Urlaub'],['lohn','Lohn'],['team','Team'],['einst','Einstellungen']]
+        ? [['plan','Kalender'],['konten','Urlaub'],['lohn','Auswertung'],['team','Team'],['einst','Einstellungen']]
         : [['plan','Kalender'],['meins','Mein Urlaub']]);
   if(tabs.filter(function(t){ return t[0]===VIEW; }).length === 0) VIEW = tabs[0][0];
   h += '<div class="tabs">'+tabs.map(function(t){
@@ -433,7 +436,9 @@ function zelle(m, datum, klass){
     var t = TY[a.typ] || {farbe:'#888', label:a.typ};
     var kurz = t.label.substr(0,1).toUpperCase();
     var blass = / frei\b/.test(klass) ? ';opacity:0.3' : '';
-    inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+blass+'">'+ (a.halbtag?'':kurz) +'</span>'
+    var offen = (a.status === 'beantragt') ? ' offen' : '';
+    inner = '<span class="mark'+(a.halbtag?' half':'')+offen+'" style="background:'+t.farbe+blass+'">'
+          + (a.halbtag?'':kurz) +'</span>'
           + (HATDATEI[a.id] ? '<span class="klammer" title="Nachweis vorhanden"></span>' : '');
   }
   var titel = a ? (TY[a.typ]?TY[a.typ].label:a.typ)+' · '+dmy(a.von)+'–'+dmy(a.bis)+(a.notiz?' · '+a.notiz:'') : dmy(datum);
@@ -478,7 +483,7 @@ function setPlanart(a){ PLANART = a; render(); }
 
 function viewPlan(){
   var h = heuteStreifen();
-  if(S.leitung){ h += antraegeKarte(); h += fehlendeNachweise(); }
+  if(S.leitung){ h += antraegeKarte(); h += krankmeldungenKarte(); h += fehlendeNachweise(); }
   h += '<div style="display:flex;gap:9px;align-items:center;margin-bottom:12px" class="noprint">'
      + '<div class="seg">'
      +   '<button class="'+(PLANART==='monat'?'on':'')+'" onclick="setPlanart(\'monat\')">Monat</button>'
@@ -524,6 +529,35 @@ function antraegeKarte(){
   });
   return h + '</div>';
 }
+/** Krankmeldungen, die eine Mitarbeiterin selbst eingetragen hat. */
+function krankmeldungenKarte(){
+  var neu = S.absences.filter(function(a){ return a.status === 'gemeldet'; })
+    .sort(function(a,b){ return a.von < b.von ? 1 : -1; });
+  if(!neu.length) return '';
+  var h = '<div class="card noprint"><h2>Krankmeldungen</h2>';
+  neu.forEach(function(a){
+    var m = S.staff.filter(function(x){ return x.id === a.staff_id; })[0] || {name:'?'};
+    var t = TY[a.typ] || {label:a.typ, farbe:'#888'};
+    h += '<div class="antrag"><span class="dot" style="background:'+t.farbe+'"></span>'
+      + '<div class="t"><b>'+esc(m.name)+'</b> · '+esc(t.label)+'<br>'
+      + '<span class="muted">'+zeitraum(a.von,a.bis)+' · '+tage(a.tage)
+      + (a.mail_am ? ' · an die Steuerberatung gemeldet' : (S.mail && S.mail.aktiv ? ' · <b>E-Mail nicht versendet</b>' : ''))
+      + '</span></div>'
+      + '<button class="btn small ghost" onclick="openEintragById(\''+a.id+'\')">Öffnen</button>'
+      + ((S.mail && S.mail.aktiv) ? '<button class="btn small ghost" onclick="mailErneut(\''+a.id+'\')">'
+         + (a.mail_am ? 'Erneut senden' : 'Jetzt senden')+'</button>' : '')
+      + '<button class="btn small" onclick="entscheiden(\''+a.id+'\',\'genehmigt\')">Zur Kenntnis</button></div>';
+  });
+  return h + '<p class="muted" style="margin-top:8px">Selbst gemeldete Krankheitstage gelten sofort. '
+     + 'Ändern oder löschen kann sie nur die Praxisleitung. „Zur Kenntnis" nimmt sie aus dieser Liste.</p></div>';
+}
+function mailErneut(id){
+  api('mail_erneut', {id:id}).then(function(r){
+    if(r.ok) return load().then(function(){ zeige('Krankmeldung versendet.', true); });
+    zeige('E-Mail nicht versendet: '+(r.fehler||'unbekannt'));
+  }).catch(function(e){ zeige(fehlerText(e)); });
+}
+
 /** Krankmeldungen und Fortbildungen, zu denen noch kein Nachweis hinterlegt ist. */
 function fehlendeNachweise(){
   var pflicht = {krank:1, kind_krank:1, fortbildung:1};
@@ -928,32 +962,64 @@ function delStaff(id){
 }
 
 // ------------------------------------------------------------------ Ansicht: Lohnabrechnung
-var MONATWAHL = new Date().getMonth() + 1;   // 0 = ganzes Jahr
+var MONATWAHL = new Date().getMonth() + 1;   // 0 = ganzes Jahr, -1 = bis heute, -2 = eigener Zeitraum
+var ZVON = '', ZBIS = '';
 var REPORT = null;
 
-function ladeReport(){
-  return api('report&jahr='+JAHR+'&monat='+MONATWAHL).then(function(r){ REPORT = r; render(); })
-    .catch(function(e){ zeige(fehlerText(e)); });
+function reportAdresse(basis){
+  if(MONATWAHL === -1) return basis+'&jahr='+JAHR+'&von='+JAHR+'-01-01&bis='+S.heute;
+  if(MONATWAHL === -2 && ZVON && ZBIS) return basis+'&jahr='+JAHR+'&von='+ZVON+'&bis='+ZBIS;
+  return basis+'&jahr='+JAHR+'&monat='+Math.max(0, MONATWAHL);
 }
-function monatWahl(m){ MONATWAHL = parseInt(m, 10); REPORT = null; ladeReport(); }
+var REPORT_KEY = null, REPORT_LAEDT = false;
+function reportSchluessel(){ return JAHR+'|'+MONATWAHL+'|'+ZVON+'|'+ZBIS; }
+function ladeReport(){
+  var k = reportSchluessel();
+  return api(reportAdresse('report')).then(function(r){
+    REPORT = r; REPORT_KEY = k; REPORT_LAEDT = false; render();
+  }).catch(function(e){ REPORT_LAEDT = false; zeige(fehlerText(e)); });
+}
+function monatWahl(m){
+  MONATWAHL = parseInt(m, 10);
+  REPORT_KEY = null;
+  if(MONATWAHL === -2){
+    if(!ZVON) ZVON = JAHR+'-01-01';
+    if(!ZBIS) ZBIS = S.heute;
+  }
+  ladeReport();
+}
+function zeitraumWahl(){
+  ZVON = el('r_von').value; ZBIS = el('r_bis').value;
+  if(ZVON && ZBIS && ZBIS >= ZVON){ REPORT_KEY = null; ladeReport(); }
+}
 
 function viewLohn(){
-  if(!REPORT || REPORT.jahr !== JAHR || REPORT.monat !== MONATWAHL){
-    ladeReport();
-    return '<div class="card"><p class="muted">Auswertung wird geladen …</p></div>';
+  if(REPORT_KEY !== reportSchluessel()){
+    if(!REPORT_LAEDT){ REPORT_LAEDT = true; ladeReport(); }
+    if(!REPORT) return '<div class="card"><p class="muted">Auswertung wird geladen …</p></div>';
   }
-  var opts = '<option value="0"'+(MONATWAHL===0?' selected':'')+'>Ganzes Jahr '+JAHR+'</option>'
+  var opts = '<option value="-1"'+(MONATWAHL===-1?' selected':'')+'>Bis heute (seit 01.01.'+JAHR+')</option>'
+    + '<option value="0"'+(MONATWAHL===0?' selected':'')+'>Ganzes Jahr '+JAHR+'</option>'
     + MNAME.map(function(n,i){
-        return '<option value="'+(i+1)+'"'+(MONATWAHL===i+1?' selected':'')+'>'+n+' '+JAHR+'</option>'; }).join('');
+        return '<option value="'+(i+1)+'"'+(MONATWAHL===i+1?' selected':'')+'>'+n+' '+JAHR+'</option>'; }).join('')
+    + '<option value="-2"'+(MONATWAHL===-2?' selected':'')+'>Eigener Zeitraum …</option>';
 
   var h = '<div class="card"><div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:6px">'
-    + '<b style="flex:1;font-size:1.05rem">Fehlzeiten für die Lohnabrechnung</b></div>'
-    + '<div class="row"><div><label>Zeitraum</label>'
-    + '<select onchange="monatWahl(this.value)">'+opts+'</select></div>'
-    + '<div style="display:flex;align-items:flex-end;gap:8px">'
-    + '<a class="btn ghost" style="margin:0;text-decoration:none;text-align:center" '
-    +   'href="api.php?a=report_csv&jahr='+JAHR+'&monat='+MONATWAHL+'">CSV für DATEV / Excel</a>'
-    + '<button class="btn ghost" style="margin:0" onclick="window.print()">Drucken</button></div></div>'
+    + '<b style="flex:1;font-size:1.05rem">'+(S.steuerberater ? 'Fehlzeiten für die Lohnabrechnung'
+      : 'Abwesenheiten und Fehlzeiten')+'</b></div>'
+    + '<div class="row'+(MONATWAHL === -2 ? ' three' : ' one')+'">'
+    +   '<div><label>Zeitraum</label><select onchange="monatWahl(this.value)">'+opts+'</select></div>'
+    +   (MONATWAHL === -2
+        ? '<div><label>Von</label><input id="r_von" type="date" value="'+esc(ZVON)+'" '
+          + 'onchange="zeitraumWahl()"></div>'
+          + '<div><label>Bis</label><input id="r_bis" type="date" value="'+esc(ZBIS)+'" '
+          + 'onchange="zeitraumWahl()"></div>'
+        : '')
+    + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+    +   '<a class="btn small ghost" style="text-decoration:none;text-align:center" '
+    +     'href="'+reportAdresse('api.php?a=report_csv')+'">CSV für DATEV / Excel</a>'
+    +   '<button class="btn small ghost" onclick="window.print()">Drucken</button></div>'
     + '<p class="muted">Zeitraum '+dmy(REPORT.von)+' bis '+dmy(REPORT.bis)+' · AT = Arbeitstage nach '
     + 'persönlichem Wochenmuster, KT = Kalendertage. Enthält keine Notizen und keine Diagnosen.</p></div>';
 
@@ -966,6 +1032,11 @@ function viewLohn(){
        + (z.eintritt ? ' · Eintritt '+dmy(z.eintritt) : '')
        + (z.austritt ? ' · Austritt '+dmy(z.austritt) : '')+'</span></div>';
     h += '<div class="kgrid">'
+       + '<div class="kbox rest"><div class="v">'+num(z.abwesend_at)+'</div>'
+       +   '<div class="l">abwesend gesamt (AT)</div></div>'
+       + '<div class="kbox"><div class="v">'+z.abwesend_kt+'</div>'
+       +   '<div class="l">abwesend gesamt (KT)</div></div>'
+       + '</div><div class="kgrid">'
        + kbox(z.urlaub,'Urlaub (AT)')
        + kbox(z.krank_at,'Krank (AT)')
        + '<div class="kbox"><div class="v">'+z.krank_kt+'</div><div class="l">Krank (KT)</div></div>'
@@ -979,6 +1050,7 @@ function viewLohn(){
     if(z.fortbildung) weitere += kbox(z.fortbildung,'Fortbildung (AT)');
     if(z.berufsschule) weitere += kbox(z.berufsschule,'Berufsschule (AT)');
     if(z.ueberstunden) weitere += kbox(z.ueberstunden,'Überstunden (AT)');
+    if(z.sonstiges) weitere += kbox(z.sonstiges,'Sonstiges (AT)');
     if(weitere) h += '<div class="kgrid">'+weitere+'</div>';
 
     if(z.perioden.length){
@@ -1042,7 +1114,8 @@ function viewMeins(){
   meine.forEach(function(a){
     var t = TY[a.typ] || {label:a.typ, farbe:'#888'};
     var st = a.status === 'beantragt' ? ' · <b>wartet auf Genehmigung</b>'
-           : (a.status === 'abgelehnt' ? ' · abgelehnt' : '');
+           : (a.status === 'abgelehnt' ? ' · abgelehnt'
+           : (a.status === 'gemeldet' ? ' · gemeldet – Änderung nur durch die Praxisleitung' : ''));
     h += '<div class="item"><span class="dot" style="background:'+t.farbe+'"></span>'
       + '<div class="t"><b>'+esc(t.label)+'</b><span>'+zeitraum(a.von,a.bis)+' · '+tage(a.tage)+st
       + (HATDATEI[a.id] ? ' · '+HATDATEI[a.id]+' Nachweis'+(HATDATEI[a.id]>1?'e':'') : '')+'</span></div>'
@@ -1083,15 +1156,20 @@ function viewEinst(){
   return '<div class="card"><h2>Praxis</h2>'
    + '<div class="row"><div><label>Name der Praxis</label><input id="e_praxis" value="'+esc(S.praxis)+'"></div>'
    + '<div><label>Bundesland</label><select id="e_bl">'+bl+'</select></div></div>'
-   + '<div class="row one"><div><label><input type="checkbox" id="e_det" '+(S.details_sichtbar?'checked':'')
-   + ' style="width:auto;margin-right:6px">Mitarbeiterinnen sehen im Plan auch die <b>Art</b> der Abwesenheit</label>'
-   + '<p class="muted">Ausgeschaltet sehen sie nur, <i>dass</i> jemand fehlt – nicht, ob Urlaub oder Krankheit. '
-   + 'Das eigene Konto sieht jede Person immer vollständig.</p></div></div>'
+   + '<div class="row one"><div><label>Was Mitarbeiterinnen von anderen sehen</label>'
+   + '<select id="e_sicht">'
+   +   '<option value="urlaub"'+(S.mitarbeiter_sicht!=='alle'?' selected':'')+'>Nur Urlaub (empfohlen)</option>'
+   +   '<option value="alle"'+(S.mitarbeiter_sicht==='alle'?' selected':'')+'>Alle Arten der Abwesenheit</option>'
+   + '</select>'
+   + '<p class="muted">Bei <b>Nur Urlaub</b> sehen Mitarbeiterinnen im Plan ausschließlich genehmigten Urlaub '
+   + 'der Kolleginnen – zur eigenen Planung. Krankheit, Kind krank, Fortbildung, Notizen und Nachweise anderer '
+   + 'bleiben verborgen. Die eigenen Daten sieht jede Person immer vollständig.</p></div></div>'
    + '<div class="row one"><div><label><input type="checkbox" id="e_stb" '+(S.stb_nachweise?'checked':'')
    + ' style="width:auto;margin-right:6px">Die Steuerberatung darf hochgeladene <b>Krankenscheine öffnen</b></label>'
    + '<p class="muted">Standardmäßig aus. Für die Lohnabrechnung und die U1-Erstattung genügen in aller Regel '
    + 'die Zeiträume – der Krankenschein selbst gehört in die Personalakte der Praxis.</p></div></div>'
    + '<button class="btn" onclick="saveEinst()">Speichern</button></div>'
+   + mailKarte()
    + '<div class="card"><h2>Passwort ändern</h2>'
    + '<div class="row"><div><label>Aktuelles Passwort</label><input id="p_alt" type="password"></div>'
    + '<div><label>Neues Passwort (mind. 10 Zeichen)</label><input id="p_neu" type="password"></div></div>'
@@ -1139,9 +1217,80 @@ function wochentag(datum){
   var d = new Date(datum+'T12:00:00');
   return WTAG[(d.getDay()+6)%7];
 }
+/** Einstellungen fuer die automatische Krankmeldung per E-Mail. */
+function mailKarte(){
+  var m = S.mail || {};
+  if(m.aus_config){
+    return '<div class="card"><h2>Krankmeldung per E-Mail</h2>'
+      + '<p class="muted">Die Zugangsdaten stehen in <code>config.php</code> und werden hier nicht angezeigt. '
+      + 'Empfänger und An/Aus lassen sich trotzdem hier pflegen.</p>'
+      + mailEmpfaengerFelder(m) + '</div>';
+  }
+  return '<div class="card"><h2>Krankmeldung per E-Mail</h2>'
+    + '<p class="muted" style="margin-bottom:12px">Meldet sich jemand krank, geht am selben Tag automatisch '
+    + 'eine Nachricht an die Steuerberatung – <b>ohne Krankenschein im Anhang</b> und ohne Diagnose. '
+    + 'Es werden nur Name, Art, Zeitraum und Tage übermittelt.</p>'
+    + mailEmpfaengerFelder(m)
+    + '<div class="row"><div><label>Postausgangsserver (SMTP)</label>'
+    +   '<input id="m_host" value="'+esc(m.host||'smtp.ionos.de')+'" placeholder="smtp.ionos.de"></div>'
+    + '<div><label>Port</label><select id="m_port">'
+    +   '<option value="587"'+(m.port!==465?' selected':'')+'>587 (STARTTLS, empfohlen)</option>'
+    +   '<option value="465"'+(m.port===465?' selected':'')+'>465 (SSL)</option>'
+    + '</select></div></div>'
+    + '<div class="row"><div><label>Postfach / Benutzername</label>'
+    +   '<input id="m_user" autocapitalize="off" value="'+esc(m.user||'')+'" '
+    +   'placeholder="praxis@hausarztpraxis-dr-yar-hamburg.de"></div>'
+    + '<div><label>Passwort des Postfachs'+(m.pass_gesetzt?' (gesetzt)':'')+'</label>'
+    +   '<input id="m_pass" type="password" autocomplete="new-password" placeholder="'
+    +   (m.pass_gesetzt?'unverändert lassen':'Passwort')+'"></div></div>'
+    + '<div class="row"><div><label>Absenderadresse</label>'
+    +   '<input id="m_von" autocapitalize="off" value="'+esc(m.von||'')+'" '
+    +   'placeholder="praxis@hausarztpraxis-dr-yar-hamburg.de"></div>'
+    + '<div><label>Absendername</label><input id="m_vonname" value="'+esc(m.von_name||S.praxis)+'"></div></div>'
+    + '<button class="btn" onclick="saveMail()">E-Mail-Einstellungen speichern</button>'
+    + '<button class="btn ghost" onclick="mailTest()">Testnachricht senden</button>'
+    + '<div class="hilfe">Bei IONOS: Postfach unter <b>E-Mail</b> im Control Panel anlegen, dann hier '
+    + 'die volle Adresse als Benutzername und das Postfach-Passwort eintragen. Absenderadresse muss '
+    + 'dasselbe Postfach sein, sonst weist IONOS die Nachricht ab.</div></div>';
+}
+function mailEmpfaengerFelder(m){
+  return '<div class="row one"><div><label><input type="checkbox" id="m_aktiv" '+(m.aktiv?'checked':'')
+    + ' style="width:auto;margin-right:6px">Krankmeldungen automatisch versenden</label></div></div>'
+    + '<div class="row"><div><label>An: Steuerberatung</label>'
+    +   '<input id="m_an" autocapitalize="off" value="'+esc(m.an||'')+'" placeholder="kanzlei@steuerberater.de"></div>'
+    + '<div><label>Kopie an (Cc)</label>'
+    +   '<input id="m_cc" autocapitalize="off" value="'+esc(m.cc||'')+'" '
+    +   'placeholder="dr.yar@hausarztpraxis-dr-yar-hamburg.de"></div></div>';
+}
+function mailFelder(){
+  var d = {mail_aktiv: el('m_aktiv').checked ? 1 : 0,
+           mail_an: el('m_an').value, mail_cc: el('m_cc').value};
+  if(el('m_host')){
+    d.mail_host = el('m_host').value; d.mail_port = el('m_port').value;
+    d.mail_user = el('m_user').value; d.mail_von = el('m_von').value;
+    d.mail_von_name = el('m_vonname').value;
+    if(el('m_pass').value) d.mail_pass = el('m_pass').value;
+  }
+  return d;
+}
+function saveMail(){
+  api('save_settings', mailFelder()).then(load)
+   .then(function(){ zeige('E-Mail-Einstellungen gespeichert.', true); })
+   .catch(function(e){ zeige(fehlerText(e)); });
+}
+function mailTest(){
+  api('save_settings', mailFelder())
+   .then(function(){ return api('mail_test', {}); })
+   .then(function(r){
+      if(r.ok) zeige('Testnachricht verschickt an '+r.an.join(', ')+(r.cc.length?' (Kopie: '+r.cc.join(', ')+')':''), true);
+      else zeige('Nicht verschickt: '+(r.fehler||'unbekannt'));
+      return load();
+   })
+   .catch(function(e){ zeige(fehlerText(e)); });
+}
 function saveEinst(){
   api('save_settings', {praxisname:el('e_praxis').value, bundesland:el('e_bl').value,
-                        details_sichtbar: el('e_det') && el('e_det').checked ? 1 : 0,
+                        mitarbeiter_sicht: el('e_sicht') ? el('e_sicht').value : 'urlaub',
                         stb_nachweise: el('e_stb') && el('e_stb').checked ? 1 : 0})
    .then(load).then(function(){ zeige('Gespeichert.', true); })
    .catch(function(e){ zeige(fehlerText(e)); });
@@ -1256,6 +1405,11 @@ function openEintrag(a){
    + '<input id="a_notiz" maxlength="120" value="'+esc(a.notiz||'')+'"></div></div>'
    + '<div id="a_nachweisbox">' + nachweisBereich(a, typ, istL) + '</div>'
    + '<div id="a_vorschau" class="ok" style="display:none"></div>'
+   + (istL ? '' : '<div class="hilfe">Urlaub und ähnliche Wünsche gehen als <b>Antrag</b> an die '
+       + 'Praxisleitung und gelten erst nach der Genehmigung. Eine <b>Krankmeldung</b> gilt sofort – '
+       + 'ändern oder löschen kann sie danach nur die Praxisleitung.'
+       + ((S.krankmeldung_mail) ? ' Sie wird am selben Tag an die Steuerberatung gemeldet.' : '')
+       + '</div>')
    + (darfLoeschen ? '<button class="btn danger" onclick="delEintrag(\''+a.id+'\')">Eintrag löschen</button>' : ''),
      function(){
        var liste = zeitraeume();
@@ -1282,7 +1436,7 @@ function openEintrag(a){
        });
        return kette.then(function(){ return dateienHochladen(ersteId); });
      },
-     istL ? 'Speichern' : 'Antrag senden');
+     istL ? 'Speichern' : (istKrankArt(typ) ? 'Krankmeldung senden' : 'Antrag senden'));
   nachweisSichtbarkeit();
   vorschau();
 }
@@ -1395,10 +1549,15 @@ function zeitraeume(){
     return {von: z.querySelector('.zvon').value, bis: z.querySelector('.zbis').value};
   }).filter(function(z){ return z.von && z.bis; });
 }
+function istKrankArt(typ){ return typ === 'krank' || typ === 'kind_krank'; }
 function typWahl(b){
   Array.prototype.forEach.call(document.querySelectorAll('#a_typen button'), function(x){
     x.classList.remove('on'); });
   b.classList.add('on');
+  var knopf = el('dlg_save');
+  if(knopf && !S.leitung){
+    knopf.textContent = istKrankArt(b.getAttribute('data-typ')) ? 'Krankmeldung senden' : 'Antrag senden';
+  }
   el('a_typ').value = b.getAttribute('data-typ');
   artAnpassen();
   nachweisSichtbarkeit();
@@ -1555,8 +1714,19 @@ function dialog(titel, inhalt, onSave, saveLabel){
   if(!onSave) return;
   el('dlg_save').onclick = function(){
     el('dlg_save').disabled = true;
-    Promise.resolve(onSave()).then(function(){ closeDialog(); return load(); })
-      .then(function(){ zeige('Gespeichert.', true); })
+    Promise.resolve(onSave()).then(function(r){
+        closeDialog();
+        return load().then(function(){ return r; });
+      })
+      .then(function(r){
+        if(r && r.mail && r.mail.ok === false){
+          zeige('Gespeichert – aber die E-Mail an die Steuerberatung ging nicht raus: '+(r.mail.fehler||''));
+        } else if(r && r.mail && r.mail.ok){
+          zeige('Gespeichert und an die Steuerberatung gemeldet.', true);
+        } else {
+          zeige('Gespeichert.', true);
+        }
+      })
       .catch(function(e){
         var b = el('dlg_fehler'); if(b) b.innerHTML = '<div class="err">'+esc(fehlerText(e))+'</div>';
         var s = el('dlg_save'); if(s) s.disabled = false;
