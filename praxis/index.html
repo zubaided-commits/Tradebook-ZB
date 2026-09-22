@@ -1247,8 +1247,13 @@ function mailKarte(){
     +   '<input id="m_von" autocapitalize="off" value="'+esc(m.von||'')+'" '
     +   'placeholder="praxis@hausarztpraxis-dr-yar-hamburg.de"></div>'
     + '<div><label>Absendername</label><input id="m_vonname" value="'+esc(m.von_name||S.praxis)+'"></div></div>'
+    + '<div class="row one"><div><label>Versandweg</label><select id="m_art">'
+    +   '<option value="smtp"'+(m.art!=='php'?' selected':'')+'>Über den Postausgangsserver (empfohlen)</option>'
+    +   '<option value="php"'+(m.art==='php'?' selected':'')+'>Über PHP mail() – falls der erste Weg gesperrt ist</option>'
+    + '</select></div></div>'
     + '<button class="btn" onclick="saveMail()">E-Mail-Einstellungen speichern</button>'
     + '<button class="btn ghost" onclick="mailTest()">Testnachricht senden</button>'
+    + '<button class="btn ghost" onclick="mailDiagnose()">Verbindung prüfen</button>'
     + '<div class="hilfe">Bei IONOS: Postfach unter <b>E-Mail</b> im Control Panel anlegen, dann hier '
     + 'die volle Adresse als Benutzername und das Postfach-Passwort eintragen. Absenderadresse muss '
     + 'dasselbe Postfach sein, sonst weist IONOS die Nachricht ab.</div></div>';
@@ -1265,6 +1270,7 @@ function mailEmpfaengerFelder(m){
 function mailFelder(){
   var d = {mail_aktiv: el('m_aktiv').checked ? 1 : 0,
            mail_an: el('m_an').value, mail_cc: el('m_cc').value};
+  if(el('m_art')) d.mail_art = el('m_art').value;
   if(el('m_host')){
     d.mail_host = el('m_host').value; d.mail_port = el('m_port').value;
     d.mail_user = el('m_user').value; d.mail_von = el('m_von').value;
@@ -1278,12 +1284,73 @@ function saveMail(){
    .then(function(){ zeige('E-Mail-Einstellungen gespeichert.', true); })
    .catch(function(e){ zeige(fehlerText(e)); });
 }
+function mailDiagnose(){
+  dialog('Verbindung prüfen', '<p class="muted">Der Server wird geprüft – das dauert einen Moment …</p>', null);
+  api('save_settings', mailFelder())
+   .then(function(){ return api('mail_diagnose', {}); })
+   .then(function(r){
+      var h = r.schritte.map(function(s){
+        return '<div class="item"><span class="dot" style="background:'
+          + (s.ok ? 'var(--accent)' : 'var(--bad)')+'"></span>'
+          + '<div class="t"><b>'+(s.ok ? '' : 'Problem: ')+esc(s.titel)+'</b>'
+          + '<span>'+esc(s.text)+'</span></div></div>';
+      }).join('');
+      var probleme = r.schritte.filter(function(s){ return !s.ok; });
+      var rat = '';
+      if(probleme.length){
+        var t = probleme.map(function(p){ return p.titel; }).join(' ');
+        if(/stream_socket_client/.test(t))
+          rat = 'Ihr Hoster erlaubt keine eigenen Verbindungen nach außen. Stellen Sie den '
+              + '<b>Versandweg auf „Über PHP mail()"</b> um und testen Sie erneut.';
+        else if(/Port/.test(t) && probleme.filter(function(p){ return /Port/.test(p.titel); }).length >= 3)
+          rat = 'Kein Port des Mailservers ist erreichbar – vermutlich blockt der Hoster den Versand. '
+              + 'Stellen Sie den <b>Versandweg auf „Über PHP mail()"</b> um.';
+        else if(/Anmeldung/.test(t))
+          rat = 'Benutzername oder Passwort stimmen nicht. Der Benutzername ist die <b>vollständige '
+              + 'E-Mail-Adresse</b> des Postfachs, das Passwort ist das des Postfachs – nicht das '
+              + 'IONOS-Kundenkonto.';
+        else if(/Absender/.test(t))
+          rat = 'Absenderadresse und Postfach müssen identisch sein.';
+        else if(/Angaben/.test(t))
+          rat = 'Bitte die fehlenden Felder ausfüllen und erneut prüfen.';
+        else if(/wäre erreichbar/.test(t))
+          rat = 'Der eingestellte Port ist zu, ein anderer geht. Bitte im Feld <b>Port</b> umstellen '
+              + 'und erneut prüfen.';
+        else if(/Verbindung zum Mailserver|Port/.test(t))
+          rat = 'Der Mailserver ist von Ihrem Webspace aus nicht erreichbar. Bitte die Schreibweise von '
+              + '<b>smtp.ionos.de</b> prüfen. Bleibt es dabei, stellen Sie den <b>Versandweg auf '
+              + '„Über PHP mail()"</b> um – das geht auch, wenn der Hoster den direkten Versand sperrt.';
+        else if(/Verschlüsselung/.test(t))
+          rat = 'Die Verschlüsselung kam nicht zustande. Bitte den anderen Port probieren '
+              + '(587 statt 465 oder umgekehrt).';
+        else
+          rat = 'Bitte den ersten rot markierten Punkt beheben: <b>'+esc(probleme[0].titel)+'</b> – '
+              + esc(probleme[0].text);
+      } else {
+        rat = 'Alles in Ordnung. Wenn die Testnachricht trotzdem nicht ankommt, bitte den '
+            + '<b>Spam-Ordner</b> prüfen.';
+      }
+      dialog('Verbindung prüfen', h + '<div class="'+(probleme.length?'err':'ok')+'" style="margin-top:10px">'
+        + rat + '</div>', null);
+   })
+   .catch(function(e){ zeige(fehlerText(e)); });
+}
 function mailTest(){
   api('save_settings', mailFelder())
    .then(function(){ return api('mail_test', {}); })
    .then(function(r){
-      if(r.ok) zeige('Testnachricht verschickt an '+r.an.join(', ')+(r.cc.length?' (Kopie: '+r.cc.join(', ')+')':''), true);
-      else zeige('Nicht verschickt: '+(r.fehler||'unbekannt'));
+      if(r.ok){
+        dialog('Testnachricht verschickt',
+          '<p style="font-size:0.95rem;line-height:1.7">Die Nachricht ging an <b>'+esc(r.an.join(', '))+'</b>'
+          + (r.cc.length ? ' mit Kopie an <b>'+esc(r.cc.join(', '))+'</b>' : '')+'.</p>'
+          + '<p class="muted">Kommt sie nicht an, bitte im <b>Spam-Ordner</b> nachsehen. '
+          + 'Manche Postfächer brauchen ein bis zwei Minuten.</p>', null);
+      } else {
+        dialog('Testnachricht nicht verschickt',
+          '<div class="err">'+esc(r.fehler||'unbekannt')+'</div>'
+          + '<p class="muted">Tippen Sie auf <b>Verbindung prüfen</b> – dort steht Schritt für Schritt, '
+          + 'woran es liegt.</p>', null);
+      }
       return load();
    })
    .catch(function(e){ zeige(fehlerText(e)); });

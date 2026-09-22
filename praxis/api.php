@@ -481,6 +481,7 @@ function mailKonfig(): array {
   $c = $CFG['mail'] ?? [];
   return [
     'aktiv'    => setting('mail_aktiv', '0') === '1',
+    'art'      => setting('mail_art', 'smtp'),
     'host'     => (string)($c['host'] ?? setting('mail_host', 'smtp.ionos.de')),
     'port'     => (int)   ($c['port'] ?? setting('mail_port', '587')),
     'user'     => (string)($c['user'] ?? setting('mail_user', '')),
@@ -506,15 +507,16 @@ function mimeKopf(string $text): string {
 /** Kleiner SMTP-Client: Port 465 direkt ueber SSL, sonst STARTTLS. */
 function smtpSenden(array $c, array $an, array $cc, string $betreff, string $text): array {
   if ($c['host'] === '' || $c['user'] === '' || $c['pass'] === '' || $c['von'] === '') {
-    return ['ok' => false, 'fehler' => 'E-Mail-Zugangsdaten unvollständig'];
+    return ['ok' => false, 'stufe' => 'angaben', 'fehler' => 'E-Mail-Zugangsdaten unvollständig'];
   }
-  if (!$an) return ['ok' => false, 'fehler' => 'Keine Empfängeradresse hinterlegt'];
+  if (!$an) return ['ok' => false, 'stufe' => 'angaben', 'fehler' => 'Keine Empfängeradresse hinterlegt'];
 
   $ziel = ($c['port'] === 465 ? 'ssl://' : '') . $c['host'] . ':' . $c['port'];
   $ctx = stream_context_create(['ssl' => ['verify_peer' => true, 'verify_peer_name' => true,
                                           'SNI_enabled' => true, 'peer_name' => $c['host']]]);
   $fp = @stream_socket_client($ziel, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $ctx);
-  if (!$fp) return ['ok' => false, 'fehler' => 'Verbindung zum Mailserver nicht möglich (' . $errstr . ')'];
+  if (!$fp) return ['ok' => false, 'stufe' => 'verbindung',
+                    'fehler' => 'Verbindung zum Mailserver nicht möglich (' . $errstr . ')'];
   stream_set_timeout($fp, 15);
 
   $lesen = function () use ($fp) {
@@ -528,27 +530,33 @@ function smtpSenden(array $c, array $an, array $cc, string $betreff, string $tex
   $senden = function (string $befehl) use ($fp, $lesen) { fwrite($fp, $befehl . "\r\n"); return $lesen(); };
   $code = fn(string $a) => (int)substr(trim($a), 0, 3);
 
-  $schluss = function (string $fehler) use ($fp) { @fclose($fp); return ['ok' => false, 'fehler' => $fehler]; };
+  $schluss = function (string $stufe, string $fehler) use ($fp) {
+    @fclose($fp);
+    return ['ok' => false, 'stufe' => $stufe, 'fehler' => $fehler];
+  };
 
-  if ($code($lesen()) !== 220) return $schluss('Mailserver meldet sich nicht');
+  if ($code($lesen()) !== 220) return $schluss('verbindung', 'Mailserver meldet sich nicht');
   $host = $_SERVER['HTTP_HOST'] ?? 'praxis';
-  if ($code($senden('EHLO ' . $host)) !== 250) return $schluss('EHLO abgelehnt');
+  if ($code($senden('EHLO ' . $host)) !== 250) return $schluss('verbindung', 'EHLO abgelehnt');
   if ($c['port'] !== 465) {
-    if ($code($senden('STARTTLS')) !== 220) return $schluss('STARTTLS nicht möglich');
+    if ($code($senden('STARTTLS')) !== 220) return $schluss('tls', 'STARTTLS nicht möglich');
     if (!@stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
-      return $schluss('Verschlüsselung fehlgeschlagen');
+      return $schluss('tls', 'Verschlüsselung fehlgeschlagen');
     }
-    if ($code($senden('EHLO ' . $host)) !== 250) return $schluss('EHLO nach STARTTLS abgelehnt');
+    if ($code($senden('EHLO ' . $host)) !== 250) return $schluss('tls', 'EHLO nach STARTTLS abgelehnt');
   }
-  if ($code($senden('AUTH LOGIN')) !== 334) return $schluss('Anmeldung nicht möglich');
-  if ($code($senden(base64_encode($c['user']))) !== 334) return $schluss('Benutzername abgelehnt');
-  if ($code($senden(base64_encode($c['pass']))) !== 235) return $schluss('Passwort abgelehnt');
-  if ($code($senden('MAIL FROM:<' . $c['von'] . '>')) !== 250) return $schluss('Absender abgelehnt');
+  if ($code($senden('AUTH LOGIN')) !== 334) return $schluss('anmeldung', 'Anmeldung nicht möglich');
+  if ($code($senden(base64_encode($c['user']))) !== 334) return $schluss('anmeldung', 'Benutzername abgelehnt');
+  $pw = trim($senden(base64_encode($c['pass'])));
+  if ($code($pw) !== 235) return $schluss('anmeldung', 'Passwort abgelehnt (' . mb_substr($pw, 0, 60) . ')');
+  if ($code($senden('MAIL FROM:<' . $c['von'] . '>')) !== 250) {
+    return $schluss('absender', 'Absenderadresse abgelehnt – sie muss dem Postfach entsprechen');
+  }
   foreach (array_merge($an, $cc) as $e) {
     $r = $code($senden('RCPT TO:<' . $e . '>'));
-    if ($r !== 250 && $r !== 251) return $schluss('Empfänger abgelehnt: ' . $e);
+    if ($r !== 250 && $r !== 251) return $schluss('empfaenger', 'Empfänger abgelehnt: ' . $e);
   }
-  if ($code($senden('DATA')) !== 354) return $schluss('DATA abgelehnt');
+  if ($code($senden('DATA')) !== 354) return $schluss('daten', 'DATA abgelehnt');
 
   $kopf = 'From: ' . mimeKopf($c['von_name']) . ' <' . $c['von'] . '>' . "\r\n"
         . 'To: ' . implode(', ', $an) . "\r\n"
@@ -561,10 +569,34 @@ function smtpSenden(array $c, array $an, array $cc, string $betreff, string $tex
         . 'Content-Transfer-Encoding: base64' . "\r\n"
         . 'Auto-Submitted: auto-generated' . "\r\n\r\n";
   fwrite($fp, $kopf . chunk_split(base64_encode($text), 76, "\r\n") . "\r\n.\r\n");
-  if ($code($lesen()) !== 250) return $schluss('Nachricht wurde nicht angenommen');
+  if ($code($lesen()) !== 250) return $schluss('daten', 'Nachricht wurde nicht angenommen');
   $senden('QUIT');
   @fclose($fp);
-  return ['ok' => true];
+  return ['ok' => true, 'stufe' => 'ok'];
+}
+
+/** Versand ueber die PHP-Funktion mail() - Rueckfallweg, wenn SMTP gesperrt ist. */
+function phpMailSenden(array $c, array $an, array $cc, string $betreff, string $text): array {
+  if (!function_exists('mail')) return ['ok' => false, 'fehler' => 'Die Funktion mail() ist auf dem Server gesperrt'];
+  if (!$an) return ['ok' => false, 'fehler' => 'Keine Empfängeradresse hinterlegt'];
+  $von = $c['von'] !== '' ? $c['von'] : $c['user'];
+  if ($von === '') return ['ok' => false, 'fehler' => 'Keine Absenderadresse hinterlegt'];
+  $kopf = 'From: ' . mimeKopf($c['von_name']) . ' <' . $von . '>' . "\r\n"
+        . ($cc ? 'Cc: ' . implode(', ', $cc) . "\r\n" : '')
+        . 'MIME-Version: 1.0' . "\r\n"
+        . 'Content-Type: text/plain; charset=UTF-8' . "\r\n"
+        . 'Content-Transfer-Encoding: base64' . "\r\n"
+        . 'Auto-Submitted: auto-generated';
+  $ok = @mail(implode(', ', $an), mimeKopf($betreff),
+              chunk_split(base64_encode($text), 76, "\r\n"), $kopf, '-f' . $von);
+  return $ok ? ['ok' => true]
+             : ['ok' => false, 'fehler' => 'Der Server hat die Nachricht nicht angenommen (mail() meldet Fehler)'];
+}
+/** Versand ueber den eingestellten Weg. */
+function mailVersenden(array $c, array $an, array $cc, string $betreff, string $text): array {
+  return ($c['art'] === 'php')
+    ? phpMailSenden($c, $an, $cc, $betreff, $text)
+    : smtpSenden($c, $an, $cc, $betreff, $text);
 }
 
 /** Text der Krankmeldung - ohne Diagnose, ohne Anhang. */
@@ -608,7 +640,7 @@ function krankMailSenden(string $absenceId, bool $erneut = false): array {
   if (!$m) return ['ok' => false, 'fehler' => 'Person nicht gefunden'];
 
   $inhalt = krankMailText($m, $a);
-  $r = smtpSenden($c, mailAdressen($c['an']), mailAdressen($c['cc']), $inhalt['betreff'], $inhalt['text']);
+  $r = mailVersenden($c, mailAdressen($c['an']), mailAdressen($c['cc']), $inhalt['betreff'], $inhalt['text']);
   if ($r['ok']) {
     db()->prepare("UPDATE " . t('absences') . " SET mail_am = ? WHERE id = ?")
        ->execute([date('c'), $absenceId]);
@@ -860,6 +892,7 @@ case 'state': {
     'stb_nachweise' => setting('stb_nachweise', '0') === '1' ? 1 : 0,
     'mail' => $istL ? [
       'aktiv' => setting('mail_aktiv', '0') === '1' ? 1 : 0,
+      'art' => setting('mail_art', 'smtp'),
       'host' => setting('mail_host', 'smtp.ionos.de'),
       'port' => (int)setting('mail_port', '587'),
       'user' => setting('mail_user', ''),
@@ -1168,6 +1201,7 @@ case 'save_settings': {
 
   // E-Mail-Versand
   if (isset($d['mail_aktiv'])) setSetting('mail_aktiv', !empty($d['mail_aktiv']) ? '1' : '0');
+  if (isset($d['mail_art'])) setSetting('mail_art', s($d, 'mail_art') === 'php' ? 'php' : 'smtp');
   foreach (['mail_host' => 190, 'mail_user' => 190, 'mail_von' => 190, 'mail_von_name' => 80,
             'mail_an' => 400, 'mail_cc' => 400] as $feld => $laenge) {
     if (isset($d[$feld])) setSetting($feld, mb_substr(s($d, $feld), 0, $laenge));
@@ -1493,6 +1527,103 @@ case 'report_csv': {
   exit;
 }
 
+case 'mail_diagnose': {
+  requirePost(); requireLeitung(); requireCsrf();
+  $c = mailKonfig();
+  $schritte = [];
+  $merk = function (string $titel, bool $ok, string $text = '') use (&$schritte) {
+    $schritte[] = ['titel' => $titel, 'ok' => $ok, 'text' => $text];
+  };
+
+  // 1. Was kann dieser Server ueberhaupt?
+  $merk('PHP-Version', version_compare(PHP_VERSION, '7.4', '>='), PHP_VERSION);
+  $merk('Verschlüsselung (OpenSSL)', extension_loaded('openssl'),
+        extension_loaded('openssl') ? 'vorhanden' : 'fehlt - SMTP ist ohne OpenSSL nicht möglich');
+  $gesperrt = array_map('trim', explode(',', (string)ini_get('disable_functions')));
+  $sockOk = function_exists('stream_socket_client') && !in_array('stream_socket_client', $gesperrt, true);
+  $merk('Ausgehende Verbindungen (stream_socket_client)', $sockOk,
+        $sockOk ? 'erlaubt' : 'vom Hoster gesperrt - bitte auf "PHP mail()" umstellen');
+  $mailOk = function_exists('mail') && !in_array('mail', $gesperrt, true);
+  $merk('PHP-Funktion mail() als Rückfallweg', $mailOk, $mailOk ? 'vorhanden' : 'gesperrt');
+
+  // 2. Angaben vollstaendig?
+  $fehlt = [];
+  foreach (['host' => 'Postausgangsserver', 'user' => 'Benutzername', 'pass' => 'Passwort',
+            'von' => 'Absenderadresse'] as $k => $name) {
+    if (($c[$k] ?? '') === '') $fehlt[] = $name;
+  }
+  if (!mailAdressen($c['an'])) $fehlt[] = 'Empfänger (An)';
+  $merk('Angaben vollständig', !$fehlt, $fehlt ? 'Es fehlt: ' . implode(', ', $fehlt) : 'alles ausgefüllt');
+  if (($c['von'] ?? '') !== '' && ($c['user'] ?? '') !== '') {
+    $merk('Absender = Postfach', strcasecmp($c['von'], $c['user']) === 0,
+          strcasecmp($c['von'], $c['user']) === 0
+            ? 'stimmt überein'
+            : 'Absender "' . $c['von'] . '" und Postfach "' . $c['user'] . '" sind verschieden – IONOS weist das ab');
+  }
+
+  // 3. Server erreichbar?
+  if ($c['host'] !== '') {
+    if (filter_var($c['host'], FILTER_VALIDATE_IP)) {
+      $merk('Adresse des Mailservers', true, $c['host'] . ' (feste IP-Adresse)');
+    } else {
+      $ip = @gethostbyname($c['host']);
+      $merk('Name auflösen (' . $c['host'] . ')', $ip !== $c['host'],
+            $ip !== $c['host'] ? $ip : 'unbekannter Name – bitte Schreibweise prüfen');
+    }
+    if ($sockOk) {
+      $pruefePort = function (int $port) use ($c) {
+        $t0 = microtime(true);
+        $fp = @stream_socket_client(($port === 465 ? 'ssl://' : '') . $c['host'] . ':' . $port,
+              $errno, $errstr, 5, STREAM_CLIENT_CONNECT,
+              stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]));
+        $ms = (int)round((microtime(true) - $t0) * 1000);
+        if (!$fp) return ['ok' => false, 'text' => 'nicht erreichbar (' . $errstr . ')'];
+        $gruss = trim((string)fgets($fp, 512));
+        @fclose($fp);
+        return ['ok' => true, 'text' => $ms . ' ms · ' . mb_substr($gruss, 0, 90)];
+      };
+      $eigener = $pruefePort($c['port']);
+      $portOffen = $eigener['ok'];
+      $merk('Eingestellter Port ' . $c['port'] . ' erreichbar', $eigener['ok'], $eigener['text']);
+      // Erst wenn der eingestellte Port klemmt, die Alternativen durchprobieren
+      if (!$eigener['ok']) {
+        foreach ([587, 465, 25] as $port) {
+          if ($port === $c['port']) continue;
+          $r2 = $pruefePort($port);
+          if ($r2['ok']) $merk('Port ' . $port . ' wäre erreichbar', false,
+                               'Bitte im Feld Port auf ' . $port . ' umstellen – ' . $r2['text']);
+        }
+      }
+    }
+  }
+
+  // 4. Echte Anmeldung versuchen
+  if ($c['art'] === 'php') {
+    $merk('Versandart', true, 'PHP mail() – SMTP-Anmeldung wird nicht verwendet');
+  } elseif ($sockOk && !$fehlt && !empty($portOffen)) {
+    // Probelauf bis zur Empfaengerpruefung - es wird nichts verschickt
+    $r = smtpSenden($c, ['pruefung@example.invalid'], [], 'Test', 'Test');
+    $stufe = $r['stufe'] ?? 'unbekannt';
+    $verbunden = !in_array($stufe, ['verbindung', 'angaben'], true);
+    $merk('Verbindung zum Mailserver', $verbunden,
+          $verbunden ? 'steht' : ($r['fehler'] ?? 'unbekannt'));
+    if ($verbunden) {
+      $tlsOk = $stufe !== 'tls';
+      $merk('Verschlüsselung (STARTTLS/SSL)', $tlsOk, $tlsOk ? 'in Ordnung' : ($r['fehler'] ?? ''));
+      if ($tlsOk) {
+        $authOk = !in_array($stufe, ['anmeldung'], true);
+        $merk('Anmeldung am Postfach', $authOk,
+              $authOk ? 'Benutzername und Passwort werden akzeptiert' : ($r['fehler'] ?? ''));
+        if ($authOk) {
+          $absOk = $stufe !== 'absender';
+          $merk('Absenderadresse akzeptiert', $absOk, $absOk ? 'in Ordnung' : ($r['fehler'] ?? ''));
+        }
+      }
+    }
+  }
+  out(['schritte' => $schritte, 'art' => $c['art'], 'port' => $c['port']]);
+}
+
 case 'mail_test': {
   requirePost(); requireLeitung(); requireCsrf();
   $c = mailKonfig();
@@ -1502,7 +1633,7 @@ case 'mail_test': {
   $text = setting('praxisname', 'Praxis') . "\n\nTestnachricht des Praxis-Kalenders.\n\n"
         . "Wenn Sie diese E-Mail erhalten, funktioniert der Versand der Krankmeldungen.\n"
         . "Gesendet am " . date('d.m.Y H:i') . " Uhr.";
-  $r = smtpSenden($c, $an, $cc, 'Test: Krankmeldungen aus dem Praxis-Kalender', $text);
+  $r = mailVersenden($c, $an, $cc, 'Test: Krankmeldungen aus dem Praxis-Kalender', $text);
   logAction('mail_test', $r['ok'] ? 'erfolgreich' : ('fehlgeschlagen: ' . ($r['fehler'] ?? '?')));
   if (!$r['ok']) out(['ok' => false, 'fehler' => $r['fehler'] ?? 'unbekannt'], 200);
   out(['ok' => true, 'an' => $an, 'cc' => $cc]);

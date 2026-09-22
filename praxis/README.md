@@ -144,13 +144,27 @@ Einrichtung unter *Einstellungen → Krankmeldung per E-Mail*:
 | An | Adresse der Steuerberatung |
 | Kopie an (Cc) | Adresse von Frau Dr. Yar |
 
-Mit **Testnachricht senden** lässt sich das sofort prüfen. In der Karte
+Mit **Testnachricht senden** lässt sich das sofort prüfen. Klappt es nicht, sagt
+**Verbindung prüfen** Schritt für Schritt, woran es liegt – vom fehlenden Feld bis
+zum abgelehnten Passwort – und nennt den nächsten Schritt.
+
+Sperrt der Hoster den direkten Versand, lässt sich unter **Versandweg** auf
+*„Über PHP mail()"* umstellen; dann verschickt der Webserver die Nachricht selbst. In der Karte
 *Krankmeldungen* steht bei jeder Meldung, ob sie versendet wurde; über
 **Erneut senden** geht sie noch einmal raus.
 
-Die Zugangsdaten lassen sich auch in `config.php` hinterlegen (Block `mail`),
-dann stehen sie nicht in der Datenbank. Das ist die sicherere Variante und hat
-Vorrang vor den Feldern in der Oberfläche.
+**Wo landet das Passwort des Postfachs?**
+
+* **Normalfall – einfach in der Anwendung eintragen.** Es wird in der Datenbank
+  gespeichert, also in `data/praxis.sqlite`. Dieser Ordner ist per `.htaccess`
+  gesperrt und über das Internet nicht erreichbar; an den Browser wird das
+  Passwort nie zurückgegeben. **Für die Praxis ist das völlig in Ordnung – Sie
+  müssen nichts weiter tun.**
+* **Etwas strenger – in `config.php`.** Wer möchte, trägt die Zugangsdaten dort
+  ein (Block `mail`); dann stehen sie nur in dieser einen Datei und nicht in der
+  Datenbank. Nützlich vor allem, wenn die Datenbank öfter weitergegeben oder
+  gesichert wird. Ist der Block vorhanden, hat er Vorrang, und die Felder in der
+  Oberfläche werden ausgeblendet.
 
 > Hinweis: E-Mail ist auf dem Transportweg verschlüsselt, aber nicht
 > Ende-zu-Ende. Deshalb enthält die Nachricht bewusst nur das Nötigste und
