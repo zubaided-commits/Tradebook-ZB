@@ -563,7 +563,9 @@ function krankmeldungenKarte(){
     h += '<div class="antrag"><span class="dot" style="background:'+t.farbe+'"></span>'
       + '<div class="t"><b>'+esc(m.name)+'</b> · '+esc(t.label)+'<br>'
       + '<span class="muted">'+zeitraum(a.von,a.bis)+' · '+tage(a.tage)
-      + (a.mail_am ? ' · an die Steuerberatung gemeldet' : (S.mail && S.mail.aktiv ? ' · <b>E-Mail nicht versendet</b>' : ''))
+      + (a.mail_am ? ' · an die Steuerberatung gemeldet'
+         : ((S.mail && S.mail.aktiv && (S.mail.arten||[]).indexOf(a.typ) >= 0)
+            ? ' · <b>E-Mail nicht versendet</b>' : ''))
       + '</span></div>'
       + '<button class="btn small ghost" onclick="openEintragById(\''+a.id+'\')">Öffnen</button>'
       + ((S.mail && S.mail.aktiv) ? '<button class="btn small ghost" onclick="mailErneut(\''+a.id+'\')">'
@@ -1276,15 +1278,15 @@ function wochentag(datum){
 function mailKarte(){
   var m = S.mail || {};
   if(m.aus_config){
-    return '<div class="card"><h2>Krankmeldung per E-Mail</h2>'
+    return '<div class="card"><h2>Meldungen an die Steuerberatung</h2>'
       + '<p class="muted">Die Zugangsdaten stehen in <code>config.php</code> und werden hier nicht angezeigt. '
       + 'Empfänger und An/Aus lassen sich trotzdem hier pflegen.</p>'
       + mailEmpfaengerFelder(m) + '</div>';
   }
-  return '<div class="card"><h2>Krankmeldung per E-Mail</h2>'
-    + '<p class="muted" style="margin-bottom:12px">Meldet sich jemand krank, geht am selben Tag automatisch '
-    + 'eine Nachricht an die Steuerberatung – <b>ohne Krankenschein im Anhang</b> und ohne Diagnose. '
-    + 'Es werden nur Name, Art, Zeitraum und Tage übermittelt.</p>'
+  return '<div class="card"><h2>Meldungen an die Steuerberatung</h2>'
+    + '<p class="muted" style="margin-bottom:12px">Wird einer der unten gewählten Einträge angelegt, geht am '
+    + 'selben Tag automatisch eine Nachricht an die Steuerberatung – <b>ohne Nachweis im Anhang</b> und ohne '
+    + 'Diagnose. Übermittelt werden nur Name, Art, Zeitraum und Tage.</p>'
     + mailEmpfaengerFelder(m)
     + '<div class="row"><div><label>Postausgangsserver (SMTP)</label>'
     +   '<input id="m_host" value="'+esc(m.host||'smtp.ionos.de')+'" placeholder="smtp.ionos.de"></div>'
@@ -1314,8 +1316,20 @@ function mailKarte(){
     + 'dasselbe Postfach sein, sonst weist IONOS die Nachricht ab.</div></div>';
 }
 function mailEmpfaengerFelder(m){
+  var arten = m.arten || [];
+  var meldbar = m.meldbar || ['krank','kind_krank','mutterschutz','unbezahlt'];
+  var kaestchen = meldbar.map(function(k){
+    var t = TY[k] || {label:k};
+    return '<label style="display:flex;align-items:center;gap:7px;font-size:0.8rem;text-transform:none;'
+      + 'letter-spacing:0;font-weight:500;color:var(--ink);margin-bottom:6px">'
+      + '<input type="checkbox" class="m_art" value="'+k+'" '+(arten.indexOf(k)>=0?'checked':'')
+      + ' style="width:auto;margin:0">'+esc(t.label)+'</label>';
+  }).join('');
   return '<div class="row one"><div><label><input type="checkbox" id="m_aktiv" '+(m.aktiv?'checked':'')
-    + ' style="width:auto;margin-right:6px">Krankmeldungen automatisch versenden</label></div></div>'
+    + ' style="width:auto;margin-right:6px">Meldungen automatisch versenden</label></div></div>'
+    + '<div class="row one"><div><label>Welche Einträge werden gemeldet?</label>'+kaestchen
+    + '<p class="muted">Urlaub, Fortbildung und Überstunden werden nie gemeldet. '
+    + 'Ein Antrag wird erst gemeldet, wenn Sie ihn genehmigt haben.</p></div></div>'
     + '<div class="row"><div><label>An: Steuerberatung</label>'
     +   '<input id="m_an" autocapitalize="off" value="'+esc(m.an||'')+'" placeholder="kanzlei@steuerberater.de"></div>'
     + '<div><label>Kopie an (Cc)</label>'
@@ -1323,7 +1337,10 @@ function mailEmpfaengerFelder(m){
     +   'placeholder="dr.yar@hausarztpraxis-dr-yar-hamburg.de"></div></div>';
 }
 function mailFelder(){
-  var d = {mail_aktiv: el('m_aktiv').checked ? 1 : 0,
+  var arten = [];
+  Array.prototype.forEach.call(document.querySelectorAll('.m_art'), function(x){
+    if(x.checked) arten.push(x.value); });
+  var d = {mail_aktiv: el('m_aktiv').checked ? 1 : 0, mail_arten: arten,
            mail_an: el('m_an').value, mail_cc: el('m_cc').value};
   if(el('m_art')) d.mail_art = el('m_art').value;
   if(el('m_host')){
@@ -1528,10 +1545,12 @@ function openEintrag(a){
    + '<input id="a_notiz" maxlength="120" value="'+esc(a.notiz||'')+'"></div></div>'
    + '<div id="a_nachweisbox">' + nachweisBereich(a, typ, istL) + '</div>'
    + '<div id="a_vorschau" class="ok" style="display:none"></div>'
+   + meldeStatus(a, istL)
    + (istL ? '' : '<div class="hilfe">Urlaub und ähnliche Wünsche gehen als <b>Antrag</b> an die '
        + 'Praxisleitung und gelten erst nach der Genehmigung. Eine <b>Krankmeldung</b> gilt sofort – '
        + 'ändern oder löschen kann sie danach nur die Praxisleitung.'
-       + ((S.krankmeldung_mail) ? ' Sie wird am selben Tag an die Steuerberatung gemeldet.' : '')
+       + ((S.krankmeldung_mail && (S.mail_arten||[]).indexOf('krank') >= 0)
+           ? ' Sie wird am selben Tag an die Steuerberatung gemeldet.' : '')
        + '</div>')
    + (darfLoeschen ? '<button class="btn danger" onclick="delEintrag(\''+a.id+'\')">Eintrag löschen</button>' : ''),
      function(){
@@ -1563,6 +1582,20 @@ function openEintrag(a){
   nachweisSichtbarkeit();
   vorschau();
 }
+/** Zeigt der Leitung, ob dieser Eintrag schon an die Steuerberatung gemeldet wurde. */
+function meldeStatus(a, istL){
+  if(!istL || !a.id || !S.mail || !S.mail.aktiv) return '';
+  if((S.mail.arten||[]).indexOf(a.typ) < 0) return '';
+  var t = TY[a.typ] || {label:a.typ};
+  return '<div class="hilfe" style="margin-top:10px">'
+    + (a.mail_am
+        ? '<b>'+esc(t.label)+'</b> wurde am '+dmy((a.mail_am||'').substr(0,10))
+          + ' an die Steuerberatung gemeldet.'
+        : '<b>'+esc(t.label)+'</b> ist noch nicht an die Steuerberatung gemeldet.')
+    + ' <button type="button" class="zt-weg" onclick="mailErneut(\''+a.id+'\')">'
+    + (a.mail_am ? 'erneut senden' : 'jetzt senden')+'</button></div>';
+}
+
 /** Abschnitt "Nachweise" im Eintragsdialog: vorhandene Dateien + Auswahlfeld. */
 function nachweisBereich(a, typ, istL){
   var arten = S.nachweis_arten || {};

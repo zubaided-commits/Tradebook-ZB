@@ -122,15 +122,31 @@ Im Kalender zeigt eine kleine Ecke in der Tagesspalte, dass ein Nachweis hinterl
 ist. Die Leitung sieht außerdem oben die Liste **„Nachweis fehlt noch"** – alle
 vergangenen Krank-, Kind-krank- und Fortbildungstage ohne Beleg.
 
-### Krankmeldung per E-Mail an die Steuerberatung
+### Meldungen an die Steuerberatung per E-Mail
 
-Meldet sich jemand krank – ob selbst eingetragen oder von der Leitung erfasst –
-geht **am selben Tag automatisch** eine Nachricht an die Steuerberatung, mit der
-Praxisleitung in Kopie.
+Wird einer der gewählten Einträge angelegt – ob selbst gemeldet oder von der
+Leitung erfasst – geht **am selben Tag automatisch** eine Nachricht an die
+Steuerberatung, mit der Praxisleitung in Kopie.
 
-Die Nachricht enthält: Name, Art (Arbeitsunfähigkeit oder Kind krank), Zeitraum,
-Arbeits- und Kalendertage, ob ein Nachweis in der Praxis vorliegt, und das
-Meldedatum. **Ohne Krankenschein im Anhang und ohne Diagnose.**
+Welche Arten gemeldet werden, stellen Sie unter *Einstellungen* ein:
+
+| Art | Vorgabe | warum sie für die Lohnabrechnung zählt |
+|---|---|---|
+| Krank (AU) | an | Entgeltfortzahlung, Sechs-Wochen-Frist, U1-Erstattung |
+| Kind krank | an | unbezahlt durch die Praxis, Kinderkrankengeld der Kasse |
+| Mutterschutz / Elternzeit | an | Mutterschaftsgeld, U2-Umlage, Meldungen zur Sozialversicherung |
+| Unbezahlter Urlaub | aus | ab fünf Arbeitstagen Unterbrechung im Lohnkonto |
+
+Urlaub, Fortbildung, Berufsschule und Überstunden werden **nie** gemeldet.
+
+Die Nachricht enthält Name, Art, Zeitraum, Arbeits- und Kalendertage, das
+Meldedatum und – bei Krankheit – ob ein Nachweis in der Praxis vorliegt.
+**Ohne Nachweis im Anhang und ohne Diagnose.**
+
+Trägt eine Mitarbeiterin selbst etwas ein, gilt: eine **Krankmeldung** geht
+sofort raus, ein **Antrag** (z. B. Elternzeit) erst, wenn die Praxisleitung ihn
+genehmigt hat. Jeder Eintrag zeigt beim Öffnen, ob und wann er gemeldet wurde,
+mit einem Knopf zum erneuten Senden.
 
 Einrichtung unter *Einstellungen → Krankmeldung per E-Mail*:
 

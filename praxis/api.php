@@ -594,7 +594,15 @@ function mailKonfig(): array {
     'von_name' => setting('mail_von_name', setting('praxisname', 'Praxis')),
     'an'       => setting('mail_an', ''),
     'cc'       => setting('mail_cc', ''),
+    'arten'    => mailArten(),
   ];
+}
+/** Abwesenheitsarten, die automatisch an die Steuerberatung gemeldet werden. */
+const MELDBARE_ARTEN = ['krank', 'kind_krank', 'mutterschutz', 'unbezahlt'];
+function mailArten(): array {
+  $roh = setting('mail_arten', 'krank,kind_krank,mutterschutz');
+  $liste = array_values(array_intersect(array_map('trim', explode(',', (string)$roh)), MELDBARE_ARTEN));
+  return $liste;
 }
 function mailAdressen(string $roh): array {
   $out = [];
@@ -703,54 +711,76 @@ function mailVersenden(array $c, array $an, array $cc, string $betreff, string $
     : smtpSenden($c, $an, $cc, $betreff, $text);
 }
 
-/** Text der Krankmeldung - ohne Diagnose, ohne Anhang. */
-function krankMailText(array $m, array $a): array {
-  $c = mailKonfig();
-  $art = $a['typ'] === 'kind_krank' ? 'Kind krank (Betreuung eines erkrankten Kindes)'
-                                    : 'Arbeitsunfähigkeit';
+/** Text der Meldung - ohne Diagnose, ohne Anhang. */
+function meldungMailText(array $m, array $a): array {
+  $bezeichnung = [
+    'krank'        => ['Krankmeldung',            'Arbeitsunfähigkeit'],
+    'kind_krank'   => ['Kind krank',              'Betreuung eines erkrankten Kindes'],
+    'mutterschutz' => ['Mutterschutz / Elternzeit','Mutterschutz bzw. Elternzeit'],
+    'unbezahlt'    => ['Unbezahlter Urlaub',      'Unbezahlter Urlaub'],
+  ][$a['typ']] ?? ['Meldung', $a['typ']];
+
   $zeitraum = $a['von'] === $a['bis']
     ? date('d.m.Y', (int)strtotime($a['von']))
     : date('d.m.Y', (int)strtotime($a['von'])) . ' bis ' . date('d.m.Y', (int)strtotime($a['bis']));
-  $betreff = 'Krankmeldung ' . $m['name'] . ' – ' . $zeitraum;
+  $betreff = $bezeichnung[0] . ' ' . $m['name'] . ' – ' . $zeitraum;
+
   $text = setting('praxisname', 'Praxis') . "\n\n"
-    . "Krankmeldung zur Lohnabrechnung\n"
+    . $bezeichnung[0] . " zur Lohnabrechnung\n"
     . str_repeat('-', 40) . "\n\n"
     . "Mitarbeiterin/Mitarbeiter: " . $m['name'] . "\n"
-    . "Art: " . $art . "\n"
+    . "Art: " . $bezeichnung[1] . "\n"
     . "Zeitraum: " . $zeitraum . "\n"
     . "Arbeitstage: " . rtrim(rtrim(number_format((float)$a['tage'], 1, ',', ''), '0'), ',') . "\n"
-    . "Kalendertage: " . (int)$a['kalendertage'] . "\n"
-    . "Nachweis liegt in der Praxis vor: " . (((int)$a['nachweis'] === 1) ? 'ja' : 'noch nicht') . "\n"
-    . "Gemeldet am: " . date('d.m.Y') . "\n\n"
-    . "Die Arbeitsunfähigkeitsbescheinigung wird aus Datenschutzgründen nicht mitgeschickt; "
-    . "sie liegt in der Praxis vor. Diese Nachricht enthält keine Diagnose.\n\n"
-    . "Automatisch erzeugt vom Praxis-Kalender.";
+    . "Kalendertage: " . (int)$a['kalendertage'] . "\n";
+
+  if (in_array($a['typ'], ['krank', 'kind_krank'], true)) {
+    $text .= "Nachweis liegt in der Praxis vor: " . (((int)$a['nachweis'] === 1) ? 'ja' : 'noch nicht') . "\n";
+  }
+  $text .= "Gemeldet am: " . date('d.m.Y') . "\n\n";
+
+  if (in_array($a['typ'], ['krank', 'kind_krank'], true)) {
+    $text .= "Die Arbeitsunfähigkeitsbescheinigung bzw. das Attest wird aus Datenschutzgründen nicht "
+           . "mitgeschickt; der Nachweis liegt in der Praxis vor. Diese Nachricht enthält keine Diagnose.\n\n";
+  } elseif ($a['typ'] === 'mutterschutz') {
+    $text .= "Bescheinigungen liegen in der Praxis vor und werden aus Datenschutzgründen nicht "
+           . "mitgeschickt. Bitte prüfen, was für Lohnabrechnung und Meldungen zur Sozialversicherung "
+           . "zu veranlassen ist.\n\n";
+  } elseif ($a['typ'] === 'unbezahlt') {
+    $text .= "Bitte prüfen, ob eine Unterbrechung im Lohnkonto und eine Meldung zur "
+           . "Sozialversicherung zu erfassen ist.\n\n";
+  }
+  $text .= "Automatisch erzeugt vom Praxis-Kalender.";
   return ['betreff' => $betreff, 'text' => $text];
 }
 
-/** Krankmeldung verschicken und das Datum am Eintrag vermerken. */
-function krankMailSenden(string $absenceId, bool $erneut = false): array {
+/** Meldung verschicken und das Datum am Eintrag vermerken. */
+function meldungMailSenden(string $absenceId, bool $erneut = false): array {
   $c = mailKonfig();
   if (!$c['aktiv']) return ['ok' => false, 'fehler' => 'Versand ist ausgeschaltet', 'still' => true];
   $st = db()->prepare("SELECT * FROM " . t('absences') . " WHERE id = ?");
   $st->execute([$absenceId]);
   $a = $st->fetch();
   if (!$a) return ['ok' => false, 'fehler' => 'Eintrag nicht gefunden'];
-  if (!in_array($a['typ'], ['krank', 'kind_krank'], true)) {
-    return ['ok' => false, 'fehler' => 'Nur Krankmeldungen werden verschickt', 'still' => true];
+  if (!in_array($a['typ'], $c['arten'], true)) {
+    return ['ok' => false, 'fehler' => 'Diese Art wird nicht gemeldet', 'still' => true];
+  }
+  // Ein noch nicht genehmigter Antrag wird nicht gemeldet - erst bei der Genehmigung
+  if ($a['status'] === 'beantragt') {
+    return ['ok' => false, 'fehler' => 'Antrag ist noch nicht genehmigt', 'still' => true];
   }
   if (!$erneut && !empty($a['mail_am'])) return ['ok' => true, 'schon' => true];
   $m = ladeStaff((string)$a['staff_id']);
   if (!$m) return ['ok' => false, 'fehler' => 'Person nicht gefunden'];
 
-  $inhalt = krankMailText($m, $a);
+  $inhalt = meldungMailText($m, $a);
   $r = mailVersenden($c, mailAdressen($c['an']), mailAdressen($c['cc']), $inhalt['betreff'], $inhalt['text']);
   if ($r['ok']) {
     db()->prepare("UPDATE " . t('absences') . " SET mail_am = ? WHERE id = ?")
        ->execute([date('c'), $absenceId]);
-    logAction('krankmeldung_versandt', $m['name'] . ' ' . $a['von']);
+    logAction('meldung_versandt', $a['typ'] . ' ' . $m['name'] . ' ' . $a['von']);
   } else {
-    logAction('krankmeldung_fehlgeschlagen', ($r['fehler'] ?? '?'));
+    logAction('meldung_fehlgeschlagen', ($r['fehler'] ?? '?'));
   }
   return $r;
 }
@@ -979,6 +1009,7 @@ case 'state': {
     'offene_antraege' => $offen,
     'krankmeldungen' => $gemeldet,
     'krankmeldung_mail' => mailKonfig()['aktiv'] ? 1 : 0,
+    'mail_arten' => mailKonfig()['aktiv'] ? mailArten() : [],
     'mitarbeiter_sicht' => $sicht,
     'users' => $istL ? listUsers() : [],
     'doppelte' => $istL ? doppelteEintraege($abs) : [],
@@ -993,6 +1024,8 @@ case 'state': {
       'von_name' => setting('mail_von_name', setting('praxisname', 'Praxis')),
       'an' => setting('mail_an', ''),
       'cc' => setting('mail_cc', ''),
+      'arten' => mailArten(),
+      'meldbar' => MELDBARE_ARTEN,
       'pass_gesetzt' => setting('mail_pass', '') !== '' ? 1 : 0,
       'aus_config' => isset($GLOBALS['CFG']['mail']) ? 1 : 0,
     ] : null,
@@ -1239,11 +1272,11 @@ case 'save_absence': {
   }
   logAction('eintrag_gespeichert', "$typ $von..$bis");
 
-  // Krankmeldung noch am selben Tag an die Steuerberatung schicken
+  // Meldung noch am selben Tag an die Steuerberatung schicken
   $mail = null;
-  if (in_array($typ, ['krank', 'kind_krank'], true)) {
+  if (in_array($typ, mailArten(), true)) {
     foreach ($gespeichert as $gid) {
-      $r = krankMailSenden($gid);
+      $r = meldungMailSenden($gid);
       if (empty($r['still']) && empty($r['schon'])) $mail = $r;
     }
   }
@@ -1311,6 +1344,10 @@ case 'save_settings': {
   // E-Mail-Versand
   if (isset($d['mail_aktiv'])) setSetting('mail_aktiv', !empty($d['mail_aktiv']) ? '1' : '0');
   if (isset($d['mail_art'])) setSetting('mail_art', s($d, 'mail_art') === 'php' ? 'php' : 'smtp');
+  if (isset($d['mail_arten']) && is_array($d['mail_arten'])) {
+    $gewaehlt = array_values(array_intersect($d['mail_arten'], MELDBARE_ARTEN));
+    setSetting('mail_arten', implode(',', $gewaehlt));
+  }
   foreach (['mail_host' => 190, 'mail_user' => 190, 'mail_von' => 190, 'mail_von_name' => 80,
             'mail_an' => 400, 'mail_cc' => 400] as $feld => $laenge) {
     if (isset($d[$feld])) setSetting($feld, mb_substr(s($d, $feld), 0, $laenge));
@@ -1453,7 +1490,13 @@ case 'entscheiden': {
   db()->prepare("UPDATE " . t('absences') . " SET status = ?, updated_at = ? WHERE id = ?")
       ->execute([$status, date('c'), $id]);
   logAction('antrag_' . $status, $id);
-  out(['ok' => true]);
+  // Genehmigte Meldearten gehen jetzt an die Steuerberatung
+  $mail = null;
+  if ($status === 'genehmigt') {
+    $r = meldungMailSenden($id);
+    if (empty($r['still']) && empty($r['schon'])) $mail = $r;
+  }
+  out(['ok' => true, 'mail' => $mail]);
 }
 
 case 'upload': {
@@ -1750,7 +1793,7 @@ case 'mail_test': {
 
 case 'mail_erneut': {
   requirePost(); requireLeitung(); requireCsrf();
-  $r = krankMailSenden(s(body(), 'id'), true);
+  $r = meldungMailSenden(s(body(), 'id'), true);
   if (!$r['ok']) out(['ok' => false, 'fehler' => $r['fehler'] ?? 'unbekannt'], 200);
   out(['ok' => true]);
 }
