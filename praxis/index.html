@@ -483,7 +483,7 @@ function setPlanart(a){ PLANART = a; render(); }
 
 function viewPlan(){
   var h = heuteStreifen();
-  if(S.leitung){ h += antraegeKarte(); h += krankmeldungenKarte(); h += fehlendeNachweise(); }
+  if(S.leitung){ h += doppelteKarte(); h += antraegeKarte(); h += krankmeldungenKarte(); h += fehlendeNachweise(); }
   h += '<div style="display:flex;gap:9px;align-items:center;margin-bottom:12px" class="noprint">'
      + '<div class="seg">'
      +   '<button class="'+(PLANART==='monat'?'on':'')+'" onclick="setPlanart(\'monat\')">Monat</button>'
@@ -529,6 +529,28 @@ function antraegeKarte(){
   });
   return h + '</div>';
 }
+/** Eintraege, die sich ueberschneiden - fast immer versehentlich doppelt erfasst. */
+function doppelteKarte(){
+  var d = S.doppelte || [];
+  if(!d.length) return '';
+  var h = '<div class="card noprint"><h2>Doppelte Einträge prüfen</h2>'
+    + '<p class="muted" style="margin-bottom:10px">Diese Zeiträume überschneiden sich bei derselben '
+    + 'Person. Die Tage werden zwar nur <b>einmal</b> gezählt, trotzdem ist meist einer davon '
+    + 'versehentlich entstanden.</p>';
+  d.forEach(function(p){
+    var m = S.staff.filter(function(x){ return x.id === p.staff_id; })[0] || {name:'?'};
+    var ta = TY[p.a.typ] || {label:p.a.typ, farbe:'#888'};
+    var tb = TY[p.b.typ] || {label:p.b.typ, farbe:'#888'};
+    h += '<div class="antrag"><span class="dot" style="background:'+ta.farbe+'"></span>'
+      + '<div class="t"><b>'+esc(m.name)+'</b>'+(p.gleich ? ' · <b>zweimal dasselbe</b>' : '')+'<br>'
+      + '<span class="muted">'+esc(ta.label)+' '+zeitraum(p.a.von,p.a.bis)+'  ·  '
+      + esc(tb.label)+' '+zeitraum(p.b.von,p.b.bis)+'</span></div>'
+      + '<button class="btn small ghost" onclick="openEintragById(\''+p.a.id+'\')">1. öffnen</button>'
+      + '<button class="btn small ghost" onclick="openEintragById(\''+p.b.id+'\')">2. öffnen</button></div>';
+  });
+  return h + '</div>';
+}
+
 /** Krankmeldungen, die eine Mitarbeiterin selbst eingetragen hat. */
 function krankmeldungenKarte(){
   var neu = S.absences.filter(function(a){ return a.status === 'gemeldet'; })
@@ -739,6 +761,7 @@ function viewKonten(){
       h += '<div class="flag">Noch '+tage(k.rest)+' offen und kein Urlaubs-Hinweis dokumentiert. '
          + '<a href="#" onclick="hinweisText(\''+m.id+'\');return false;"><b>Hinweisschreiben erzeugen</b></a></div>';
     }
+    h += urlaubsPosten(m);
     h += '<div class="noprint" style="margin-top:9px">'
        + '<button class="btn small ghost" onclick="openKonto(\''+m.id+'\')">Übertrag / Anspruch anpassen</button>'
        + '<button class="btn small ghost" onclick="openEintrag({staff_id:\''+m.id+'\'})">+ Eintrag</button></div>';
@@ -746,6 +769,38 @@ function viewKonten(){
   });
   h += '<p class="muted">AT = Arbeitstage nach persönlichem Wochenmuster, Feiertage und Wochenenden sind bereits abgezogen.</p>';
   return h + '</div>';
+}
+/** Alle Urlaubseintraege einer Person - damit jede Zahl nachvollziehbar ist. */
+function urlaubsPosten(m){
+  var liste = S.absences.filter(function(a){
+    return a.staff_id === m.id && a.typ === 'urlaub'
+        && a.status !== 'abgelehnt' && a.status !== 'storniert';
+  }).sort(function(a,b){ return a.von < b.von ? -1 : 1; });
+  if(!liste.length) return '';
+  var doppelt = {};
+  (S.doppelte||[]).forEach(function(p){
+    if(p.staff_id === m.id){ doppelt[p.a.id] = 1; doppelt[p.b.id] = 1; }
+  });
+  var summe = 0;
+  var zeilen = liste.map(function(a){
+    summe += a.tage;
+    return '<tr'+(doppelt[a.id] ? ' style="background:#fdeaea"' : '')+'>'
+      + '<td style="padding:5px 8px">'+zeitraum(a.von,a.bis)+'</td>'
+      + '<td style="padding:5px 8px;text-align:right;white-space:nowrap">'+num(a.tage)+' T.</td>'
+      + '<td style="padding:5px 8px;font-size:0.7rem;color:var(--mut)">'
+      +   (a.status === 'beantragt' ? 'beantragt' : (doppelt[a.id] ? 'überschneidet sich' : ''))+'</td>'
+      + '<td style="padding:5px 8px;text-align:right"><button class="zt-weg" '
+      +   'onclick="openEintragById(\''+a.id+'\')">öffnen</button></td></tr>';
+  }).join('');
+  return '<details style="margin-top:8px"><summary class="muted" style="cursor:pointer;font-size:0.78rem">'
+    + liste.length+' Urlaubseintr'+(liste.length===1?'ag':'äge')+' anzeigen · zusammen '+num(summe)+' Tage'
+    + (Object.keys(doppelt).length ? ' · <b style="color:var(--bad)">Überschneidung</b>' : '')
+    + '</summary><table style="width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:6px">'
+    + zeilen + '</table>'
+    + (Math.abs(summe - ((S.konten[m.id]||{}).genommen + (S.konten[m.id]||{}).geplant)) > 0.01
+        ? '<p class="muted" style="margin-top:6px">Die Summe der Einträge ist größer als die gezählten '
+          + 'Tage, weil sich Zeiträume überschneiden – jeder Kalendertag zählt nur einmal.</p>' : '')
+    + '</details>';
 }
 function kbox(v, l){ return '<div class="kbox"><div class="v">'+num(v||0)+'</div><div class="l">'+l+'</div></div>'; }
 
@@ -1382,6 +1437,7 @@ function recalc(){
 // ------------------------------------------------------------------ Eintrag anlegen / ändern
 function openEintrag(a){
   a = a || {};
+  OFFENER_EINTRAG = a.id || '';
   var istL  = S.leitung;
   var staff = aktiveStaff();
   if(istL && !staff.length){ alert('Bitte zuerst im Reiter Team eine Mitarbeiterin anlegen.'); return; }
@@ -1678,6 +1734,7 @@ function eintragZuruecksetzen(){
   var urlaub = document.querySelector('#a_typen button[data-typ="urlaub"]');
   if(urlaub) typWahl(urlaub); else vorschau();
 }
+var OFFENER_EINTRAG = '';
 function vorschau(){
   var box = el('a_vorschau'); if(!box) return;
   var sid = el('a_staff').value, typ = el('a_typ').value;
@@ -1686,7 +1743,8 @@ function vorschau(){
   var halb = el('a_halb').checked && liste.length === 1 && liste[0].von === liste[0].bis;
 
   Promise.all(liste.map(function(z){
-    return api('preview', {staff_id:sid, von:z.von, bis:z.bis, halbtag: halb ? 1 : 0});
+    return api('preview', {staff_id:sid, von:z.von, bis:z.bis, halbtag: halb ? 1 : 0,
+                           id: OFFENER_EINTRAG});
   })).then(function(res){
     var tage = 0, kal = 0;
     res.forEach(function(r){ tage += r.tage; kal += r.kalendertage; });
@@ -1714,7 +1772,15 @@ function vorschau(){
         if(liste[i].von <= liste[j].bis && liste[j].von <= liste[i].bis){ doppelt = true; break; }
       }
     }
-    if(doppelt) txt += '<br>&#9888; Zwei Zeiträume überschneiden sich.';
+    if(doppelt) txt += '<br>&#9888; Zwei Ihrer Zeiträume überschneiden sich.';
+    var schon = [];
+    res.forEach(function(r){ (r.vorhanden||[]).forEach(function(v){
+      if(!schon.filter(function(x){ return x.id === v.id; }).length) schon.push(v); }); });
+    if(schon.length){
+      txt += '<br>&#9888; Für diese Person gibt es hier schon: '
+           + schon.map(function(v){ return esc(v.label)+' '+zeitraum(v.von,v.bis); }).join(', ')
+           + '. Bitte prüfen, ob der Eintrag doppelt wäre.';
+    }
 
     // Wer ist im selben Zeitraum schon abwesend?
     var kollegen = {};
@@ -1730,7 +1796,7 @@ function vorschau(){
 
     box.innerHTML = txt;
     box.style.display = 'block';
-    box.className = (namen.length || doppelt || tage === 0) ? 'err' : 'ok';
+    box.className = (namen.length || doppelt || schon.length || tage === 0) ? 'err' : 'ok';
   }).catch(function(e){
     box.className = 'err'; box.innerHTML = esc(fehlerText(e)); box.style.display = 'block';
   });

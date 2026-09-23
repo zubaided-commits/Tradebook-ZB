@@ -286,6 +286,117 @@ function arbeitstage(array $staff, string $von, string $bis, bool $halbtag): arr
   return ['tage' => round($tage, 2), 'kalendertage' => $kal];
 }
 
+// ---------------------------------------------------------------- Belegte Tage
+/**
+ * Rang der Abwesenheitsarten. Liegen zwei Eintraege auf demselben Tag, gewinnt der hoehere Rang.
+ * Krankheit steht ueber Urlaub: wer im Urlaub krank wird und eine AU vorlegt, bekommt die
+ * Urlaubstage zurueck (§ 9 BUrlG).
+ */
+const RANG = [
+  'krank' => 100, 'kind_krank' => 90, 'mutterschutz' => 80, 'unbezahlt' => 70,
+  'sonderurlaub' => 60, 'urlaub' => 50, 'ueberstunden' => 40, 'fortbildung' => 30,
+  'berufsschule' => 20, 'abwesend' => 10, 'geschlossen' => 5,
+];
+
+/**
+ * Jeder Kalendertag im Zeitraum wird genau EINMAL gezaehlt - auch wenn mehrere Eintraege
+ * darauf liegen. Das verhindert doppelte Zaehlung bei versehentlich doppelten oder
+ * ueberlappenden Eintraegen.
+ *
+ * Rueckgabe: [ 'YYYY-MM-DD' => ['typ' => ..., 'faktor' => 0|0.5|1, 'id' => ...], ... ]
+ */
+function belegteTage(array $staff, array $abs, string $von, string $bis): array {
+  $muster = muster((string)($staff['muster'] ?? '1,1,1,1,1,0,0'));
+  $bl = setting('bundesland', 'HH') ?? 'HH';
+  $tage = [];
+  $fcache = [];
+  foreach ($abs as $a) {
+    if ((string)$a['staff_id'] !== (string)$staff['id']) continue;
+    if (in_array($a['status'], ['abgelehnt', 'storniert'], true)) continue;
+    $v = max($a['von'], $von);
+    $b = min($a['bis'], $bis);
+    if ($b < $v) continue;
+    $halb = ((int)$a['halbtag'] === 1 && $a['von'] === $a['bis']);
+    $rang = RANG[$a['typ']] ?? 0;
+    for ($t = strtotime($v . ' 12:00'); $t !== false && $t <= strtotime($b . ' 12:00'); $t += 86400) {
+      $d = date('Y-m-d', $t);
+      if (isset($tage[$d]) && (RANG[$tage[$d]['typ']] ?? 0) >= $rang) continue;
+      // Arbeitet die Person an diesem Tag ueberhaupt?
+      $faktor = 0.0;
+      if ((empty($staff['eintritt']) || $d >= $staff['eintritt'])
+       && (empty($staff['austritt']) || $d <= $staff['austritt'])) {
+        $jahr = (int)date('Y', $t);
+        if (!isset($fcache[$jahr])) $fcache[$jahr] = feiertage($jahr, $bl);
+        if (!isset($fcache[$jahr][$d])) {
+          $faktor = $muster[(int)date('N', $t) - 1];
+          if ($halb && $faktor > 0.5) $faktor = 0.5;
+        }
+      }
+      $tage[$d] = ['typ' => $a['typ'], 'faktor' => $faktor, 'id' => $a['id'],
+                   'status' => $a['status'], 'nachweis' => (int)$a['nachweis']];
+    }
+  }
+  ksort($tage);
+  return $tage;
+}
+
+/** Summen je Konto-Gruppe aus den belegten Tagen. */
+function summenAusTagen(array $tage, string $stichtag = ''): array {
+  $s = ['urlaub_genommen' => 0.0, 'urlaub_geplant' => 0.0, 'krank' => 0.0, 'krank_kal' => 0,
+        'kind' => 0.0, 'kind_kal' => 0, 'fortbildung' => 0.0, 'sonder' => 0.0, 'stunden' => 0.0,
+        'unbezahlt' => 0.0, 'berufsschule' => 0.0, 'sonstiges' => 0.0,
+        'mutterschutz' => 0.0, 'mutterschutz_kal' => 0, 'abwesend' => 0.0, 'abwesend_kal' => 0];
+  foreach ($tage as $d => $t) {
+    $f = (float)$t['faktor'];
+    if ($t['typ'] !== 'geschlossen') { $s['abwesend'] += $f; $s['abwesend_kal']++; }
+    switch ($t['typ']) {
+      case 'urlaub':
+        if ($stichtag !== '' && $d > $stichtag) $s['urlaub_geplant'] += $f;
+        else                                    $s['urlaub_genommen'] += $f;
+        break;
+      case 'krank':        $s['krank'] += $f; $s['krank_kal']++; break;
+      case 'kind_krank':   $s['kind'] += $f;  $s['kind_kal']++; break;
+      case 'mutterschutz': $s['mutterschutz'] += $f; $s['mutterschutz_kal']++; break;
+      case 'unbezahlt':    $s['unbezahlt'] += $f; break;
+      case 'sonderurlaub': $s['sonder'] += $f; break;
+      case 'fortbildung':  $s['fortbildung'] += $f; break;
+      case 'berufsschule': $s['berufsschule'] += $f; break;
+      case 'ueberstunden': $s['stunden'] += $f; break;
+      case 'abwesend':     $s['sonstiges'] += $f; break;
+    }
+  }
+  foreach ($s as $k => $v) if (is_float($v)) $s[$k] = round($v, 2);
+  return $s;
+}
+
+/** Eintraege derselben Person, die sich zeitlich ueberschneiden - meist versehentlich doppelt erfasst. */
+function doppelteEintraege(array $abs): array {
+  $nachPerson = [];
+  foreach ($abs as $a) {
+    if (in_array($a['status'], ['abgelehnt', 'storniert'], true)) continue;
+    if ($a['typ'] === 'geschlossen') continue;
+    $nachPerson[$a['staff_id']][] = $a;
+  }
+  $paare = [];
+  foreach ($nachPerson as $sid => $liste) {
+    $n = count($liste);
+    for ($i = 0; $i < $n; $i++) {
+      for ($j = $i + 1; $j < $n; $j++) {
+        $a = $liste[$i]; $b = $liste[$j];
+        if ($a['von'] <= $b['bis'] && $b['von'] <= $a['bis']) {
+          $paare[] = [
+            'staff_id' => $sid,
+            'gleich' => ($a['typ'] === $b['typ'] && $a['von'] === $b['von'] && $a['bis'] === $b['bis']) ? 1 : 0,
+            'a' => ['id' => $a['id'], 'typ' => $a['typ'], 'von' => $a['von'], 'bis' => $a['bis']],
+            'b' => ['id' => $b['id'], 'typ' => $b['typ'], 'von' => $b['von'], 'bis' => $b['bis']],
+          ];
+        }
+      }
+    }
+  }
+  return $paare;
+}
+
 // ---------------------------------------------------------------- Urlaubskonto
 /** Anteiliger Jahresanspruch bei Ein-/Austritt im laufenden Jahr (1/12 je vollem Monat). */
 function anspruchJahr(array $staff, int $jahr): float {
@@ -321,55 +432,48 @@ function konten(int $jahr): array {
   $st->execute(["$jahr-01-01", "$jahr-12-31"]);
   $abs = $st->fetchAll();
 
-  // Rollierende 12 Monate fuer die 6-Wochen-Grenze (EFZG)
+  // Rollierende 12 Monate fuer die Sechs-Wochen-Grenze (EFZG) - ebenfalls tagegenau
   $seit = date('Y-m-d', strtotime('-365 days'));
-  $st = $pdo->prepare("SELECT staff_id, von, bis, kalendertage FROM " . t('absences') . " WHERE typ = 'krank' AND bis >= ?");
-  $st->execute([$seit]);
-  $krank12 = [];
-  foreach ($st->fetchAll() as $k) {
-    $krank12[$k['staff_id']] = ($krank12[$k['staff_id']] ?? 0) + (int)$k['kalendertage'];
-  }
-
   $heute = today();
+  $st = $pdo->prepare("SELECT * FROM " . t('absences') . " WHERE bis >= ? AND von <= ?");
+  $st->execute([$seit, $heute]);
+  $abs12 = $st->fetchAll();
+
   $res = [];
   foreach ($staff as $m) {
     $c = $carry[$m['id']] ?? null;
     $anspruch = ($c && $c['anspruch_override'] !== null && $c['anspruch_override'] !== '')
       ? (float)$c['anspruch_override'] : anspruchJahr($m, $jahr);
     $uebertrag = $c ? (float)$c['uebertrag'] : 0.0;
-    $k = ['genommen'=>0.0,'geplant'=>0.0,'krank'=>0.0,'krank_kal'=>0,'kind'=>0.0,
-          'fortbildung'=>0.0,'sonder'=>0.0,'stunden'=>0.0,'unbezahlt'=>0.0];
-    foreach ($abs as $a) {
-      if ($a['staff_id'] !== $m['id'] || $a['status'] === 'abgelehnt' || $a['status'] === 'storniert') continue;
-      $tage = anteilImJahr($a, $m, $jahr);
-      switch (typKonto($a['typ'])) {
-        case 'urlaub':      if ($a['bis'] < $heute) $k['genommen'] += $tage; else $k['geplant'] += $tage; break;
-        case 'krank':       $k['krank'] += $tage; $k['krank_kal'] += (int)$a['kalendertage']; break;
-        case 'kind':        $k['kind'] += $tage; break;
-        case 'fortbildung': $k['fortbildung'] += $tage; break;
-        case 'sonder':      $k['sonder'] += $tage; break;
-        case 'stunden':     $k['stunden'] += $tage; break;
-        case 'unbezahlt':   $k['unbezahlt'] += $tage; break;
-      }
+
+    $tage = belegteTage($m, $abs, "$jahr-01-01", "$jahr-12-31");
+    $s = summenAusTagen($tage, $heute);
+
+    // Krankheits-Kalendertage der letzten 12 Monate, jeder Tag nur einmal
+    $k12 = 0;
+    foreach (belegteTage($m, $abs12, $seit, $heute) as $t) {
+      if ($t['typ'] === 'krank') $k12++;
     }
+
     $res[$m['id']] = [
       'anspruch'   => round($anspruch, 1),
       'uebertrag'  => round($uebertrag, 1),
-      'genommen'   => round($k['genommen'], 1),
-      'geplant'    => round($k['geplant'], 1),
-      'rest'       => round($anspruch + $uebertrag - $k['genommen'] - $k['geplant'], 1),
-      'krank'      => round($k['krank'], 1),
-      'kind'       => round($k['kind'], 1),
-      'fortbildung'=> round($k['fortbildung'], 1),
-      'sonder'     => round($k['sonder'], 1),
-      'stunden'    => round($k['stunden'], 1),
-      'unbezahlt'  => round($k['unbezahlt'], 1),
-      'krank_12m_kalendertage' => (int)($krank12[$m['id']] ?? 0),
+      'genommen'   => round($s['urlaub_genommen'], 1),
+      'geplant'    => round($s['urlaub_geplant'], 1),
+      'rest'       => round($anspruch + $uebertrag - $s['urlaub_genommen'] - $s['urlaub_geplant'], 1),
+      'krank'      => round($s['krank'], 1),
+      'kind'       => round($s['kind'], 1),
+      'fortbildung'=> round($s['fortbildung'], 1),
+      'sonder'     => round($s['sonder'], 1),
+      'stunden'    => round($s['stunden'], 1),
+      'unbezahlt'  => round($s['unbezahlt'], 1),
+      'krank_12m_kalendertage' => $k12,
       'hinweis_am' => $c['hinweis_am'] ?? '',
     ];
   }
   return $res;
 }
+
 /** Anteil einer Abwesenheit, der in ein beliebiges Fenster faellt (Arbeitstage). */
 function anteilImZeitraum(array $a, array $staff, string $von, string $bis): float {
   $v = max($a['von'], $von);
@@ -679,55 +783,43 @@ function reportDaten(int $jahr, int $monat, string $vonFrei = '', string $bisFre
 
   $zeilen = [];
   foreach ($staff as $m) {
+    $tage = belegteTage($m, $abs, $von, $bis);
+    $sum  = summenAusTagen($tage, '');
     $z = [
       'name' => $m['name'], 'rolle' => $m['rolle'],
       'eintritt' => $m['eintritt'], 'austritt' => $m['austritt'],
-      'urlaub' => 0.0, 'sonderurlaub' => 0.0, 'unbezahlt' => 0.0,
-      'krank_at' => 0.0, 'krank_kt' => 0, 'kind_at' => 0.0, 'kind_kt' => 0,
-      'mutterschutz_kt' => 0, 'mutterschutz_at' => 0.0, 'sonstiges' => 0.0,
-      'fortbildung' => 0.0, 'berufsschule' => 0.0, 'ueberstunden' => 0.0,
-      'abwesend_at' => 0.0, 'abwesend_kt' => 0,
+      'urlaub' => round($sum['urlaub_genommen'], 1), 'sonderurlaub' => round($sum['sonder'], 1),
+      'unbezahlt' => round($sum['unbezahlt'], 1),
+      'krank_at' => round($sum['krank'], 1), 'krank_kt' => $sum['krank_kal'],
+      'kind_at' => round($sum['kind'], 1), 'kind_kt' => $sum['kind_kal'],
+      'mutterschutz_kt' => $sum['mutterschutz_kal'], 'mutterschutz_at' => round($sum['mutterschutz'], 1),
+      'sonstiges' => round($sum['sonstiges'], 1),
+      'fortbildung' => round($sum['fortbildung'], 1), 'berufsschule' => round($sum['berufsschule'], 1),
+      'ueberstunden' => round($sum['stunden'], 1),
+      'abwesend_at' => round($sum['abwesend'], 1), 'abwesend_kt' => $sum['abwesend_kal'],
       'perioden' => [], 'hinweise' => [],
     ];
+    // Einzelne Zeitraeume weiterhin aus den Eintraegen - sie sind fuer die Lohnabrechnung nötig
     foreach ($abs as $a) {
-      if ($a['staff_id'] !== $m['id']) continue;
+      if ((string)$a['staff_id'] !== (string)$m['id']) continue;
       if (in_array($a['status'], ['abgelehnt', 'storniert'], true)) continue;
+      if (!in_array($a['typ'], ['krank', 'kind_krank', 'unbezahlt', 'mutterschutz'], true)) continue;
       $at = anteilImZeitraum($a, $m, $von, $bis);
       $kt = kalenderImZeitraum($a, $von, $bis);
-      switch ($a['typ']) {
-        case 'urlaub':       $z['urlaub'] += $at; break;
-        case 'sonderurlaub': $z['sonderurlaub'] += $at; break;
-        case 'unbezahlt':    $z['unbezahlt'] += $at; break;
-        case 'krank':        $z['krank_at'] += $at; $z['krank_kt'] += $kt; break;
-        case 'kind_krank':   $z['kind_at'] += $at;  $z['kind_kt'] += $kt; break;
-        case 'mutterschutz': $z['mutterschutz_kt'] += $kt; $z['mutterschutz_at'] += $at; break;
-        case 'abwesend':     $z['sonstiges'] += $at; break;
-        case 'fortbildung':  $z['fortbildung'] += $at; break;
-        case 'berufsschule': $z['berufsschule'] += $at; break;
-        case 'ueberstunden': $z['ueberstunden'] += $at; break;
+      if ($at <= 0 && $kt <= 0) continue;
+      $z['perioden'][] = [
+        'id' => $a['id'], 'typ' => $a['typ'],
+        'von' => $a['von'], 'bis' => $a['bis'],
+        'arbeitstage' => round((float)$a['tage'], 1),
+        'kalendertage' => (int)$a['kalendertage'],
+        'nachweis' => (isset($dateien[$a['id']]) || (int)$a['nachweis'] === 1) ? 1 : 0,
+        'dateien' => darfNachweis((string)$m['id']) ? ($dateien[$a['id']] ?? []) : [],
+        'im_zeitraum_at' => round($at, 1),
+      ];
+      if ($a['typ'] === 'unbezahlt' && (float)$a['tage'] >= 5) {
+        $z['hinweise'][] = 'Unbezahlter Urlaub ab ' . $a['von'] . ': mindestens fünf zusammenhängende '
+          . 'Arbeitstage – Unterbrechung im Lohnkonto und Meldung zur Sozialversicherung prüfen.';
       }
-      // Zeitraeume, die in der Lohnabrechnung einzeln gebraucht werden
-      // Gesamte Abwesenheit von der Praxis (ohne Praxisschliessung)
-      if ($a['typ'] !== 'geschlossen') { $z['abwesend_at'] += $at; $z['abwesend_kt'] += $kt; }
-      if (in_array($a['typ'], ['krank', 'kind_krank', 'unbezahlt', 'mutterschutz'], true) && ($at > 0 || $kt > 0)) {
-        $z['perioden'][] = [
-          'id' => $a['id'], 'typ' => $a['typ'],
-          'von' => $a['von'], 'bis' => $a['bis'],
-          'arbeitstage' => round((float)$a['tage'], 1),
-          'kalendertage' => (int)$a['kalendertage'],
-          'nachweis' => (isset($dateien[$a['id']]) || (int)$a['nachweis'] === 1) ? 1 : 0,
-          'dateien' => darfNachweis((string)$m['id']) ? ($dateien[$a['id']] ?? []) : [],
-          'im_zeitraum_at' => round($at, 1),
-        ];
-        if ($a['typ'] === 'unbezahlt' && (float)$a['tage'] >= 5) {
-          $z['hinweise'][] = 'Unbezahlter Urlaub ab ' . $a['von'] . ': mindestens fünf zusammenhängende '
-            . 'Arbeitstage – Unterbrechung im Lohnkonto und Meldung zur Sozialversicherung prüfen.';
-        }
-      }
-    }
-    foreach (['urlaub','sonderurlaub','unbezahlt','krank_at','kind_at','fortbildung','berufsschule',
-              'ueberstunden','sonstiges','mutterschutz_at','abwesend_at'] as $f) {
-      $z[$f] = round($z[$f], 1);
     }
     $k = $konten[$m['id']] ?? [];
     $z['konto'] = [
@@ -889,6 +981,7 @@ case 'state': {
     'krankmeldung_mail' => mailKonfig()['aktiv'] ? 1 : 0,
     'mitarbeiter_sicht' => $sicht,
     'users' => $istL ? listUsers() : [],
+    'doppelte' => $istL ? doppelteEintraege($abs) : [],
     'stb_nachweise' => setting('stb_nachweise', '0') === '1' ? 1 : 0,
     'mail' => $istL ? [
       'aktiv' => setting('mail_aktiv', '0') === '1' ? 1 : 0,
@@ -1056,7 +1149,23 @@ case 'preview': {
   $von = s($d, 'von'); $bis = s($d, 'bis') ?: $von;
   if (!isDate($von) || !isDate($bis)) fail('datum_ungueltig');
   if ($bis < $von) fail('bis_vor_von');
-  out(arbeitstage($staff, $von, $bis, !empty($d['halbtag'])));
+  $r = arbeitstage($staff, $von, $bis, !empty($d['halbtag']));
+
+  // Gibt es fuer diese Person bereits einen Eintrag in diesem Zeitraum?
+  $ausser = s($d, 'id');
+  $st = db()->prepare("SELECT * FROM " . t('absences') . "
+                       WHERE staff_id = ? AND bis >= ? AND von <= ?
+                       AND status NOT IN ('abgelehnt','storniert') AND typ <> 'geschlossen'");
+  $st->execute([$sid, $von, $bis]);
+  $schon = [];
+  foreach ($st->fetchAll() as $a) {
+    if ($ausser !== '' && $a['id'] === $ausser) continue;
+    $label = $a['typ'];
+    foreach (TYPEN as $ty) if ($ty['key'] === $a['typ']) $label = $ty['label'];
+    $schon[] = ['id' => $a['id'], 'label' => $label, 'von' => $a['von'], 'bis' => $a['bis']];
+  }
+  $r['vorhanden'] = $schon;
+  out($r);
 }
 
 case 'save_absence': {

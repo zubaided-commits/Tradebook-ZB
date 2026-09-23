@@ -231,6 +231,26 @@ Der Urlaubsanspruch wird in **Tagen** geführt. Faustregel bei Teilzeit:
 `Vollzeittage × (Arbeitstage pro Woche ÷ 5)` – bei 28 Tagen Vollzeit und 3 Tagen
 pro Woche also 16,8 ≈ 17 Tage.
 
+### Wie gezählt wird
+
+Gezählt werden **Kalendertage, nicht Einträge**. Jeder Tag zählt genau einmal –
+auch wenn versehentlich zwei Einträge auf demselben Tag liegen. Überschneiden
+sich zwei Arten am selben Tag, gilt diese Rangfolge:
+
+`Krank` › `Kind krank` › `Mutterschutz` › `Unbezahlt` › `Sonderurlaub` ›
+`Urlaub` › `Überstunden` › `Fortbildung` › `Berufsschule` › `Abwesend`
+
+Daraus folgt unter anderem: Wer **im Urlaub krank** wird, trägt die Krankheit
+über den Urlaubszeitraum ein – die betroffenen Tage wandern automatisch vom
+Urlaubs- ins Krankheitskonto und der Urlaub steht wieder zur Verfügung
+(§ 9 BUrlG).
+
+Jede Zahl lässt sich nachprüfen: im Reiter *Urlaub* öffnet
+**„… Urlaubseinträge anzeigen"** die Einzelposten hinter dem Konto.
+Überschneidungen sind dort rot markiert, und im Kalender führt die Karte
+**„Doppelte Einträge prüfen"** alle betroffenen Fälle auf. Beim Eintragen warnt
+die Vorschau, wenn es für diese Person im gewählten Zeitraum schon etwas gibt.
+
 ### Was die Anwendung automatisch beachtet
 * **Anteiliger Anspruch** bei Ein- oder Austritt im laufenden Jahr (1/12 je vollem Monat).
 * **Übertrag ins Folgejahr** inklusive Feld „Hinweis erteilt am“. Seit den BAG-Urteilen
