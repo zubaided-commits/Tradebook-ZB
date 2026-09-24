@@ -78,7 +78,9 @@ td.d.we{background:var(--we)}
 td.d.frei{background:repeating-linear-gradient(135deg,#fff,#fff 3px,#e8efea 3px,#e8efea 6px)}
 td.d.halbfrei::after{content:'';position:absolute;right:0;bottom:0;width:0;height:0;border-left:7px solid transparent;border-bottom:7px solid #d5dbe0}
 td.d.ft{background:var(--ft)}
-td.d.today{outline:2px solid var(--accent);outline-offset:-2px;z-index:1}
+td.d.today{background:rgba(22,101,63,0.09)}
+td.d.today.we{background:rgba(22,101,63,0.15)}
+table.plan thead th.today{color:var(--accent);font-weight:800;background:rgba(22,101,63,0.09)}
 td.d .mark{position:absolute;inset:2px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.55rem;font-weight:700}
 td.d .mark.half{clip-path:polygon(0 0,100% 0,0 100%)}
 td.d .mark.offen{opacity:0.55;box-shadow:inset 0 0 0 2px #fff, inset 0 0 0 4px currentColor}
@@ -435,7 +437,9 @@ function zelle(m, datum, klass){
   if(a){
     var t = TY[a.typ] || {farbe:'#888', label:a.typ};
     var kurz = t.label.substr(0,1).toUpperCase();
-    var blass = / frei\b/.test(klass) ? ';opacity:0.3' : '';
+    // Wochenende, Feiertag und freie Teilzeittage zaehlen nicht - das soll man sehen
+    var zaehltNicht = /(^| )(we|ft|frei)( |$)/.test(klass);
+    var blass = zaehltNicht ? ';opacity:0.32' : '';
     var offen = (a.status === 'beantragt') ? ' offen' : '';
     inner = '<span class="mark'+(a.halbtag?' half':'')+offen+'" style="background:'+t.farbe+blass+'">'
           + (a.halbtag?'':kurz) +'</span>'
@@ -474,7 +478,8 @@ function legende(){
     return '<span class="lg"><i style="background:'+t.farbe+'"></i>'+esc(t.label)+'</span>'; }).join('')
     + '<span class="lg"><i style="background:var(--ft)"></i>Feiertag</span>'
     + '<span class="lg"><i style="background:var(--we)"></i>Wochenende</span>'
-    + '<span class="lg"><i style="background:repeating-linear-gradient(135deg,#fff,#fff 2px,#eceff2 2px,#eceff2 4px)"></i>kein Arbeitstag (Teilzeit)</span></div>';
+    + '<span class="lg"><i style="background:repeating-linear-gradient(135deg,#fff,#fff 2px,#eceff2 2px,#eceff2 4px)"></i>kein Arbeitstag (Teilzeit)</span>'
+    + '<span class="lg"><i style="background:var(--accent);opacity:0.32"></i>blass = zählt nicht mit</span></div>';
 }
 
 // ------------------------------------------------------------------ Ansicht: Kalender
@@ -626,7 +631,7 @@ function viewMonat(){
   var kopf = '<tr><th class="nm">Mitarbeiter</th>';
   for(var i=1;i<=anzahl;i++){
     var d = new Date(JAHR, MONAT, i);
-    kopf += '<th>'+i+'<br>'+WTAG[(d.getDay()+6)%7]+'</th>';
+    kopf += '<th'+(iso(d)===S.heute ? ' class="today"' : '')+'>'+i+'<br>'+WTAG[(d.getDay()+6)%7]+'</th>';
   }
   kopf += '</tr>';
 
@@ -716,7 +721,7 @@ function zelleSchmal(m, datum, klass){
   if(a){
     var t = TY[a.typ] || {farbe:'#888', label:a.typ};
     inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+';inset:1px;border-radius:2px'
-          + (/ frei\b/.test(klass) ? ';opacity:0.3' : '')+'"></span>';
+          + (/(^| )(we|ft|frei)( |$)/.test(klass) ? ';opacity:0.32' : '')+'"></span>';
   }
   var titel = a ? (TY[a.typ]?TY[a.typ].label:a.typ)+' · '+dmy(a.von)+'–'+dmy(a.bis) : dmy(datum);
   return '<td class="d '+klass+'" style="'+stil+'" title="'+esc(titel)+'" onclick="zelleKlick(\''+m.id+'\',\''+datum+'\')">'+inner+'</td>';
