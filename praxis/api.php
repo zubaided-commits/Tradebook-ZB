@@ -115,6 +115,7 @@ function ensureSchema(): void {
   ensureColumn('users', 'staff_id', $txt);
   ensureColumn('users', 'aktiv', 'INT DEFAULT 1');
   ensureColumn('absences', 'mail_am', $txt);
+  ensureColumn('staff', 'elternzeit', 'INT DEFAULT 0');
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('abs') . "_von ON " . t('absences') . " (von)");
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('abs') . "_staff ON " . t('absences') . " (staff_id)");
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('fil') . "_abs ON " . t('files') . " (absence_id)");
@@ -953,6 +954,13 @@ case 'state': {
     $m['anspruch'] = (float)$m['anspruch'];
     $m['aktiv'] = (int)$m['aktiv'];
     $m['sortierung'] = (int)$m['sortierung'];
+    $m['elternzeit'] = (int)($m['elternzeit'] ?? 0);
+    // Von Kolleginnen sieht eine Mitarbeiterin nur, was fuer die Anzeige noetig ist
+    if (!istLeitung() && $m['id'] !== eigeneStaffId()) {
+      $m['anspruch'] = 0;
+      $m['notiz'] = '';
+      $m['elternzeit'] = 0;
+    }
   }
   unset($m);
   $st = $pdo->prepare("SELECT * FROM " . t('absences') . " WHERE bis >= ? AND von <= ? ORDER BY von");
@@ -1135,6 +1143,7 @@ case 'save_staff': {
     'muster' => $musterStr,
     'anspruch' => f($d, 'anspruch', 25),
     'aktiv' => !empty($d['aktiv']) ? 1 : 0,
+    'elternzeit' => !empty($d['elternzeit']) ? 1 : 0,
     'sortierung' => (int)f($d, 'sortierung', 0),
     'notiz' => mb_substr(s($d, 'notiz'), 0, 500),
   ];
@@ -1219,6 +1228,11 @@ case 'save_absence': {
     if ($typ === 'geschlossen') fail('keine_berechtigung', 403);
     $eigene = eigeneStaffId();
     if ($eigene === '') fail('kein_mitarbeiter_verknuepft', 403);
+    // Mutterschutz / Elternzeit nur, wenn die Praxisleitung es fuer diese Person freigegeben hat
+    if ($typ === 'mutterschutz') {
+      $ich = ladeStaff($eigene);
+      if (!$ich || (int)($ich['elternzeit'] ?? 0) !== 1) fail('elternzeit_gesperrt', 403);
+    }
     $d['staff_id'] = $eigene;
     // Urlaub & Co. sind Antraege, eine Krankmeldung ist eine Meldung - sofort verbindlich
     $d['status'] = in_array($typ, ['krank', 'kind_krank'], true) ? 'gemeldet' : 'beantragt';

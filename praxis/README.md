@@ -227,6 +227,14 @@ es geht nichts verloren.
   * Eine **Krankmeldung** gilt sofort und ist danach für sie gesperrt: ändern
     oder löschen kann sie nur die Praxisleitung.
   * Umstellbar unter *Einstellungen → Was Mitarbeiterinnen von anderen sehen*.
+  * **Mutterschutz / Elternzeit** steht Mitarbeiterinnen normalerweise **nicht**
+    zur Auswahl – die Art taucht in ihrem Eintragsdialog gar nicht erst auf.
+    Im Team-Dialog lässt sich das **je Person** freigeben (*darf Mutterschutz /
+    Elternzeit selbst eintragen*); dann kann diese eine Mitarbeiterin es als
+    Antrag stellen. Die Praxisleitung kann es ohnehin jederzeit für jede Person
+    eintragen. Dass bei jemandem freigegeben ist, sehen die Kolleginnen nicht.
+  * Von Kolleginnen sieht eine Mitarbeiterin außerdem **nicht** deren
+    Urlaubsanspruch und keine Notizen.
 * **Anmelden erlaubt** abschalten sperrt den Zugang, ohne etwas zu löschen (z. B. bei
   längerer Abwesenheit oder nach dem Austritt).
 * Ein Zugang kann auch **ohne Person** bestehen (reines Verwaltungskonto).

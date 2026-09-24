@@ -310,6 +310,7 @@ var FEHLER = {
   kein_mitarbeiter_verknuepft:'Ihr Zugang ist noch keiner Person im Plan zugeordnet.',
   keine_berechtigung:'Dafür fehlt Ihnen die Berechtigung.',
   keine_empfaenger:'Bitte zuerst die Adresse der Steuerberatung eintragen.',
+  elternzeit_gesperrt:'Mutterschutz und Elternzeit trägt die Praxisleitung ein.',
   adresse_ungueltig:'Bitte eine gültige E-Mail-Adresse eintragen.'
 };
 function fehlerText(e){
@@ -873,7 +874,8 @@ function viewTeam(){
       : '<span class="zugang">kein Zugang</span>';
     h += '<div class="item"><span class="dot" style="background:'+esc(m.farbe)+'"></span>'
       + '<div class="t"><b>'+esc(m.name)+(m.aktiv?'':' <span class="muted">(nicht im Plan)</span>')+'</b>'
-      + '<span>'+esc(ROLLEN[m.rolle]||m.rolle)+' · '+esc(tageTxt||'–')+' · '+num(m.anspruch)+' Urlaubstage</span>'
+      + '<span>'+esc(ROLLEN[m.rolle]||m.rolle)+' · '+esc(tageTxt||'–')+' · '+num(m.anspruch)+' Urlaubstage'
+      + (m.elternzeit ? ' · darf Elternzeit selbst eintragen' : '')+'</span>'
       + zugang + '</div>'
       + '<button class="btn small ghost" onclick="openStaff(\''+m.id+'\')">Ändern</button>'
       + (u ? '<button class="btn small ghost" onclick="openUser(\''+u.id+'\')">Zugang</button>'
@@ -976,7 +978,7 @@ function delUser(id){
 function openStaff(id){
   var m = id ? S.staff.filter(function(x){ return x.id===id; })[0]
              : {name:'',rolle:'mfa',kuerzel:'',farbe:'#16653f',eintritt:'',austritt:'',
-                muster:'1,1,1,1,1,0,0',anspruch:25,aktiv:1,sortierung:S.staff.length};
+                muster:'1,1,1,1,1,0,0',anspruch:25,aktiv:1,elternzeit:0,sortierung:S.staff.length};
   var mus = String(m.muster).split(',').map(Number);
   var rollen = Object.keys(ROLLEN).map(function(r){
     return '<option value="'+r+'"'+(m.rolle===r?' selected':'')+'>'+ROLLEN[r]+'</option>'; }).join('');
@@ -998,6 +1000,11 @@ function openStaff(id){
    + '<input id="m_austritt" type="date" value="'+esc(m.austritt||'')+'">'
    + '<button type="button" onclick="leeren(\'m_austritt\')">Leeren</button></div></div></div>'
    + '<div class="row one"><div><label><input type="checkbox" id="m_aktiv" '+(m.aktiv?'checked':'')+' style="width:auto;margin-right:6px">im Plan anzeigen</label></div></div>'
+   + '<div class="row one"><div><label><input type="checkbox" id="m_eltern" '+(m.elternzeit?'checked':'')
+   + ' style="width:auto;margin-right:6px">darf <b>Mutterschutz / Elternzeit</b> selbst eintragen</label>'
+   + '<p class="muted">Normalerweise aus. Dann taucht diese Art im Eintragsdialog der Mitarbeiterin gar '
+   + 'nicht erst auf. Sie selbst können sie jederzeit für jede Person eintragen – die Freigabe ist nur '
+   + 'nötig, wenn die Mitarbeiterin es selbst tun soll.</p></div></div>'
    + '<p class="muted">Teilzeit: nur die tatsächlichen Arbeitstage markieren. Der Urlaubsanspruch wird in <b>Tagen</b> geführt – Faustregel bei Teilzeit: Vollzeittage × (Arbeitstage pro Woche ÷ 5).</p>'
    + (id ? '<button class="btn danger" style="margin-top:14px" onclick="delStaff(\''+id+'\')">Mitarbeiterin löschen</button>' : ''),
      function(){
@@ -1008,7 +1015,8 @@ function openStaff(id){
          kuerzel:el('m_kuerzel').value, farbe:el('m_farbe').value, muster:mu.join(','),
          anspruch:el('m_anspruch').value, sortierung:el('m_sort').value,
          eintritt:el('m_eintritt').value, austritt:el('m_austritt').value,
-         aktiv:el('m_aktiv').checked?1:0});
+         aktiv:el('m_aktiv').checked?1:0,
+         elternzeit:(el('m_eltern') && el('m_eltern').checked)?1:0});
      });
 }
 function musterKlick(b){
@@ -1517,7 +1525,14 @@ function openEintrag(a){
     : '<input type="hidden" id="a_staff" value="'+esc(sid)+'">';
 
   // 2. Was - grosse farbige Schaltflächen statt Auswahlliste
-  var arten = S.typen.filter(function(t){ return istL || t.key !== 'geschlossen'; });
+  var ich = S.staff.filter(function(x){ return x.id === S.nutzer.staff_id; })[0] || {};
+  var arten = S.typen.filter(function(t){
+    if(istL) return true;
+    if(t.key === 'geschlossen') return false;
+    // Mutterschutz / Elternzeit nur nach Freigabe durch die Praxisleitung
+    if(t.key === 'mutterschutz') return ich.elternzeit === 1 || typ === 'mutterschutz';
+    return true;
+  });
   var chips = arten.map(function(t){
     return '<button type="button" class="typ'+(t.key===typ?' on':'')+'" data-typ="'+t.key+'" '
          + 'style="--c:'+t.farbe+'" onclick="typWahl(this)"><i></i>'+esc(t.label)+'</button>';
