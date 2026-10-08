@@ -115,6 +115,9 @@ function ensureSchema(): void {
   ensureColumn('users', 'staff_id', $txt);
   ensureColumn('users', 'aktiv', 'INT DEFAULT 1');
   ensureColumn('absences', 'mail_am', $txt);
+  ensureColumn('absences', 'mail_fehler', $lng);
+  ensureColumn('absences', 'mail_versuch', $txt);
+  ensureColumn('absences', 'mail_versuche', 'INT DEFAULT 0');
   ensureColumn('staff', 'elternzeit', 'INT DEFAULT 0');
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('abs') . "_von ON " . t('absences') . " (von)");
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_" . t('abs') . "_staff ON " . t('absences') . " (staff_id)");
@@ -617,6 +620,16 @@ function mimeKopf(string $text): string {
   return preg_match('/[^\x20-\x7E]/', $text)
     ? '=?UTF-8?B?' . base64_encode($text) . '?=' : $text;
 }
+/** Antwort des Mailservers lesbar kuerzen - ohne mitten im Wort abzuschneiden. */
+function smtpAntwort(string $roh, int $max = 120): string {
+  $t = trim(preg_replace('/\s+/', ' ', $roh));
+  if (mb_strlen($t) <= $max) return $t;
+  $kurz = mb_substr($t, 0, $max);
+  $luecke = mb_strrpos($kurz, ' ');
+  if ($luecke !== false && $luecke > $max - 25) $kurz = mb_substr($kurz, 0, $luecke);
+  return rtrim($kurz, " .,;:-") . ' …';
+}
+
 /** Kleiner SMTP-Client: Port 465 direkt ueber SSL, sonst STARTTLS. */
 function smtpSenden(array $c, array $an, array $cc, string $betreff, string $text): array {
   if ($c['host'] === '' || $c['user'] === '' || $c['pass'] === '' || $c['von'] === '') {
@@ -661,7 +674,7 @@ function smtpSenden(array $c, array $an, array $cc, string $betreff, string $tex
   if ($code($senden('AUTH LOGIN')) !== 334) return $schluss('anmeldung', 'Anmeldung nicht möglich');
   if ($code($senden(base64_encode($c['user']))) !== 334) return $schluss('anmeldung', 'Benutzername abgelehnt');
   $pw = trim($senden(base64_encode($c['pass'])));
-  if ($code($pw) !== 235) return $schluss('anmeldung', 'Passwort abgelehnt (' . mb_substr($pw, 0, 60) . ')');
+  if ($code($pw) !== 235) return $schluss('anmeldung', 'Passwort abgelehnt – ' . smtpAntwort($pw));
   if ($code($senden('MAIL FROM:<' . $c['von'] . '>')) !== 250) {
     return $schluss('absender', 'Absenderadresse abgelehnt – sie muss dem Postfach entsprechen');
   }
@@ -755,6 +768,51 @@ function meldungMailText(array $m, array $a): array {
   return ['betreff' => $betreff, 'text' => $text];
 }
 
+/**
+ * Was die Praxisleitung tun muss, damit der Versand klappt - in einfachen Worten,
+ * abhaengig davon, an welcher Stelle der Versand gescheitert ist.
+ */
+function mailHinweis(string $stufe): string {
+  switch ($stufe) {
+    case 'angaben':
+      return 'In den Einstellungen fehlt noch eine Angabe (Postausgangsserver, Benutzername, '
+           . 'Passwort, Absenderadresse oder Empfänger).';
+    case 'verbindung':
+      return 'Der Server der Praxis erreicht den Mailserver nicht. Meist stimmt der '
+           . 'Postausgangsserver oder der Port nicht. Falls der Hoster ausgehende Verbindungen '
+           . 'sperrt, in den Einstellungen auf „PHP mail()" umstellen.';
+    case 'tls':
+      return 'Die Verschlüsselung kam nicht zustande. Bei Port 587 muss der Server STARTTLS '
+           . 'anbieten; versuchsweise auf Port 465 umstellen.';
+    case 'anmeldung':
+      return 'Benutzername oder Passwort stimmen nicht. Der Benutzername ist die vollständige '
+           . 'E-Mail-Adresse des Postfachs, das Passwort das Postfach-Passwort – nicht das '
+           . 'Passwort des IONOS-Kundenkontos.';
+    case 'absender':
+      return 'Die Absenderadresse gehört nicht zu diesem Postfach. Absenderadresse und '
+           . 'Benutzername müssen dieselbe E-Mail-Adresse sein.';
+    case 'empfaenger':
+      return 'Eine der Empfängeradressen hat der Mailserver abgelehnt. Bitte die Adressen der '
+           . 'Steuerberatung und in „Kopie an" auf Schreibfehler prüfen.';
+    case 'daten':
+      return 'Der Mailserver hat die Nachricht am Ende nicht angenommen. Bitte es noch einmal '
+           . 'versuchen; bleibt es dabei, hilft der Hoster weiter.';
+    case 'php':
+      return 'Der Versand über die PHP-Funktion mail() hat nicht funktioniert. In den '
+           . 'Einstellungen auf „SMTP" umstellen und die Zugangsdaten des Postfachs eintragen.';
+  }
+  return 'Bitte in den Einstellungen auf „Verbindung prüfen" tippen – dort steht, woran es liegt.';
+}
+
+/** Fehlschlag am Eintrag festhalten, damit die Leitung spaeter noch sehen kann, woran es lag. */
+function meldungFehlerMerken(string $absenceId, array $r): void {
+  $text = trim((string)($r['fehler'] ?? 'unbekannter Fehler'));
+  db()->prepare("UPDATE " . t('absences') . "
+                 SET mail_fehler = ?, mail_versuch = ?, mail_versuche = COALESCE(mail_versuche,0) + 1
+                 WHERE id = ?")
+     ->execute([($r['stufe'] ?? '') . '|' . $text, date('c'), $absenceId]);
+}
+
 /** Meldung verschicken und das Datum am Eintrag vermerken. */
 function meldungMailSenden(string $absenceId, bool $erneut = false): array {
   $c = mailKonfig();
@@ -770,6 +828,9 @@ function meldungMailSenden(string $absenceId, bool $erneut = false): array {
   if ($a['status'] === 'beantragt') {
     return ['ok' => false, 'fehler' => 'Antrag ist noch nicht genehmigt', 'still' => true];
   }
+  if (in_array($a['status'], ['abgelehnt', 'storniert'], true)) {
+    return ['ok' => false, 'fehler' => 'Eintrag ist zurückgezogen', 'still' => true];
+  }
   if (!$erneut && !empty($a['mail_am'])) return ['ok' => true, 'schon' => true];
   $m = ladeStaff((string)$a['staff_id']);
   if (!$m) return ['ok' => false, 'fehler' => 'Person nicht gefunden'];
@@ -777,13 +838,84 @@ function meldungMailSenden(string $absenceId, bool $erneut = false): array {
   $inhalt = meldungMailText($m, $a);
   $r = mailVersenden($c, mailAdressen($c['an']), mailAdressen($c['cc']), $inhalt['betreff'], $inhalt['text']);
   if ($r['ok']) {
-    db()->prepare("UPDATE " . t('absences') . " SET mail_am = ? WHERE id = ?")
-       ->execute([date('c'), $absenceId]);
+    db()->prepare("UPDATE " . t('absences') . " SET mail_am = ?, mail_fehler = '', mail_versuch = ? WHERE id = ?")
+       ->execute([date('c'), date('c'), $absenceId]);
     logAction('meldung_versandt', $a['typ'] . ' ' . $m['name'] . ' ' . $a['von']);
   } else {
-    logAction('meldung_fehlgeschlagen', ($r['fehler'] ?? '?'));
+    if (($r['stufe'] ?? '') === '' && $c['art'] === 'php') $r['stufe'] = 'php';
+    meldungFehlerMerken($absenceId, $r);
+    $r['hinweis'] = mailHinweis((string)($r['stufe'] ?? ''));
+    logAction('meldung_fehlgeschlagen', $m['name'] . ' ' . $a['von'] . ': ' . ($r['fehler'] ?? '?'));
   }
   return $r;
+}
+
+// ---------------------------------------------------------------- Warteschlange
+// Auf einem einfachen Webspace laeuft kein Dienst im Hintergrund. Darum werden
+// liegengebliebene Meldungen bei der naechsten Gelegenheit nachgeholt: nach jedem
+// Seitenaufruf, sobald die Antwort beim Browser ist. Niemand muss darauf warten,
+// und keine Meldung bleibt unbemerkt liegen.
+
+/** Meldepflichtige Eintraege, die noch nicht verschickt sind - neueste zuerst. */
+function offeneMeldungen(int $limit = 0, bool $nurFaellig = false): array {
+  $c = mailKonfig();
+  if (!$c['aktiv'] || !$c['arten']) return [];
+  $platz = implode(',', array_fill(0, count($c['arten']), '?'));
+  // Nur die letzten 90 Tage - aelteres holt die Leitung bei Bedarf von Hand nach
+  $werte = array_merge($c['arten'], [date('Y-m-d', strtotime('-90 days'))]);
+  $st = db()->prepare("SELECT * FROM " . t('absences') . "
+                       WHERE typ IN ($platz) AND (mail_am IS NULL OR mail_am = '')
+                       AND status NOT IN ('beantragt','abgelehnt','storniert')
+                       AND created_at >= ?
+                       ORDER BY created_at DESC");
+  $st->execute($werte);
+  $out = [];
+  foreach ($st->fetchAll() as $a) {
+    if ($nurFaellig) {
+      $n = (int)($a['mail_versuche'] ?? 0);
+      // Nach jedem Fehlversuch etwas laenger warten: 0, 2, 5, 10, 20, 40 ... Minuten
+      if ($n > 0) {
+        $wartezeit = min(60, (int)(2.5 * pow(2, min($n, 5)))) * 60;
+        $letzter = strtotime((string)($a['mail_versuch'] ?? '')) ?: 0;
+        if ($letzter && time() - $letzter < $wartezeit) continue;
+      }
+    }
+    $out[] = $a;
+    if ($limit > 0 && count($out) >= $limit) break;
+  }
+  return $out;
+}
+
+/** Liegengebliebene Meldungen nachschicken. Gibt zurueck, was dabei herauskam. */
+function warteschlangeAbarbeiten(int $max = 3, bool $nurFaellig = true): array {
+  $erledigt = 0; $fehler = 0; $letzter = null;
+  foreach (offeneMeldungen($max, $nurFaellig) as $a) {
+    $r = meldungMailSenden((string)$a['id']);
+    if (!empty($r['ok'])) $erledigt++;
+    elseif (empty($r['still'])) { $fehler++; $letzter = $r; }
+    else break;                                  // Versand aus oder Art nicht gemeldet
+  }
+  return ['versandt' => $erledigt, 'fehler' => $fehler, 'letzter' => $letzter];
+}
+
+/**
+ * Warteschlange erst abarbeiten, wenn die Seite beim Browser ist.
+ * So wartet niemand auf einen langsamen Mailserver.
+ */
+function warteschlangeNachher(int $max = 2): void {
+  if (!empty($GLOBALS['WS_GEPLANT'])) return;
+  $GLOBALS['WS_GEPLANT'] = true;
+  register_shutdown_function(function () use ($max) {
+    if (function_exists('fastcgi_finish_request')) {
+      @fastcgi_finish_request();
+    } else {
+      @ignore_user_abort(true);
+      while (ob_get_level() > 0) @ob_end_flush();
+      @flush();
+    }
+    @set_time_limit(60);
+    try { warteschlangeAbarbeiten($max, true); } catch (Throwable $e) { /* nie die Seite stoeren */ }
+  });
 }
 
 // ---------------------------------------------------------------- Auswertung fuer die Lohnabrechnung
@@ -972,6 +1104,7 @@ case 'state': {
     $x['kalendertage'] = (int)$x['kalendertage'];
     $x['nachweis'] = (int)$x['nachweis'];
     $x['mail_am'] = (string)($x['mail_am'] ?? '');
+    unset($x['mail_fehler'], $x['mail_versuch'], $x['mail_versuche']);
   }
   unset($x);
   $bl = setting('bundesland', 'HH') ?? 'HH';
@@ -1009,6 +1142,31 @@ case 'state': {
     }
   }
 
+  // Meldungen, die noch nicht bei der Steuerberatung sind - mit Grund und Rat.
+  // Nur die Praxisleitung sieht diese Liste; sie kann den Versand reparieren.
+  $wartend = [];
+  if ($istL) {
+    foreach (offeneMeldungen() as $o) {
+      $m2 = ladeStaff((string)$o['staff_id']);
+      [$stufe, $grund] = array_pad(explode('|', (string)($o['mail_fehler'] ?? ''), 2), 2, '');
+      if ($grund === '' && $stufe !== '') { $grund = $stufe; $stufe = ''; }
+      $wartend[] = [
+        'id'       => $o['id'],
+        'staff_id' => $o['staff_id'],
+        'name'     => $m2['name'] ?? '?',
+        'typ'      => $o['typ'],
+        'von'      => $o['von'],
+        'bis'      => $o['bis'],
+        'versuche' => (int)($o['mail_versuche'] ?? 0),
+        'versuch'  => (string)($o['mail_versuch'] ?? ''),
+        'grund'    => $grund,
+        'hinweis'  => $grund === '' ? '' : mailHinweis($stufe),
+      ];
+    }
+  }
+  // Liegengebliebenes nachschicken, sobald diese Seite ausgeliefert ist
+  if ($wartend || !$istL) warteschlangeNachher(2);
+
   out([
     'setup' => false, 'angemeldet' => true,
     'nutzer' => ['name' => $_SESSION['user_name'], 'rolle' => $istL ? 'leitung' : 'mitarbeiter',
@@ -1018,6 +1176,7 @@ case 'state': {
     'krankmeldungen' => $gemeldet,
     'krankmeldung_mail' => mailKonfig()['aktiv'] ? 1 : 0,
     'mail_arten' => mailKonfig()['aktiv'] ? mailArten() : [],
+    'mail_wartend' => $wartend,
     'mitarbeiter_sicht' => $sicht,
     'users' => $istL ? listUsers() : [],
     'doppelte' => $istL ? doppelteEintraege($abs) : [],
@@ -1377,6 +1536,8 @@ case 'save_settings': {
     if (isset($d[$feld]) && s($d, $feld) !== '' && !mailAdressen(s($d, $feld))) fail('adresse_ungueltig');
   }
   logAction('einstellungen_gespeichert');
+  // Zugangsdaten koennen gerade korrigiert worden sein - Liegengebliebenes nachholen
+  warteschlangeNachher(5);
   out(['ok' => true]);
 }
 
@@ -1801,15 +1962,33 @@ case 'mail_test': {
         . "Gesendet am " . date('d.m.Y H:i') . " Uhr.";
   $r = mailVersenden($c, $an, $cc, 'Test: Krankmeldungen aus dem Praxis-Kalender', $text);
   logAction('mail_test', $r['ok'] ? 'erfolgreich' : ('fehlgeschlagen: ' . ($r['fehler'] ?? '?')));
-  if (!$r['ok']) out(['ok' => false, 'fehler' => $r['fehler'] ?? 'unbekannt'], 200);
-  out(['ok' => true, 'an' => $an, 'cc' => $cc]);
+  if (!$r['ok']) {
+    out(['ok' => false, 'fehler' => $r['fehler'] ?? 'unbekannt',
+         'hinweis' => mailHinweis((string)($r['stufe'] ?? ''))], 200);
+  }
+  // Wenn der Test klappt, gehen liegengebliebene Meldungen gleich mit raus
+  $ws = warteschlangeAbarbeiten(10, false);
+  out(['ok' => true, 'an' => $an, 'cc' => $cc, 'nachgeholt' => $ws['versandt']]);
 }
 
 case 'mail_erneut': {
   requirePost(); requireLeitung(); requireCsrf();
   $r = meldungMailSenden(s(body(), 'id'), true);
-  if (!$r['ok']) out(['ok' => false, 'fehler' => $r['fehler'] ?? 'unbekannt'], 200);
+  if (!$r['ok']) {
+    out(['ok' => false, 'fehler' => $r['fehler'] ?? 'unbekannt',
+         'hinweis' => $r['hinweis'] ?? mailHinweis((string)($r['stufe'] ?? ''))], 200);
+  }
   out(['ok' => true]);
+}
+
+/** Alle liegengebliebenen Meldungen auf einmal nachschicken. */
+case 'mail_warteschlange': {
+  requirePost(); requireLeitung(); requireCsrf();
+  if (!mailKonfig()['aktiv']) out(['ok' => false, 'fehler' => 'Der Versand ist ausgeschaltet'], 200);
+  $ws = warteschlangeAbarbeiten(25, false);
+  $r = $ws['letzter'];
+  out(['ok' => $ws['fehler'] === 0, 'versandt' => $ws['versandt'], 'fehler_anzahl' => $ws['fehler'],
+       'fehler' => $r['fehler'] ?? '', 'hinweis' => $r['hinweis'] ?? '']);
 }
 
 default:

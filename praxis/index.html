@@ -368,7 +368,8 @@ function render(){
         : [['plan','Kalender'],['meins','Mein Urlaub']]);
   if(tabs.filter(function(t){ return t[0]===VIEW; }).length === 0) VIEW = tabs[0][0];
   h += '<div class="tabs">'+tabs.map(function(t){
-    var badge = (t[0]==='plan' && S.leitung && S.offene_antraege) ? '<span class="badge">'+S.offene_antraege+'</span>' : '';
+    var zuTun = (S.offene_antraege||0) + ((S.mail_wartend||[]).length);
+    var badge = (t[0]==='plan' && S.leitung && zuTun) ? '<span class="badge">'+zuTun+'</span>' : '';
     return '<div class="tab'+(VIEW===t[0]?' on':'')+'" onclick="setView(\''+t[0]+'\')">'+t[1]+badge+'</div>';
   }).join('')+'</div>';
   h += '<div class="wrap">';
@@ -489,7 +490,7 @@ function setPlanart(a){ PLANART = a; render(); }
 
 function viewPlan(){
   var h = heuteStreifen();
-  if(S.leitung){ h += doppelteKarte(); h += antraegeKarte(); h += krankmeldungenKarte(); h += fehlendeNachweise(); }
+  if(S.leitung){ h += meldungenKarte(); h += doppelteKarte(); h += antraegeKarte(); h += krankmeldungenKarte(); h += fehlendeNachweise(); }
   h += '<div style="display:flex;gap:9px;align-items:center;margin-bottom:12px" class="noprint">'
      + '<div class="seg">'
      +   '<button class="'+(PLANART==='monat'?'on':'')+'" onclick="setPlanart(\'monat\')">Monat</button>'
@@ -571,7 +572,7 @@ function krankmeldungenKarte(){
       + '<span class="muted">'+zeitraum(a.von,a.bis)+' · '+tage(a.tage)
       + (a.mail_am ? ' · an die Steuerberatung gemeldet'
          : ((S.mail && S.mail.aktiv && (S.mail.arten||[]).indexOf(a.typ) >= 0)
-            ? ' · <b>E-Mail nicht versendet</b>' : ''))
+            ? ' · <b>E-Mail noch nicht versendet</b>'+wartendGrund(a.id) : ''))
       + '</span></div>'
       + '<button class="btn small ghost" onclick="openEintragById(\''+a.id+'\')">Öffnen</button>'
       + ((S.mail && S.mail.aktiv) ? '<button class="btn small ghost" onclick="mailErneut(\''+a.id+'\')">'
@@ -581,10 +582,89 @@ function krankmeldungenKarte(){
   return h + '<p class="muted" style="margin-top:8px">Selbst gemeldete Krankheitstage gelten sofort. '
      + 'Ändern oder löschen kann sie nur die Praxisleitung. „Zur Kenntnis" nimmt sie aus dieser Liste.</p></div>';
 }
+
+/** Eintrag aus der Liste der noch nicht verschickten Meldungen. */
+function wartendZu(id){
+  var w = (S.mail_wartend || []).filter(function(x){ return x.id === id; });
+  return w.length ? w[0] : null;
+}
+/** Kurzer Grund fuer die Zeile in anderen Karten. */
+function wartendGrund(id){
+  var w = wartendZu(id);
+  return (w && w.grund) ? ' <span class="muted">(' + esc(w.grund) + ')</span>' : '';
+}
+
+/**
+ * Meldungen, die noch nicht bei der Steuerberatung sind.
+ * Steht ganz oben, nennt den Grund im Klartext und sagt, was zu tun ist -
+ * damit keine Krankmeldung unbemerkt liegen bleibt.
+ */
+function meldungenKarte(){
+  var w = S.mail_wartend || [];
+  if(!w.length) return '';
+  var mitFehler = w.filter(function(x){ return !!x.grund; });
+  var h = '<div class="card noprint" style="border-color:var(--bad)">'
+    + '<h2>Noch nicht an die Steuerberatung gemeldet</h2>'
+    + '<p class="muted" style="margin-bottom:10px">'
+    + (mitFehler.length
+        ? 'Der Versand ist fehlgeschlagen. Die Meldungen bleiben gespeichert und werden automatisch '
+          + 'nachgeholt, sobald der Versand wieder geht.'
+        : 'Diese Meldungen stehen zum Versand an und gehen in den nächsten Minuten automatisch raus.')
+    + '</p>';
+  w.forEach(function(x){
+    var t = TY[x.typ] || {label:x.typ, farbe:'#888'};
+    h += '<div class="antrag"><span class="dot" style="background:'+t.farbe+'"></span>'
+      + '<div class="t"><b>'+esc(x.name)+'</b> · '+esc(t.label)+'<br>'
+      + '<span class="muted">'+zeitraum(x.von,x.bis)
+      + (x.grund ? ' · <b>'+esc(x.grund)+'</b>' : ' · wartet auf Versand')
+      + (x.versuche ? ' · '+x.versuche+' Versuch'+(x.versuche===1?'':'e') : '')
+      + '</span></div>'
+      + '<button class="btn small ghost" onclick="openEintragById(\''+x.id+'\')">Öffnen</button>'
+      + '<button class="btn small" onclick="mailErneut(\''+x.id+'\')">Jetzt senden</button></div>';
+  });
+  var hinweise = [];
+  mitFehler.forEach(function(x){ if(x.hinweis && hinweise.indexOf(x.hinweis) < 0) hinweise.push(x.hinweis); });
+  hinweise.forEach(function(t){ h += '<div class="err" style="margin-top:11px">'+t+'</div>'; });
+  h += '<div style="margin-top:6px">'
+    + '<button class="btn small" onclick="mailAlleSenden()">Alle jetzt senden</button>'
+    + (mitFehler.length
+        ? '<button class="btn small ghost" onclick="gotoEinst()">E-Mail-Einstellungen prüfen</button>' : '')
+    + '</div>';
+  return h + '</div>';
+}
+function gotoEinst(){ setView('einst'); window.scrollTo(0,0); }
+
 function mailErneut(id){
   api('mail_erneut', {id:id}).then(function(r){
-    if(r.ok) return load().then(function(){ zeige('Krankmeldung versendet.', true); });
-    zeige('E-Mail nicht versendet: '+(r.fehler||'unbekannt'));
+    if(r.ok) return load().then(function(){ zeige('Meldung an die Steuerberatung versendet.', true); });
+    return load().then(function(){
+      dialog('E-Mail nicht versendet',
+        '<div class="err">'+esc(r.fehler||'unbekannt')+'</div>'
+        + '<p style="font-size:0.95rem;line-height:1.7">'+(r.hinweis||'')+'</p>'
+        + '<p class="muted">Der Eintrag selbst ist gespeichert. Sobald der Versand wieder geht, '
+        + 'wird die Meldung automatisch nachgeholt – von Hand mit <b>Jetzt senden</b>.</p>'
+        + '<button class="btn ghost" onclick="closeDialog();gotoEinst()">Zu den E-Mail-Einstellungen</button>',
+        null);
+    });
+  }).catch(function(e){ zeige(fehlerText(e)); });
+}
+/** Alles, was liegengeblieben ist, in einem Zug nachschicken. */
+function mailAlleSenden(){
+  zeige('Meldungen werden verschickt …', true);
+  api('mail_warteschlange', {}).then(function(r){
+    return load().then(function(){
+      if(r.ok){
+        zeige(r.versandt ? (r.versandt+' Meldung'+(r.versandt===1?'':'en')+' versendet.')
+                         : 'Es war nichts zu versenden.', true);
+        return;
+      }
+      dialog('Versand nicht möglich',
+        '<div class="err">'+esc(r.fehler||'unbekannt')+'</div>'
+        + (r.versandt ? '<p class="muted">'+r.versandt+' Meldung(en) gingen trotzdem raus.</p>' : '')
+        + '<p style="font-size:0.95rem;line-height:1.7">'+(r.hinweis||'')+'</p>'
+        + '<button class="btn ghost" onclick="closeDialog();gotoEinst()">Zu den E-Mail-Einstellungen</button>',
+        null);
+    });
   }).catch(function(e){ zeige(fehlerText(e)); });
 }
 
@@ -1294,7 +1374,7 @@ function mailKarte(){
     return '<div class="card"><h2>Meldungen an die Steuerberatung</h2>'
       + '<p class="muted">Die Zugangsdaten stehen in <code>config.php</code> und werden hier nicht angezeigt. '
       + 'Empfänger und An/Aus lassen sich trotzdem hier pflegen.</p>'
-      + mailEmpfaengerFelder(m) + '</div>';
+      + mailEmpfaengerFelder(m) + mailWarteschlange() + '</div>';
   }
   return '<div class="card"><h2>Meldungen an die Steuerberatung</h2>'
     + '<p class="muted" style="margin-bottom:12px">Wird einer der unten gewählten Einträge angelegt, geht am '
@@ -1326,7 +1406,21 @@ function mailKarte(){
     + '<button class="btn ghost" onclick="mailDiagnose()">Verbindung prüfen</button>'
     + '<div class="hilfe">Bei IONOS: Postfach unter <b>E-Mail</b> im Control Panel anlegen, dann hier '
     + 'die volle Adresse als Benutzername und das Postfach-Passwort eintragen. Absenderadresse muss '
-    + 'dasselbe Postfach sein, sonst weist IONOS die Nachricht ab.</div></div>';
+    + 'dasselbe Postfach sein, sonst weist IONOS die Nachricht ab.</div>'
+    + mailWarteschlange() + '</div>';
+}
+/** Was gerade nicht rausgegangen ist - direkt bei den Einstellungen, wo man es repariert. */
+function mailWarteschlange(){
+  var w = S.mail_wartend || [];
+  if(!w.length){
+    return '<div class="ok" style="margin-top:11px">Es wartet keine Meldung auf den Versand.</div>';
+  }
+  var grund = w.filter(function(x){ return !!x.grund; })[0];
+  return '<div class="err" style="margin-top:11px"><b>'+w.length+' Meldung'+(w.length===1?'':'en')
+    + '</b> ist noch nicht bei der Steuerberatung.'
+    + (grund ? ' Letzter Fehler: <b>'+esc(grund.grund)+'</b>. '+(grund.hinweis||'') : '')
+    + '</div>'
+    + '<button class="btn ghost" onclick="mailAlleSenden()">Liegengebliebene Meldungen jetzt senden</button>';
 }
 function mailEmpfaengerFelder(m){
   var arten = m.arten || [];
@@ -1428,11 +1522,14 @@ function mailTest(){
         dialog('Testnachricht verschickt',
           '<p style="font-size:0.95rem;line-height:1.7">Die Nachricht ging an <b>'+esc(r.an.join(', '))+'</b>'
           + (r.cc.length ? ' mit Kopie an <b>'+esc(r.cc.join(', '))+'</b>' : '')+'.</p>'
+          + (r.nachgeholt ? '<div class="ok">Dabei wurden '+r.nachgeholt+' liegengebliebene Meldung'
+              + (r.nachgeholt===1?'':'en')+' nachgeschickt.</div>' : '')
           + '<p class="muted">Kommt sie nicht an, bitte im <b>Spam-Ordner</b> nachsehen. '
           + 'Manche Postfächer brauchen ein bis zwei Minuten.</p>', null);
       } else {
         dialog('Testnachricht nicht verschickt',
           '<div class="err">'+esc(r.fehler||'unbekannt')+'</div>'
+          + (r.hinweis ? '<p style="font-size:0.95rem;line-height:1.7">'+r.hinweis+'</p>' : '')
           + '<p class="muted">Tippen Sie auf <b>Verbindung prüfen</b> – dort steht Schritt für Schritt, '
           + 'woran es liegt.</p>', null);
       }
@@ -1607,11 +1704,13 @@ function meldeStatus(a, istL){
   if(!istL || !a.id || !S.mail || !S.mail.aktiv) return '';
   if((S.mail.arten||[]).indexOf(a.typ) < 0) return '';
   var t = TY[a.typ] || {label:a.typ};
+  var w = a.mail_am ? null : wartendZu(a.id);
   return '<div class="hilfe" style="margin-top:10px">'
     + (a.mail_am
         ? '<b>'+esc(t.label)+'</b> wurde am '+dmy((a.mail_am||'').substr(0,10))
           + ' an die Steuerberatung gemeldet.'
-        : '<b>'+esc(t.label)+'</b> ist noch nicht an die Steuerberatung gemeldet.')
+        : '<b>'+esc(t.label)+'</b> ist noch nicht an die Steuerberatung gemeldet.'
+          + ((w && w.grund) ? ' Der Versand scheiterte: <b>'+esc(w.grund)+'</b>. '+(w.hinweis||'') : ''))
     + ' <button type="button" class="zt-weg" onclick="mailErneut(\''+a.id+'\')">'
     + (a.mail_am ? 'erneut senden' : 'jetzt senden')+'</button></div>';
 }

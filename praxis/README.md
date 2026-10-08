@@ -165,9 +165,30 @@ Mit **Testnachricht senden** lässt sich das sofort prüfen. Klappt es nicht, sa
 zum abgelehnten Passwort – und nennt den nächsten Schritt.
 
 Sperrt der Hoster den direkten Versand, lässt sich unter **Versandweg** auf
-*„Über PHP mail()"* umstellen; dann verschickt der Webserver die Nachricht selbst. In der Karte
-*Krankmeldungen* steht bei jeder Meldung, ob sie versendet wurde; über
-**Erneut senden** geht sie noch einmal raus.
+*„Über PHP mail()"* umstellen; dann verschickt der Webserver die Nachricht selbst.
+
+#### Wenn eine Meldung nicht rausgeht
+
+Eine Meldung kann aus Gründen scheitern, für die der Kalender nichts kann: ein
+falsches Postfach-Passwort, ein Mailserver, der gerade nicht erreichbar ist, eine
+Empfängeradresse mit Tippfehler. Damit so etwas nicht unbemerkt liegen bleibt:
+
+* Der **Grund steht am Eintrag** – im Klartext, zusammen mit dem Satz, was zu tun
+  ist. Die Meldung geht nie verloren; der Eintrag selbst ist immer gespeichert.
+* Im Reiter *Kalender* steht ganz oben die Karte **„Noch nicht an die
+  Steuerberatung gemeldet"**, solange etwas offen ist. Die Zahl am Reiter
+  *Kalender* zählt diese Meldungen mit.
+* **Der Kalender versucht es von allein erneut** – bei jedem Aufruf der Seite,
+  mit wachsendem Abstand (nach wenigen Minuten, dann seltener), damit der
+  Mailserver nicht bedrängt wird. Sobald die Zugangsdaten stimmen, geht alles
+  Liegengebliebene automatisch raus; eine erfolgreiche **Testnachricht** nimmt es
+  sofort mit.
+* Von Hand: **Jetzt senden** am einzelnen Eintrag oder **Alle jetzt senden** in
+  der Karte.
+
+Nachgeholt werden Meldungen aus den letzten 90 Tagen. Ein Antrag, der noch nicht
+genehmigt ist, zählt nicht als offene Meldung – er wird erst mit der Genehmigung
+verschickt.
 
 **Wo landet das Passwort des Postfachs?**
 
