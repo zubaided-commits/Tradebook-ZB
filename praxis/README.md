@@ -186,6 +186,13 @@ Empfängeradresse mit Tippfehler. Damit so etwas nicht unbemerkt liegen bleibt:
 * Von Hand: **Jetzt senden** am einzelnen Eintrag oder **Alle jetzt senden** in
   der Karte.
 
+**Der häufigste Fall: das Passwort des Postfachs wurde geändert.** Wird das
+Mailpostfach bei IONOS mit einem neuen Passwort versehen, kennt der Kalender nur
+noch das alte und der Mailserver lehnt ihn ab. Das Feld *Passwort des Postfachs*
+ist dann rot umrandet und mit **„wird abgelehnt"** beschriftet. Neues Passwort
+eintragen, **E-Mail-Einstellungen speichern** – mehr ist nicht nötig: alles
+Liegengebliebene geht mit dem Speichern sofort raus.
+
 Nachgeholt werden Meldungen aus den letzten 90 Tagen. Ein Antrag, der noch nicht
 genehmigt ist, zählt nicht als offene Meldung – er wird erst mit der Genehmigung
 verschickt.

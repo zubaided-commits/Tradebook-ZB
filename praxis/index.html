@@ -1390,9 +1390,17 @@ function mailKarte(){
     + '<div class="row"><div><label>Postfach / Benutzername</label>'
     +   '<input id="m_user" autocapitalize="off" value="'+esc(m.user||'')+'" '
     +   'placeholder="praxis@hausarztpraxis-dr-yar-hamburg.de"></div>'
-    + '<div><label>Passwort des Postfachs'+(m.pass_gesetzt?' (gesetzt)':'')+'</label>'
-    +   '<input id="m_pass" type="password" autocomplete="new-password" placeholder="'
-    +   (m.pass_gesetzt?'unverändert lassen':'Passwort')+'"></div></div>'
+    + '<div><label>Passwort des Postfachs'
+    +   (passwortAbgelehnt() ? ' – wird abgelehnt' : (m.pass_gesetzt?' (gesetzt)':''))+'</label>'
+    +   '<input id="m_pass" type="password" autocomplete="new-password"'
+    +   (passwortAbgelehnt() ? ' style="border-color:var(--bad)"' : '')+' placeholder="'
+    +   (passwortAbgelehnt() ? 'neues Passwort des Postfachs eintragen'
+                             : (m.pass_gesetzt?'unverändert lassen':'Passwort'))+'">'
+    +   '</div></div>'
+    + (passwortAbgelehnt()
+        ? '<div class="row one"><div><p class="muted" style="margin-top:-5px">Wurde das Passwort '
+          + 'des Postfachs geändert, muss es hier neu eingetragen werden – sonst kann der Kalender '
+          + 'keine Meldung verschicken.</p></div></div>' : '')
     + '<div class="row"><div><label>Absenderadresse</label>'
     +   '<input id="m_von" autocapitalize="off" value="'+esc(m.von||'')+'" '
     +   'placeholder="praxis@hausarztpraxis-dr-yar-hamburg.de"></div>'
@@ -1408,6 +1416,10 @@ function mailKarte(){
     + 'die volle Adresse als Benutzername und das Postfach-Passwort eintragen. Absenderadresse muss '
     + 'dasselbe Postfach sein, sonst weist IONOS die Nachricht ab.</div>'
     + mailWarteschlange() + '</div>';
+}
+/** Hat der Mailserver zuletzt die Anmeldung verweigert? Dann ist das Passwort veraltet. */
+function passwortAbgelehnt(){
+  return (S.mail_wartend || []).filter(function(w){ return w.stufe === 'anmeldung'; }).length > 0;
 }
 /** Was gerade nicht rausgegangen ist - direkt bei den Einstellungen, wo man es repariert. */
 function mailWarteschlange(){

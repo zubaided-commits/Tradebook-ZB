@@ -902,10 +902,10 @@ function warteschlangeAbarbeiten(int $max = 3, bool $nurFaellig = true): array {
  * Warteschlange erst abarbeiten, wenn die Seite beim Browser ist.
  * So wartet niemand auf einen langsamen Mailserver.
  */
-function warteschlangeNachher(int $max = 2): void {
+function warteschlangeNachher(int $max = 2, bool $nurFaellig = true): void {
   if (!empty($GLOBALS['WS_GEPLANT'])) return;
   $GLOBALS['WS_GEPLANT'] = true;
-  register_shutdown_function(function () use ($max) {
+  register_shutdown_function(function () use ($max, $nurFaellig) {
     if (function_exists('fastcgi_finish_request')) {
       @fastcgi_finish_request();
     } else {
@@ -914,7 +914,7 @@ function warteschlangeNachher(int $max = 2): void {
       @flush();
     }
     @set_time_limit(60);
-    try { warteschlangeAbarbeiten($max, true); } catch (Throwable $e) { /* nie die Seite stoeren */ }
+    try { warteschlangeAbarbeiten($max, $nurFaellig); } catch (Throwable $e) { /* nie die Seite stoeren */ }
   });
 }
 
@@ -1159,6 +1159,7 @@ case 'state': {
         'bis'      => $o['bis'],
         'versuche' => (int)($o['mail_versuche'] ?? 0),
         'versuch'  => (string)($o['mail_versuch'] ?? ''),
+        'stufe'    => $stufe,
         'grund'    => $grund,
         'hinweis'  => $grund === '' ? '' : mailHinweis($stufe),
       ];
@@ -1536,8 +1537,8 @@ case 'save_settings': {
     if (isset($d[$feld]) && s($d, $feld) !== '' && !mailAdressen(s($d, $feld))) fail('adresse_ungueltig');
   }
   logAction('einstellungen_gespeichert');
-  // Zugangsdaten koennen gerade korrigiert worden sein - Liegengebliebenes nachholen
-  warteschlangeNachher(5);
+  // Zugangsdaten koennen gerade korrigiert worden sein: ohne Wartezeit sofort nachholen
+  warteschlangeNachher(25, false);
   out(['ok' => true]);
 }
 
