@@ -1,14 +1,29 @@
 name: Keep Supabase Alive
 on:
   schedule:
-    - cron: '0 9 * * *'
+    # Twice a day, off the full hour (GitHub drops busy :00 runs)
+    - cron: '17 4 * * *'
+    - cron: '43 16 * * *'
   workflow_dispatch:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    env:
+      SB_URL: https://bbdibaynxnmeoxijphje.supabase.co
+      SB_KEY: sb_publishable_uLoVa5Mf_sed4d48AQ4Ylg_atcxx7ad
     steps:
-      - name: Ping Supabase
+      - name: Read app tables
         run: |
-          curl -s "https://bbdibaynxnmeoxijphje.supabase.co/rest/v1/deposits?select=id&limit=1" \
-            -H "apikey: sb_publishable_uLoVa5Mf_sed4d48AQ4Ylg_atcxx7ad" \
-            -H "Authorization: Bearer sb_publishable_uLoVa5Mf_sed4d48AQ4Ylg_atcxx7ad"
+          for t in deposits trades; do
+            curl -fsS -o /dev/null -w "$t read: HTTP %{http_code}\n" \
+              "$SB_URL/rest/v1/$t?select=id&limit=5" \
+              -H "apikey: $SB_KEY" -H "Authorization: Bearer $SB_KEY"
+          done
+      - name: Write heartbeat row
+        run: |
+          curl -fsS -o /dev/null -w "keep_alive write: HTTP %{http_code}\n" \
+            -X POST "$SB_URL/rest/v1/keep_alive" \
+            -H "apikey: $SB_KEY" -H "Authorization: Bearer $SB_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            -d "{\"id\":1,\"pinged_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
