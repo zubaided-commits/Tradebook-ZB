@@ -82,6 +82,24 @@ Automatische Hinweise: bei unbezahltem Urlaub ab fünf zusammenhängenden
 Arbeitstagen (Unterbrechung im Lohnkonto, Meldung zur Sozialversicherung) und
 beim Überschreiten von 42 Krankheits-Kalendertagen in zwölf Monaten.
 
+### Was eine Mitarbeiterin selbst ändern darf
+
+Trägt eine Mitarbeiterin etwas für sich ein – Urlaub, Sonderurlaub, unbezahlter
+Urlaub, Abwesend, Fortbildung, Berufsschule, Überstundenabbau – ist das zunächst
+ein **Antrag** und geht an die Praxisleitung. Solange er dort noch offen liegt,
+kann sie ihn selbst ändern oder zurückziehen.
+
+**Sobald die Praxisleitung entschieden hat, steht der Eintrag fest.** Er lässt
+sich dann weder ändern noch löschen – das kann nur noch die Praxisleitung. Dasselbe
+gilt für alles, was die Praxisleitung selbst eingetragen hat, und für eine
+Krankmeldung, die vom Moment der Meldung an gilt. Öffnet eine Mitarbeiterin so
+einen Eintrag, sieht sie ihn nur noch an, mit dem Hinweis, an wen sie sich wenden
+muss. Einen **Nachweis** darf sie dagegen jederzeit nachreichen – der ändert am
+Eintrag nichts.
+
+Das ist nicht nur in der Oberfläche so: der Server weist jede Änderung und jede
+Löschung ab, auch wenn sie an der Oberfläche vorbei geschickt wird.
+
 ### Die Excel-Dateien
 
 Alles, was man herunterladen kann, gibt es als fertig formatierte **.xlsx-Datei**:
@@ -236,6 +254,15 @@ verschickt.
 > Hinweis: E-Mail ist auf dem Transportweg verschlüsselt, aber nicht
 > Ende-zu-Ende. Deshalb enthält die Nachricht bewusst nur das Nötigste und
 > niemals eine Diagnose oder den Krankenschein.
+
+### Updates einspielen
+
+`api.php` und `index.html` gehören zusammen und tragen beide dasselbe Datum. Es
+müssen **immer beide** hochgeladen werden. Passen sie nicht zusammen, steht oben
+auf der Seite ein roter Hinweis mit beiden Ständen und einem Knopf, der die Seite
+frisch vom Server holt. Die mitgelieferte `.htaccess` sorgt zusätzlich dafür, dass
+der Browser die Oberfläche nicht zwischenspeichert – sonst zeigt Safari nach einem
+Update unter Umständen noch tagelang die alte Seite.
 
 ## 3. Wer darf was
 

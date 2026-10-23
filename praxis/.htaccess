@@ -29,3 +29,13 @@ Options -Indexes
   Header always set Referrer-Policy "same-origin"
   Header always set Strict-Transport-Security "max-age=31536000"
 </IfModule>
+
+# 5. Die Oberflaeche nie zwischenspeichern.
+# Sonst zeigt der Browser nach einem Update noch tagelang die alte index.html,
+# waehrend api.php schon neu ist - die beiden passen dann nicht zusammen.
+<FilesMatch "\.(html|php)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+  </IfModule>
+</FilesMatch>

@@ -167,6 +167,13 @@ td.d .klammer{position:absolute;right:1px;top:1px;width:0;height:0;
 .bar{height:7px;border-radius:4px;background:#e8ecef;overflow:hidden;display:flex;margin-bottom:7px}
 .bar i{display:block;height:100%}
 .flag{background:#fef3c7;color:var(--warn);border-radius:8px;padding:7px 10px;font-size:0.72rem;margin-top:7px;line-height:1.45}
+/* Eintrag, der feststeht - die Mitarbeiterin kann ihn nur noch ansehen */
+.festKopf{display:flex;align-items:center;gap:10px;padding:2px 0 12px;margin-bottom:12px;
+  border-bottom:1px solid var(--line)}
+.festKopf b{display:block;font-size:1rem}
+.festKopf span{display:block;font-size:0.78rem;color:var(--mut);margin-top:2px}
+.fest{background:#f3f4f6;border-left:3px solid #9aa5ad;border-radius:8px;padding:11px 13px;
+  font-size:0.8rem;line-height:1.6;color:var(--ink);margin-bottom:12px}
 /* ---- Auswertung: eine Karte je Person ---- */
 .werkzeug{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 11px}
 .werkzeug .btn{text-decoration:none;text-align:center}
@@ -177,18 +184,27 @@ td.d .klammer{position:absolute;right:1px;top:1px;width:0;height:0;
 .person .pn{flex:1;min-width:150px;display:flex;flex-direction:column;gap:2px}
 .person .pn b{font-family:var(--serif);font-size:1.18rem;font-weight:600;line-height:1.2}
 .person .pn span{font-size:0.74rem;color:var(--mut)}
-.person .pz{text-align:right;min-width:72px}
-.person .pz b{display:block;font-family:var(--serif);font-size:1.5rem;font-weight:600;
+.person .pzwrap{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.person .pzlabel{font-size:0.55rem;color:var(--mut);text-transform:uppercase;
+  letter-spacing:0.05em;font-weight:700}
+.person .pzbox{display:flex;gap:1px;background:var(--line);border-radius:10px;overflow:hidden}
+.person .pz{text-align:center;min-width:94px;padding:7px 14px;background:#f5f8f6}
+.person .pz:last-child{background:#f6f7f8}
+.person .pz b{display:block;font-family:var(--serif);font-size:1.4rem;font-weight:600;
   line-height:1.05;color:var(--accent);font-variant-numeric:tabular-nums}
 .person .pz:last-child b{color:var(--ink)}
-.person .pz span{display:block;font-size:0.56rem;color:var(--mut);text-transform:uppercase;
+.person .pz span{display:block;font-size:0.55rem;color:var(--mut);text-transform:uppercase;
   letter-spacing:0.05em;margin-top:3px}
 table.fz{width:100%;border-collapse:collapse;margin-bottom:12px}
-table.fz th{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;
-  font-weight:700;text-align:right;padding:0 0 6px}
-table.fz th:first-child{text-align:left}
-table.fz td{padding:7px 0;border-top:1px solid var(--line);font-size:0.86rem}
-table.fz td.n{text-align:right;width:92px;font-variant-numeric:tabular-nums}
+table.fz th{font-size:0.55rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;
+  font-weight:700;text-align:right;padding:0 12px 7px 0;vertical-align:bottom;line-height:1.3}
+table.fz th:first-child{text-align:left;padding-left:0}
+table.fz th i{display:block;font-style:normal;font-size:0.62rem;color:var(--accent);
+  letter-spacing:0.08em;margin-top:1px}
+table.fz td{padding:9px 12px 9px 0;border-top:1px solid var(--line);font-size:0.88rem}
+table.fz td:first-child{padding-left:0}
+table.fz td.n{text-align:right;width:104px;font-variant-numeric:tabular-nums}
+.fznote{font-size:0.68rem;color:var(--mut);margin:-6px 0 12px;line-height:1.5}
 table.fz td:first-child{white-space:nowrap}
 table.fz td .dot{display:inline-block;margin-right:8px;vertical-align:-1px}
 table.fz tr.gesamt td{font-weight:700;border-top:2px solid var(--line)}
@@ -281,6 +297,8 @@ var IDX = {};                       // staff_id -> { 'YYYY-MM-DD': eintrag }
 var TY = {};                        // typ-key -> definition
 var MSG = null;
 
+/** Stand dieser Datei - muss zu dem in api.php passen (siehe versionsHinweis). */
+var VERSION = '2026-10-24';
 var WTAG = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 var MNAME = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 var MKURZ = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -433,6 +451,7 @@ function render(){
     return '<div class="tab'+(VIEW===t[0]?' on':'')+'" onclick="setView(\''+t[0]+'\')">'+t[1]+badge+'</div>';
   }).join('')+'</div>';
   h += '<div class="wrap">';
+  h += versionsHinweis();
   if(MSG) h += '<div id="msg" class="'+(MSG.gut?'ok':'err')+'">'+esc(MSG.text)+'</div>';
   if(VIEW==='lohn')        h += viewLohn();
   else if(VIEW==='plan')   h += viewPlan();
@@ -450,6 +469,23 @@ function render(){
   rasterAnpassen();
 }
 function setView(v){ VIEW = v; MSG = null; render(); window.scrollTo(0,0); }
+
+/**
+ * Warnt, wenn api.php und index.html nicht denselben Stand haben. Das passiert,
+ * wenn nur eine der beiden Dateien hochgeladen wurde oder der Browser noch die
+ * alte Oberflaeche aus dem Zwischenspeicher zeigt.
+ */
+function versionsHinweis(){
+  if(!S || !S.version || S.version === VERSION) return '';
+  return '<div class="err" style="line-height:1.6"><b>Die beiden Dateien passen nicht zusammen.</b><br>'
+    + 'Diese Seite (index.html) ist vom <b>'+esc(VERSION)+'</b>, die Datei api.php auf dem Server vom '
+    + '<b>'+esc(S.version)+'</b>. Bitte beide Dateien aus demselben Paket hochladen. '
+    + 'Ist das schon geschehen, zeigt der Browser noch die alte Seite: '
+    + '<button class="zt-weg" onclick="neuLaden()">Seite neu laden</button></div>';
+}
+function neuLaden(){
+  location.replace(location.pathname + '?v=' + Date.now());
+}
 function jahrWechsel(d){ JAHR += d; load(); }
 
 // ------------------------------------------------------------------ Setup / Login
@@ -917,7 +953,8 @@ function viewKonten(){
       + '<div class="ph"><div class="pn"><b>'+esc(m.name)+'</b><span>'+esc(ROLLEN[m.rolle]||m.rolle)
       +   (m.eintritt ? ' · Eintritt '+dmy(m.eintritt) : '')
       +   (m.austritt ? ' · Austritt '+dmy(m.austritt) : '')+'</span></div>'
-      + '<div class="pz"><b'+(k.rest<0?' class="neg"':'')+'>'+num(k.rest)+'</b><span>Tage Rest</span></div></div>'
+      + '<div class="pzbox"><div class="pz"><b'+(k.rest<0?' class="neg"':'')+'>'+num(k.rest)
+      +   '</b><span>Tage Rest</span></div></div></div>'
       + '<div class="bar" title="dunkel = genommen, hell = geplant">'
         + '<i style="background:var(--accent);width:'+Math.min(100,k.genommen/gesamt*100)+'%"></i>'
         + '<i style="background:#b8d9c8;width:'+Math.min(100,Math.max(0,k.geplant)/gesamt*100)+'%"></i>'
@@ -1316,11 +1353,14 @@ function personKarte(z){
     + '<div class="ph"><div class="pn"><b>'+esc(z.name)+'</b><span>'+esc(ROLLEN[z.rolle]||z.rolle)
     +   (z.eintritt ? ' · Eintritt '+dmy(z.eintritt) : '')
     +   (z.austritt ? ' · Austritt '+dmy(z.austritt) : '')+'</span></div>'
-    + '<div class="pz"><b>'+num(z.abwesend_at)+'</b><span>AT abwesend</span></div>'
-    + '<div class="pz"><b>'+z.abwesend_kt+'</b><span>Kalendertage</span></div></div>';
+    + '<div class="pzwrap"><span class="pzlabel">abwesend im Zeitraum</span><div class="pzbox">'
+    +   '<div class="pz"><b>'+num(z.abwesend_at)+'</b><span>Arbeitstage</span></div>'
+    +   '<div class="pz"><b>'+z.abwesend_kt+'</b><span>Kalendertage</span></div>'
+    + '</div></div></div>';
 
   if(zeilen.length){
-    h += '<table class="fz"><thead><tr><th>Art</th><th>Arbeitstage</th><th>Kalendertage</th></tr></thead><tbody>';
+    h += '<table class="fz"><thead><tr><th>Art der Abwesenheit</th>'
+      +  '<th>Arbeitstage<i>AT</i></th><th>Kalendertage<i>KT</i></th></tr></thead><tbody>';
     zeilen.forEach(function(x){
       var t = TY[x[0]] || {farbe:'#9aa5ad'};
       h += '<tr><td><span class="dot" style="background:'+t.farbe+'"></span>'+esc(x[1])+'</td>'
@@ -1328,7 +1368,9 @@ function personKarte(z){
         +  '<td class="n">'+(x[3] ? x[3] : '–')+'</td></tr>';
     });
     h += '<tr class="gesamt"><td>Abwesend gesamt</td><td class="n">'+num(z.abwesend_at)+'</td>'
-      +  '<td class="n">'+z.abwesend_kt+'</td></tr></tbody></table>';
+      +  '<td class="n">'+z.abwesend_kt+'</td></tr></tbody></table>'
+      +  '<p class="fznote">Jeder Kalendertag zählt genau einmal – auch wenn zwei Einträge '
+      +  'auf denselben Tag fallen.</p>';
   } else {
     h += '<p class="muted" style="margin:2px 0 10px">Keine Fehlzeiten in diesem Zeitraum.</p>';
   }
@@ -1395,18 +1437,23 @@ function viewMeins(){
   if(!meine.length) h += '<p class="muted">Noch keine Einträge in diesem Jahr.</p>';
   meine.forEach(function(a){
     var t = TY[a.typ] || {label:a.typ, farbe:'#888'};
-    var st = a.status === 'beantragt' ? ' · <b>wartet auf Genehmigung</b>'
-           : (a.status === 'abgelehnt' ? ' · abgelehnt'
-           : (a.status === 'gemeldet' ? ' · gemeldet – Änderung nur durch die Praxisleitung' : ''));
+    var offen = a.status === 'beantragt';
+    var st = offen        ? ' · <b>wartet auf Genehmigung</b>'
+           : a.status === 'abgelehnt' ? ' · <b>abgelehnt</b>'
+           : a.status === 'gemeldet'  ? ' · gemeldet · <b>steht fest</b>'
+           : ' · genehmigt · <b>steht fest</b>';
     h += '<div class="item"><span class="dot" style="background:'+t.farbe+'"></span>'
       + '<div class="t"><b>'+esc(t.label)+'</b><span>'+zeitraum(a.von,a.bis)+' · '+tage(a.tage)+st
       + (HATDATEI[a.id] ? ' · '+HATDATEI[a.id]+' Nachweis'+(HATDATEI[a.id]>1?'e':'') : '')+'</span></div>'
       + '<button class="btn small ghost" onclick="openEintragById(\''+a.id+'\')">'
-      + (HATDATEI[a.id] ? 'Nachweis' : 'Nachweis hochladen')+'</button>'
-      + (a.status === 'beantragt'
-          ? '<button class="btn small ghost" onclick="delEintrag(\''+a.id+'\')">Zurückziehen</button>' : '')
+      + (offen ? 'Ändern' : (istNachweisArt(a.typ) ? 'Nachweis' : 'Ansehen'))+'</button>'
+      + (offen ? '<button class="btn small ghost" onclick="delEintrag(\''+a.id+'\')">Zurückziehen</button>' : '')
       + '</div>';
   });
+  h += '<p class="muted" style="margin-top:10px">Solange ein Antrag auf die Genehmigung wartet, können '
+     + 'Sie ihn selbst ändern oder zurückziehen. Sobald die Praxisleitung entschieden hat – und bei einer '
+     + 'Krankmeldung sofort – steht der Eintrag fest; ändern kann ihn dann nur noch die Praxisleitung. '
+     + 'Einen Nachweis dürfen Sie jederzeit nachreichen.</p>';
   h += '</div>';
   h += '<div class="card"><h2>Mein Zugang</h2>'
      + '<div class="row"><div><label>Aktuelles Passwort</label><input id="p_alt" type="password"></div>'
@@ -1733,19 +1780,34 @@ function openEintrag(a){
 
   if(nurLesen){
     var m0 = S.staff.filter(function(x){ return x.id === a.staff_id; })[0] || {name:'?'};
-    var t0 = TY[a.typ] || {label:a.typ};
+    var t0 = TY[a.typ] || {label:a.typ, farbe:'#888'};
     var eigener = a.staff_id === S.nutzer.staff_id;
-    var kopf = '<p style="font-size:0.95rem;line-height:1.7"><b>'+esc(m0.name)+'</b><br>'+esc(t0.label)+'<br>'
-             + zeitraum(a.von, a.bis)+'</p>';
+    var kopf = '<div class="festKopf"><span class="dot" style="background:'+t0.farbe+'"></span>'
+             + '<div><b>'+esc(t0.label)+'</b><span>'+esc(m0.name)+' · '+zeitraum(a.von, a.bis)
+             + ' · '+tage(a.tage)+'</span></div></div>';
     if(!eigener){
-      dialog('Eintrag', kopf + '<p class="muted">Ändern darf das nur die Praxisleitung.</p>', null);
+      dialog('Eintrag', kopf + '<p class="muted">Eintragungen anderer kann nur die Praxisleitung ändern.</p>', null);
       return;
     }
-    // Eigener Eintrag: Zeitraum unveränderbar, aber Nachweis darf hochgeladen werden
+    // Eigener Eintrag, aber bereits entschieden oder gemeldet: steht fest.
+    // Ein Nachweis darf trotzdem nachgereicht werden - der aendert den Eintrag nicht.
+    var warum = a.status === 'gemeldet'
+      ? 'Diese Meldung gilt ab sofort und steht damit fest.'
+      : (a.status === 'genehmigt'
+          ? 'Die Praxisleitung hat das genehmigt – damit steht es fest.'
+          : (a.status === 'abgelehnt' ? 'Die Praxisleitung hat das abgelehnt.'
+                                      : 'Dieser Eintrag stammt von der Praxisleitung.'));
+    var fest = '<div class="fest"><b>Steht fest – Sie können das nicht mehr ändern.</b><br>'+warum
+             + ' Ist etwas falsch, wenden Sie sich bitte an die Praxisleitung; nur sie kann den '
+             + 'Eintrag noch ändern oder löschen.</div>';
+    if(!istNachweisArt(a.typ)){
+      dialog('Mein Eintrag', kopf + fest, null);
+      return;
+    }
     dialog('Mein Eintrag',
-      kopf + nachweisBereich(a, a.typ, false)
-      + '<p class="muted">Den Zeitraum ändert die Praxisleitung. Ihren Krankenschein oder das Attest '
-      + 'fürs Kind können Sie hier selbst hinzufügen.</p>',
+      kopf + fest + nachweisBereich(a, a.typ, false)
+      + '<p class="muted">Den Krankenschein oder das Attest fürs Kind können Sie selbst nachreichen – '
+      + 'am Eintrag ändert das nichts.</p>',
       function(){
         var feld = el('a_datei');
         if(!feld || !feld.files || !feld.files.length) return Promise.resolve();
@@ -1978,6 +2040,8 @@ function zeitraeume(){
   }).filter(function(z){ return z.von && z.bis; });
 }
 function istKrankArt(typ){ return typ === 'krank' || typ === 'kind_krank'; }
+/** Arten, zu denen ein Beleg gehoert - nur dort lohnt sich der Hochladen-Bereich. */
+function istNachweisArt(typ){ return !!(TY[typ] && TY[typ].nachweis); }
 function typWahl(b){
   Array.prototype.forEach.call(document.querySelectorAll('#a_typen button'), function(x){
     x.classList.remove('on'); });

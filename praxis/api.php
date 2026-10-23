@@ -6,6 +6,13 @@
  */
 declare(strict_types=1);
 
+/**
+ * Stand dieser Datei. index.html traegt dieselbe Zahl. Stimmen die beiden nicht
+ * ueberein, wurde nur eine der zwei Dateien hochgeladen (oder der Browser zeigt
+ * noch die alte Oberflaeche) - die Anwendung sagt das dann oben auf der Seite.
+ */
+const VERSION = '2026-10-24';
+
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: same-origin');
@@ -1002,8 +1009,11 @@ function xlsxDatum(string $ymd): ?int {
 function xlsxStyles(): string {
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
   . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+  // Format-Codes bewusst klein geschrieben: Apples Vorschau liest sie als Unicode-Muster,
+  // dort bedeutet ein grosses D den Tag des Jahres (274 statt 01) und ein grosses Y das
+  // Wochenjahr. Excel ist das egal, der iPad-Vorschau nicht.
   . '<numFmts count="3">'
-  .   '<numFmt numFmtId="164" formatCode="DD\.MM\.YYYY"/>'
+  .   '<numFmt numFmtId="164" formatCode="dd\.mm\.yyyy"/>'
   .   '<numFmt numFmtId="165" formatCode="#,##0.0"/>'
   .   '<numFmt numFmtId="166" formatCode="#,##0"/>'
   . '</numFmts>'
@@ -1332,10 +1342,10 @@ case 'state': {
   $jahr = (int)($_GET['jahr'] ?? date('Y'));
   if ($jahr < 2000 || $jahr > 2100) $jahr = (int)date('Y');
   if (nutzerAnzahl() === 0) {
-    out(['setup' => true, 'app' => $GLOBALS['CFG']['app']['name'] ?? 'Praxis-Kalender',
+    out(['setup' => true, 'version' => VERSION, 'app' => $GLOBALS['CFG']['app']['name'] ?? 'Praxis-Kalender',
          'bundeslaender' => BUNDESLAENDER]);
   }
-  if (!angemeldet()) out(['setup' => false, 'angemeldet' => false,
+  if (!angemeldet()) out(['setup' => false, 'angemeldet' => false, 'version' => VERSION,
     'praxis' => setting('praxisname', 'Praxis'), 'app' => $GLOBALS['CFG']['app']['name']]);
 
   if (istSteuerberater()) {
@@ -1345,7 +1355,7 @@ case 'state': {
                   'eintritt' => $m['eintritt'], 'austritt' => $m['austritt'], 'aktiv' => (int)$m['aktiv']];
     }
     out([
-      'setup' => false, 'angemeldet' => true,
+      'setup' => false, 'angemeldet' => true, 'version' => VERSION,
       'nutzer' => ['name' => $_SESSION['user_name'], 'rolle' => 'steuerberater', 'staff_id' => ''],
       'leitung' => false, 'steuerberater' => true,
       'csrf' => $_SESSION['csrf'],
@@ -1445,7 +1455,7 @@ case 'state': {
   if ($wartend || !$istL) warteschlangeNachher(2);
 
   out([
-    'setup' => false, 'angemeldet' => true,
+    'setup' => false, 'angemeldet' => true, 'version' => VERSION,
     'nutzer' => ['name' => $_SESSION['user_name'], 'rolle' => $istL ? 'leitung' : 'mitarbeiter',
                  'staff_id' => $eigene],
     'leitung' => $istL,
@@ -2012,7 +2022,7 @@ case 'report_csv': {
   }
 
   // ---- Blatt 2: einzelne Zeitraeume
-  $p = ['name' => 'Einzelne Zeiträume', 'fixieren' => 4, 'spalten' => [26, 19, 12, 12, 11, 11, 10],
+  $p = ['name' => 'Einzelne Zeiträume', 'fixieren' => 4, 'spalten' => [26, 21, 13, 13, 12, 14, 11],
         'hoehen' => [0 => 24, 3 => 30], 'zeilen' => []];
   $p['zeilen'][] = [['w' => 'Einzelne Zeiträume', 's' => XL_TITEL]];
   $p['zeilen'][] = [['w' => 'Krankheit, Kind krank, unbezahlter Urlaub, Mutterschutz · ' . $zeitraum
