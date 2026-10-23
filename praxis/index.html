@@ -17,7 +17,7 @@
   /* Farben der Praxis-Website (Hausarztpraxis Dr. med. Victoria Yar) */
   --bg:#f6f9f7; --card:#fff; --line:#dde8e2; --ink:#0f1c14; --mut:#627a6d;
   --accent:#16653f; --accent-2:#1a7d4d; --accent-soft:#eaf5f0; --warn:#8a5a00; --bad:#a3231f;
-  --we:#eef2ef; --ft:#fbf3e6;
+  --we:#e9edf2; --ft:#fcefd6;
   /* Keine externen Schriften: nichts verlaesst den Praxis-Server */
   --serif:'Cormorant Garamond',Lora,Georgia,'Times New Roman',serif;
 }
@@ -75,12 +75,22 @@ table.plan thead th.nm{z-index:4}
 td.d{width:var(--cell,26px);min-width:var(--cell,26px);height:var(--rowh,34px);
   text-align:center;cursor:pointer;position:relative}
 td.d.we{background:var(--we)}
-td.d.frei{background:repeating-linear-gradient(135deg,#fff,#fff 3px,#e8efea 3px,#e8efea 6px)}
-td.d.halbfrei::after{content:'';position:absolute;right:0;bottom:0;width:0;height:0;border-left:7px solid transparent;border-bottom:7px solid #d5dbe0}
 td.d.ft{background:var(--ft)}
+/* Kein Arbeitstag dieser Person (Teilzeit): ein durchgezogener Strich - gehoert zur Zeile,
+   nicht zur Spalte, und ist dadurch nicht mit einem Wochenende zu verwechseln. */
+td.d.frei{background-image:linear-gradient(135deg,transparent 45%,#c3ccd6 45%,#c3ccd6 55%,transparent 55%)}
+/* Vor Eintritt oder nach Austritt: gehoert nicht zum Arbeitsverhaeltnis */
+td.d.ausserhalb{background:#f3f4f6}
+td.d.ausserhalb::after{content:'';position:absolute;inset:0;background:
+  repeating-linear-gradient(135deg,transparent,transparent 3px,#e2e5e9 3px,#e2e5e9 5px)}
+td.d.halbfrei::after{content:'';position:absolute;right:0;bottom:0;width:0;height:0;
+  border-left:9px solid transparent;border-bottom:9px solid #b9c3cd}
 td.d.today{background:rgba(22,101,63,0.09)}
 td.d.today.we{background:rgba(22,101,63,0.15)}
 table.plan thead th.today{color:var(--accent);font-weight:800;background:rgba(22,101,63,0.09)}
+table.plan thead th.we{background:var(--we);color:#7b8794}
+table.plan thead th.ft{background:var(--ft);color:#9a6b1d}
+table.plan thead th.ft::after{content:'\2022';display:block;font-size:0.8rem;line-height:0.5;margin-top:1px}
 td.d .mark{position:absolute;inset:2px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.55rem;font-weight:700}
 td.d .mark.half{clip-path:polygon(0 0,100% 0,0 100%)}
 td.d .mark.offen{opacity:0.55;box-shadow:inset 0 0 0 2px #fff, inset 0 0 0 4px currentColor}
@@ -145,20 +155,70 @@ td.d .klammer{position:absolute;right:1px;top:1px;width:0;height:0;
 .legend{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
 .lg{display:inline-flex;align-items:center;gap:5px;font-size:0.68rem;color:var(--mut)}
 .lg i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.lgt{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;
+  font-weight:700;min-width:44px}
+.legend+.legend{margin-top:5px}
+.ftzeile{margin-top:11px;padding:9px 12px;background:var(--ft);border-radius:10px;
+  font-size:0.72rem;color:#7a551a;line-height:1.6}
+.ftzeile span{display:block;font-size:0.56rem;text-transform:uppercase;letter-spacing:0.05em;
+  font-weight:700;opacity:0.75;margin-bottom:2px}
 /* ---- Konten ---- */
-.konto{border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:10px}
-.konto .kh{display:flex;align-items:center;gap:8px;margin-bottom:9px}
-.konto .kh b{font-family:var(--serif);font-size:1.12rem;font-weight:600}
 .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
-.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:7px;margin-bottom:9px}
-.kbox{background:#f7f9fa;border-radius:9px;padding:8px;text-align:center}
-.kbox .v{font-family:var(--serif);font-size:1.3rem;font-weight:600;font-variant-numeric:tabular-nums}
-.kbox .l{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px}
-.kbox.rest .v{color:var(--accent)}
-.kbox.rest.neg .v{color:var(--bad)}
 .bar{height:7px;border-radius:4px;background:#e8ecef;overflow:hidden;display:flex;margin-bottom:7px}
 .bar i{display:block;height:100%}
 .flag{background:#fef3c7;color:var(--warn);border-radius:8px;padding:7px 10px;font-size:0.72rem;margin-top:7px;line-height:1.45}
+/* ---- Auswertung: eine Karte je Person ---- */
+.werkzeug{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 11px}
+.werkzeug .btn{text-decoration:none;text-align:center}
+.person{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;
+  margin-bottom:12px;box-shadow:0 1px 2px rgba(15,28,20,0.04);break-inside:avoid}
+.person .ph{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;
+  padding-bottom:11px;margin-bottom:12px;border-bottom:2px solid var(--line)}
+.person .pn{flex:1;min-width:150px;display:flex;flex-direction:column;gap:2px}
+.person .pn b{font-family:var(--serif);font-size:1.18rem;font-weight:600;line-height:1.2}
+.person .pn span{font-size:0.74rem;color:var(--mut)}
+.person .pz{text-align:right;min-width:72px}
+.person .pz b{display:block;font-family:var(--serif);font-size:1.5rem;font-weight:600;
+  line-height:1.05;color:var(--accent);font-variant-numeric:tabular-nums}
+.person .pz:last-child b{color:var(--ink)}
+.person .pz span{display:block;font-size:0.56rem;color:var(--mut);text-transform:uppercase;
+  letter-spacing:0.05em;margin-top:3px}
+table.fz{width:100%;border-collapse:collapse;margin-bottom:12px}
+table.fz th{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;
+  font-weight:700;text-align:right;padding:0 0 6px}
+table.fz th:first-child{text-align:left}
+table.fz td{padding:7px 0;border-top:1px solid var(--line);font-size:0.86rem}
+table.fz td.n{text-align:right;width:92px;font-variant-numeric:tabular-nums}
+table.fz td:first-child{white-space:nowrap}
+table.fz td .dot{display:inline-block;margin-right:8px;vertical-align:-1px}
+table.fz tr.gesamt td{font-weight:700;border-top:2px solid var(--line)}
+/* Urlaubsrechnung: Anspruch + Uebertrag - genommen - geplant = Rest */
+.rechnung{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;background:#f5f8f6;
+  border:1px solid var(--line);border-radius:12px;padding:10px 13px}
+.rechnung .rt{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;
+  font-weight:700;width:100%;margin-bottom:2px}
+.rechnung .rp{display:flex;flex-direction:column;align-items:center;min-width:56px}
+.rechnung .rp b{font-family:var(--serif);font-size:1.12rem;font-weight:600;font-variant-numeric:tabular-nums}
+.rechnung .rp span{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.04em;margin-top:1px}
+.rechnung .rop{color:var(--mut);font-size:0.95rem;font-weight:600;padding-bottom:12px}
+.rechnung .rp.erg b{color:var(--accent);font-size:1.32rem}
+.rechnung.neg{background:#fef2f2;border-color:#fecaca}
+.rechnung.neg .rp.erg b{color:var(--bad)}
+.person .ptitel{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;
+  font-weight:700;margin:14px 0 2px}
+.legende-text p{font-size:0.8rem;line-height:1.6;color:var(--mut);margin-bottom:9px}
+.legende-text p:last-child{margin-bottom:0}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.chp{display:inline-flex;align-items:baseline;gap:6px;background:#f5f7f8;border-radius:20px;
+  padding:5px 12px;font-size:0.72rem;color:var(--mut)}
+.chp b{font-size:0.86rem;color:var(--ink);font-variant-numeric:tabular-nums}
+.chp i{font-style:normal;font-size:0.6rem;opacity:0.7}
+.person .pz b.neg{color:var(--bad)}
+@media (max-width:520px){
+  .person{padding:14px}
+  .person .pz b{font-size:1.28rem}
+  table.fz td.n{width:70px}
+}
 /* ---- Liste ---- */
 .item{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)}
 .item:last-child{border-bottom:none}
@@ -440,7 +500,7 @@ function zelle(m, datum, klass){
     var t = TY[a.typ] || {farbe:'#888', label:a.typ};
     var kurz = t.label.substr(0,1).toUpperCase();
     // Wochenende, Feiertag und freie Teilzeittage zaehlen nicht - das soll man sehen
-    var zaehltNicht = /(^| )(we|ft|frei)( |$)/.test(klass);
+    var zaehltNicht = /(^| )(we|ft|frei|ausserhalb)( |$)/.test(klass);
     var blass = zaehltNicht ? ';opacity:0.32' : '';
     var offen = (a.status === 'beantragt') ? ' offen' : '';
     inner = '<span class="mark'+(a.halbtag?' half':'')+offen+'" style="background:'+t.farbe+blass+'">'
@@ -459,9 +519,11 @@ function zelleKlick(staffId, datum){
 }
 function musterKlass(m, d, datum){
   var wd = (d.getDay()+6)%7;
+  // Vor dem Eintritt und nach dem Austritt gehoert der Tag nicht zum Arbeitsverhaeltnis -
+  // das gilt auch an Wochenenden und Feiertagen
+  if(m.eintritt && datum < m.eintritt) return ' ausserhalb';
+  if(m.austritt && datum > m.austritt) return ' ausserhalb';
   if(S.feiertage[datum] || wd>=5) return '';
-  if(m.eintritt && datum < m.eintritt) return ' frei';
-  if(m.austritt && datum > m.austritt) return ' frei';
   var mu = String(m.muster||'1,1,1,1,1,0,0').split(',').map(Number);
   if(!mu[wd]) return ' frei';
   if(mu[wd] === 0.5) return ' halbfrei';
@@ -476,12 +538,33 @@ function tagKlass(d, datum){
   return k.join(' ');
 }
 function legende(){
-  return '<div class="legend">'+S.typen.map(function(t){
-    return '<span class="lg"><i style="background:'+t.farbe+'"></i>'+esc(t.label)+'</span>'; }).join('')
-    + '<span class="lg"><i style="background:var(--ft)"></i>Feiertag</span>'
+  return '<div class="legend"><span class="lgt">Arten</span>'
+    + S.typen.map(function(t){
+        return '<span class="lg"><i style="background:'+t.farbe+'"></i>'+esc(t.label)+'</span>'; }).join('')
+    + '</div>'
+    + '<div class="legend"><span class="lgt">Tage</span>'
     + '<span class="lg"><i style="background:var(--we)"></i>Wochenende</span>'
-    + '<span class="lg"><i style="background:repeating-linear-gradient(135deg,#fff,#fff 2px,#eceff2 2px,#eceff2 4px)"></i>kein Arbeitstag (Teilzeit)</span>'
-    + '<span class="lg"><i style="background:var(--accent);opacity:0.32"></i>blass = zählt nicht mit</span></div>';
+    + '<span class="lg"><i style="background:var(--ft)"></i>Feiertag</span>'
+    + '<span class="lg"><i style="background:linear-gradient(135deg,#fff 45%,#c3ccd6 45%,#c3ccd6 55%,#fff 55%);'
+    +   'border:1px solid var(--line)"></i>kein Arbeitstag (Teilzeit)</span>'
+    + '<span class="lg"><i style="background:repeating-linear-gradient(135deg,#f3f4f6,#f3f4f6 2px,#e2e5e9 2px,#e2e5e9 4px);'
+    +   'border:1px solid var(--line)"></i>vor Eintritt / nach Austritt</span>'
+    + '<span class="lg"><i style="background:var(--accent);opacity:0.32"></i>blass = zählt nicht mit</span>'
+    + '</div>';
+}
+
+/** Feiertage des angezeigten Monats im Klartext unter dem Plan. */
+function feiertageDesMonats(){
+  var liste = [];
+  Object.keys(S.feiertage || {}).sort().forEach(function(d){
+    var p = d.split('-');
+    if(+p[0] === JAHR && +p[1] === MONAT + 1){
+      var wt = WTAG[(new Date(+p[0], +p[1]-1, +p[2]).getDay()+6)%7];
+      liste.push('<b>'+wt+' '+p[2]+'.'+p[1]+'.</b> '+esc(S.feiertage[d]));
+    }
+  });
+  if(!liste.length) return '';
+  return '<div class="ftzeile"><span>Feiertage im '+MNAME[MONAT]+'</span>'+liste.join(' · ')+'</div>';
 }
 
 // ------------------------------------------------------------------ Ansicht: Kalender
@@ -712,7 +795,13 @@ function viewMonat(){
   var kopf = '<tr><th class="nm">Mitarbeiter</th>';
   for(var i=1;i<=anzahl;i++){
     var d = new Date(JAHR, MONAT, i);
-    kopf += '<th'+(iso(d)===S.heute ? ' class="today"' : '')+'>'+i+'<br>'+WTAG[(d.getDay()+6)%7]+'</th>';
+    var dk = iso(d), kl = [];
+    if((d.getDay()+6)%7 >= 5) kl.push('we');
+    if(S.feiertage[dk]) kl.push('ft');
+    if(dk === S.heute) kl.push('today');
+    kopf += '<th'+(kl.length ? ' class="'+kl.join(' ')+'"' : '')
+         +  (S.feiertage[dk] ? ' title="'+esc(S.feiertage[dk])+'"' : '')
+         +  '>'+i+'<br>'+WTAG[(d.getDay()+6)%7]+'</th>';
   }
   kopf += '</tr>';
 
@@ -745,6 +834,7 @@ function viewMonat(){
 
   h += '<div class="scroll"><table class="plan" data-tage="'+anzahl+'" data-min="26">'
      + '<thead>'+kopf+'</thead><tbody>'+body+sum+'</tbody></table></div>';
+  h += feiertageDesMonats();
   h += legende();
   h += '<div class="hilfe">Auf ein Feld tippen legt einen Eintrag an oder öffnet einen vorhandenen. '
      + 'Der grüne Knopf unten rechts geht immer. '
@@ -802,7 +892,7 @@ function zelleSchmal(m, datum, klass){
   if(a){
     var t = TY[a.typ] || {farbe:'#888', label:a.typ};
     inner = '<span class="mark'+(a.halbtag?' half':'')+'" style="background:'+t.farbe+';inset:1px;border-radius:2px'
-          + (/(^| )(we|ft|frei)( |$)/.test(klass) ? ';opacity:0.32' : '')+'"></span>';
+          + (/(^| )(we|ft|frei|ausserhalb)( |$)/.test(klass) ? ';opacity:0.32' : '')+'"></span>';
   }
   var titel = a ? (TY[a.typ]?TY[a.typ].label:a.typ)+' · '+dmy(a.von)+'–'+dmy(a.bis) : dmy(datum);
   return '<td class="d '+klass+'" style="'+stil+'" title="'+esc(titel)+'" onclick="zelleKlick(\''+m.id+'\',\''+datum+'\')">'+inner+'</td>';
@@ -810,31 +900,36 @@ function zelleSchmal(m, datum, klass){
 
 // ------------------------------------------------------------------ Ansicht: Urlaubskonto
 function viewKonten(){
-  var h = '<div class="card"><div style="display:flex;gap:8px;margin-bottom:12px" class="noprint">'
-        + '<b style="flex:1">Urlaubskonten '+JAHR+'</b>'
-        + '<a class="btn small ghost" href="api.php?a=export&jahr='+JAHR+'" style="text-decoration:none;text-align:center">CSV</a>'
-        + '<button class="btn small ghost" onclick="window.print()">Drucken</button></div>';
+  var h = '<div class="card"><h2>Urlaubskonten '+JAHR+'</h2>'
+        + '<div class="werkzeug noprint">'
+        +   '<a class="btn small" href="api.php?a=export&amp;jahr='+JAHR+'">Excel-Datei (.xlsx)</a>'
+        +   '<a class="btn small ghost" href="api.php?a=export&amp;jahr='+JAHR+'&amp;format=csv">CSV</a>'
+        +   '<button class="btn small ghost" onclick="window.print()">Drucken</button></div>'
+        + '<p class="muted">Rest = Anspruch + Übertrag − genommen − geplant. <b>AT</b> = Arbeitstage nach '
+        + 'persönlichem Wochenmuster; Wochenenden und Feiertage sind bereits abgezogen.</p></div>';
   var staff = S.staff.filter(function(m){ return m.aktiv; });
-  if(!staff.length) return h+'<p class="muted">Noch keine Mitarbeiterinnen angelegt.</p></div>';
+  if(!staff.length) return h+'<div class="card"><p class="muted">Noch keine Mitarbeiterinnen angelegt.</p></div>';
 
   staff.forEach(function(m){
     var k = S.konten[m.id] || {anspruch:0,uebertrag:0,genommen:0,geplant:0,rest:0,krank:0,kind:0,fortbildung:0};
     var gesamt = Math.max(1, k.anspruch + k.uebertrag);
-    h += '<div class="konto">'
-      + '<div class="kh"><span class="dot" style="background:'+esc(m.farbe)+'"></span><b>'+esc(m.name)+'</b>'
-      + '<span class="muted">'+esc(ROLLEN[m.rolle]||m.rolle)+'</span></div>'
-      + '<div class="bar">'
-        + '<i style="background:var(--accent);width:'+(k.genommen/gesamt*100)+'%"></i>'
-        + '<i style="background:#b8d9c8;width:'+(k.geplant/gesamt*100)+'%"></i>'
+    h += '<div class="person">'
+      + '<div class="ph"><div class="pn"><b>'+esc(m.name)+'</b><span>'+esc(ROLLEN[m.rolle]||m.rolle)
+      +   (m.eintritt ? ' · Eintritt '+dmy(m.eintritt) : '')
+      +   (m.austritt ? ' · Austritt '+dmy(m.austritt) : '')+'</span></div>'
+      + '<div class="pz"><b'+(k.rest<0?' class="neg"':'')+'>'+num(k.rest)+'</b><span>Tage Rest</span></div></div>'
+      + '<div class="bar" title="dunkel = genommen, hell = geplant">'
+        + '<i style="background:var(--accent);width:'+Math.min(100,k.genommen/gesamt*100)+'%"></i>'
+        + '<i style="background:#b8d9c8;width:'+Math.min(100,Math.max(0,k.geplant)/gesamt*100)+'%"></i>'
       + '</div>'
-      + '<div class="kgrid">'
-        + kbox(k.anspruch,'Anspruch') + kbox(k.uebertrag,'Übertrag')
-        + kbox(k.genommen,'genommen') + kbox(k.geplant,'geplant')
-        + '<div class="kbox rest'+(k.rest<0?' neg':'')+'"><div class="v">'+num(k.rest)+'</div><div class="l">Rest</div></div>'
-      + '</div>'
-      + '<div class="kgrid">'
-        + kbox(k.krank,'Krank (AT)') + kbox(k.kind,'Kind krank') + kbox(k.fortbildung,'Fortbildung')
-        + kbox(k.sonder||0,'Sonderurlaub')
+      + '<div class="rechnung'+(k.rest<0?' neg':'')+'">'
+        + '<span class="rt">Urlaub '+JAHR+'</span>'
+        + rPost(k.anspruch,'Anspruch') + rOp('+') + rPost(k.uebertrag,'Übertrag')
+        + rOp('−') + rPost(k.genommen,'genommen') + rOp('−') + rPost(k.geplant,'geplant')
+        + rOp('=') + '<span class="rp erg"><b>'+num(k.rest)+'</b><span>Rest 31.12.</span></span></div>'
+      + '<div class="chips">'
+        + chip('Krank', k.krank, 'AT') + chip('Kind krank', k.kind, 'AT')
+        + chip('Fortbildung', k.fortbildung, 'AT') + chip('Sonderurlaub', k.sonder||0, 'AT')
       + '</div>';
     if(k.krank_12m_kalendertage >= 42){
       h += '<div class="flag"><b>6-Wochen-Grenze erreicht:</b> '+k.krank_12m_kalendertage
@@ -845,19 +940,26 @@ function viewKonten(){
     if(k.kind >= 15){
       h += '<div class="flag">Kinderkrankentage: '+num(k.kind)+' Tage in '+JAHR+' – gesetzlicher Rahmen (15 je Kind/Elternteil) ausgeschöpft.</div>';
     }
+    if(k.rest < 0){
+      h += '<div class="flag">'+num(-k.rest)+' Tage mehr verplant als vorhanden – bitte den Übertrag prüfen '
+         + 'oder einen Urlaubsantrag anpassen.</div>';
+    }
     if(k.rest > 0 && !k.hinweis_am){
       h += '<div class="flag">Noch '+tage(k.rest)+' offen und kein Urlaubs-Hinweis dokumentiert. '
          + '<a href="#" onclick="hinweisText(\''+m.id+'\');return false;"><b>Hinweisschreiben erzeugen</b></a></div>';
     }
     h += urlaubsPosten(m);
-    h += '<div class="noprint" style="margin-top:9px">'
+    h += '<div class="noprint" style="margin-top:11px">'
        + '<button class="btn small ghost" onclick="openKonto(\''+m.id+'\')">Übertrag / Anspruch anpassen</button>'
        + '<button class="btn small ghost" onclick="openEintrag({staff_id:\''+m.id+'\'})">+ Eintrag</button></div>';
     h += '</div>';
   });
-  h += '<p class="muted">AT = Arbeitstage nach persönlichem Wochenmuster, Feiertage und Wochenenden sind bereits abgezogen.</p>';
-  return h + '</div>';
+  return h;
 }
+function chip(l, v, e){
+  return '<span class="chp"><span>'+l+'</span><b>'+num(v||0)+'</b>'+(e?'<i>'+e+'</i>':'')+'</span>';
+}
+
 /** Alle Urlaubseintraege einer Person - damit jede Zahl nachvollziehbar ist. */
 function urlaubsPosten(m){
   var liste = S.absences.filter(function(a){
@@ -890,7 +992,6 @@ function urlaubsPosten(m){
           + 'Tage, weil sich Zeiträume überschneiden – jeder Kalendertag zählt nur einmal.</p>' : '')
     + '</details>';
 }
-function kbox(v, l){ return '<div class="kbox"><div class="v">'+num(v||0)+'</div><div class="l">'+l+'</div></div>'; }
 
 function openKonto(id){
   var m = S.staff.filter(function(x){ return x.id===id; })[0];
@@ -1154,89 +1255,114 @@ function viewLohn(){
         return '<option value="'+(i+1)+'"'+(MONATWAHL===i+1?' selected':'')+'>'+n+' '+JAHR+'</option>'; }).join('')
     + '<option value="-2"'+(MONATWAHL===-2?' selected':'')+'>Eigener Zeitraum …</option>';
 
-  var h = '<div class="card"><div style="display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:6px">'
-    + '<b style="flex:1;font-size:1.05rem">'+(S.steuerberater ? 'Fehlzeiten für die Lohnabrechnung'
-      : 'Abwesenheiten und Fehlzeiten')+'</b></div>'
-    + '<div class="row'+(MONATWAHL === -2 ? ' three' : ' one')+'">'
+  var h = '<div class="card">'
+    + '<h2>'+(S.steuerberater ? 'Fehlzeiten für die Lohnabrechnung' : 'Abwesenheiten und Fehlzeiten')+'</h2>'
+    + '<div class="row noprint'+(MONATWAHL === -2 ? ' three' : ' one')+'">'
     +   '<div><label>Zeitraum</label><select onchange="monatWahl(this.value)">'+opts+'</select></div>'
     +   (MONATWAHL === -2
-        ? '<div><label>Von</label><input id="r_von" type="date" value="'+esc(ZVON)+'" '
-          + 'onchange="zeitraumWahl()"></div>'
-          + '<div><label>Bis</label><input id="r_bis" type="date" value="'+esc(ZBIS)+'" '
-          + 'onchange="zeitraumWahl()"></div>'
+        ? '<div><label>Von</label><input id="r_von" type="date" value="'+esc(ZVON)+'" onchange="zeitraumWahl()"></div>'
+          + '<div><label>Bis</label><input id="r_bis" type="date" value="'+esc(ZBIS)+'" onchange="zeitraumWahl()"></div>'
         : '')
     + '</div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
-    +   '<a class="btn small ghost" style="text-decoration:none;text-align:center" '
-    +     'href="'+reportAdresse('api.php?a=report_csv')+'">CSV für DATEV / Excel</a>'
-    +   '<button class="btn small ghost" onclick="window.print()">Drucken</button></div>'
-    + '<p class="muted">Zeitraum '+dmy(REPORT.von)+' bis '+dmy(REPORT.bis)+' · AT = Arbeitstage nach '
-    + 'persönlichem Wochenmuster, KT = Kalendertage. Enthält keine Notizen und keine Diagnosen.</p></div>';
+    + '<div class="werkzeug noprint">'
+    +   '<a class="btn small" href="'+reportAdresse('api.php?a=report_csv')+'">Excel-Datei (.xlsx)</a>'
+    +   '<a class="btn small ghost" href="'+reportAdresse('api.php?a=report_csv')+'&amp;format=csv">CSV (DATEV)</a>'
+    +   '<button class="btn small ghost" onclick="window.print()">Drucken</button>'
+    + '</div>'
+    + '<p class="muted">'+dmy(REPORT.von)+' bis '+dmy(REPORT.bis)+' · <b>AT</b> = Arbeitstage nach '
+    + 'persönlichem Wochenmuster, <b>KT</b> = Kalendertage. Jeder Tag zählt genau einmal. '
+    + 'Ohne Notizen und ohne Diagnosen.</p></div>';
 
   var leer = true;
   REPORT.zeilen.forEach(function(z){
     if(z.leer && !z.konto.genommen && !z.konto.geplant) return;
     leer = false;
-    h += '<div class="konto"><div class="kh"><b>'+esc(z.name)+'</b>'
-       + '<span class="muted">'+esc(ROLLEN[z.rolle]||z.rolle)
-       + (z.eintritt ? ' · Eintritt '+dmy(z.eintritt) : '')
-       + (z.austritt ? ' · Austritt '+dmy(z.austritt) : '')+'</span></div>';
-    h += '<div class="kgrid">'
-       + '<div class="kbox rest"><div class="v">'+num(z.abwesend_at)+'</div>'
-       +   '<div class="l">abwesend gesamt (AT)</div></div>'
-       + '<div class="kbox"><div class="v">'+z.abwesend_kt+'</div>'
-       +   '<div class="l">abwesend gesamt (KT)</div></div>'
-       + '</div><div class="kgrid">'
-       + kbox(z.urlaub,'Urlaub (AT)')
-       + kbox(z.krank_at,'Krank (AT)')
-       + '<div class="kbox"><div class="v">'+z.krank_kt+'</div><div class="l">Krank (KT)</div></div>'
-       + kbox(z.kind_at,'Kind krank (AT)')
-       + kbox(z.unbezahlt,'Unbezahlt (AT)')
-       + '</div>';
-    var weitere = '';
-    if(z.sonderurlaub) weitere += kbox(z.sonderurlaub,'Sonderurlaub (AT)');
-    if(z.mutterschutz_kt) weitere += '<div class="kbox"><div class="v">'+z.mutterschutz_kt
-       + '</div><div class="l">Mutterschutz (KT)</div></div>';
-    if(z.fortbildung) weitere += kbox(z.fortbildung,'Fortbildung (AT)');
-    if(z.berufsschule) weitere += kbox(z.berufsschule,'Berufsschule (AT)');
-    if(z.ueberstunden) weitere += kbox(z.ueberstunden,'Überstunden (AT)');
-    if(z.sonstiges) weitere += kbox(z.sonstiges,'Sonstiges (AT)');
-    if(weitere) h += '<div class="kgrid">'+weitere+'</div>';
-
-    if(z.perioden.length){
-      h += '<p class="muted" style="margin:8px 0 5px"><b>Einzelne Zeiträume</b></p>';
-      z.perioden.forEach(function(pz){
-        var t = TY[pz.typ] || {label:pz.typ, farbe:'#888'};
-        h += '<div class="antrag"><span class="dot" style="background:'+t.farbe+'"></span>'
-          + '<div class="t">'+esc(t.label)+' · '+zeitraum(pz.von,pz.bis)+'<br>'
-          + '<span class="muted">'+num(pz.arbeitstage)+' AT · '+pz.kalendertage+' KT · '
-          + (pz.nachweis ? 'Nachweis liegt vor' : 'kein Nachweis hinterlegt')+'</span></div>'
-          + (pz.dateien||[]).map(function(f){
-              return '<a class="btn small ghost" style="text-decoration:none" target="_blank" rel="noopener" '
-                   + 'href="api.php?a=datei&id='+esc(f.id)+'">Nachweis öffnen</a>'; }).join('')
-          + '</div>';
-      });
-    }
-    h += '<div class="kgrid" style="margin-top:8px">'
-       + kbox(z.konto.anspruch,'Anspruch Jahr') + kbox(z.konto.uebertrag,'Übertrag')
-       + kbox(z.konto.genommen,'genommen') + kbox(z.konto.geplant,'geplant')
-       + '<div class="kbox rest"><div class="v">'+num(z.konto.rest)+'</div><div class="l">Rest 31.12.</div></div>'
-       + '</div>';
-    (z.hinweise||[]).forEach(function(hw){ h += '<div class="flag">'+esc(hw)+'</div>'; });
-    h += '</div>';
+    h += personKarte(z);
   });
   if(leer) h += '<div class="card"><p class="muted">In diesem Zeitraum sind keine Fehlzeiten erfasst.</p></div>';
 
-  h += '<div class="card"><h2>Was in dieser Auswertung steht</h2><p class="muted">'
-     + '<b>Enthalten:</b> Urlaub, bezahlter Sonderurlaub, unbezahlter Urlaub, Krankheitstage (Arbeits- und '
-     + 'Kalendertage, je Zeitraum einzeln – für die U1-Erstattung und die Sechs-Wochen-Frist), Kind-krank-Tage, '
-     + 'Mutterschutz und Elternzeit, Fortbildung, Berufsschule, Überstundenabbau sowie der Urlaubsstand '
-     + 'für die Rückstellung zum Jahresende.<br><br>'
-     + '<b>Nicht enthalten:</b> Notizen, Diagnosen, Zugangsdaten, Praxis-Einstellungen. '
-     + 'Hochgeladene Krankenscheine sind für die Steuerberatung standardmäßig gesperrt – die Praxisleitung '
-     + 'kann sie unter Einstellungen bei Bedarf freigeben.</p></div>';
+  h += '<div class="card noprint"><h2>Was in dieser Auswertung steht</h2>'
+     + '<div class="legende-text"><p><b>Enthalten:</b> Urlaub, bezahlter Sonderurlaub, unbezahlter Urlaub, '
+     + 'Krankheitstage als Arbeits- <i>und</i> Kalendertage – je Zeitraum einzeln, für die U1-Erstattung und '
+     + 'die Sechs-Wochen-Frist –, Kind-krank-Tage, Mutterschutz und Elternzeit, Fortbildung, Berufsschule, '
+     + 'Überstundenabbau sowie der Urlaubsstand für die Rückstellung zum Jahresende.</p>'
+     + '<p><b>Nicht enthalten:</b> Notizen, Diagnosen, Zugangsdaten, Praxis-Einstellungen. Hochgeladene '
+     + 'Krankenscheine sind für die Steuerberatung standardmäßig gesperrt – die Praxisleitung kann sie '
+     + 'unter Einstellungen bei Bedarf freigeben.</p></div></div>';
   return h;
 }
+
+/** Zeilen der Fehlzeiten-Tabelle: nur, was tatsaechlich vorkommt. */
+function fehlzeitZeilen(z){
+  var r = [
+    ['urlaub',       'Urlaub',                     z.urlaub,          null],
+    ['sonderurlaub', 'Sonderurlaub',               z.sonderurlaub,    null],
+    ['unbezahlt',    'Unbezahlter Urlaub',         z.unbezahlt,       null],
+    ['krank',        'Krank (AU)',                 z.krank_at,        z.krank_kt],
+    ['kind_krank',   'Kind krank',                 z.kind_at,         z.kind_kt],
+    ['mutterschutz', 'Mutterschutz / Elternzeit',  z.mutterschutz_at, z.mutterschutz_kt],
+    ['fortbildung',  'Fortbildung',                z.fortbildung,     null],
+    ['berufsschule', 'Berufsschule',               z.berufsschule,    null],
+    ['ueberstunden', 'Überstundenabbau',           z.ueberstunden,    null],
+    ['abwesend',     'Abwesend / Sonstiges',       z.sonstiges,       null]
+  ];
+  return r.filter(function(x){ return (x[2] || 0) > 0 || (x[3] || 0) > 0; });
+}
+
+/** Eine Person: Kopf mit den beiden Hauptzahlen, Tabelle der Arten, Urlaubsrechnung. */
+function personKarte(z){
+  var zeilen = fehlzeitZeilen(z);
+  var h = '<div class="person">'
+    + '<div class="ph"><div class="pn"><b>'+esc(z.name)+'</b><span>'+esc(ROLLEN[z.rolle]||z.rolle)
+    +   (z.eintritt ? ' · Eintritt '+dmy(z.eintritt) : '')
+    +   (z.austritt ? ' · Austritt '+dmy(z.austritt) : '')+'</span></div>'
+    + '<div class="pz"><b>'+num(z.abwesend_at)+'</b><span>AT abwesend</span></div>'
+    + '<div class="pz"><b>'+z.abwesend_kt+'</b><span>Kalendertage</span></div></div>';
+
+  if(zeilen.length){
+    h += '<table class="fz"><thead><tr><th>Art</th><th>Arbeitstage</th><th>Kalendertage</th></tr></thead><tbody>';
+    zeilen.forEach(function(x){
+      var t = TY[x[0]] || {farbe:'#9aa5ad'};
+      h += '<tr><td><span class="dot" style="background:'+t.farbe+'"></span>'+esc(x[1])+'</td>'
+        +  '<td class="n">'+((x[2]||0) > 0 ? num(x[2]) : '–')+'</td>'
+        +  '<td class="n">'+(x[3] ? x[3] : '–')+'</td></tr>';
+    });
+    h += '<tr class="gesamt"><td>Abwesend gesamt</td><td class="n">'+num(z.abwesend_at)+'</td>'
+      +  '<td class="n">'+z.abwesend_kt+'</td></tr></tbody></table>';
+  } else {
+    h += '<p class="muted" style="margin:2px 0 10px">Keine Fehlzeiten in diesem Zeitraum.</p>';
+  }
+
+  var k = z.konto, rest = k.rest;
+  h += '<div class="rechnung'+(rest < 0 ? ' neg' : '')+'">'
+    + '<span class="rt">Urlaub '+JAHR+'</span>'
+    + rPost(k.anspruch,'Anspruch') + rOp('+') + rPost(k.uebertrag,'Übertrag')
+    + rOp('−') + rPost(k.genommen,'genommen') + rOp('−') + rPost(k.geplant,'geplant')
+    + rOp('=') + '<span class="rp erg"><b>'+num(rest)+'</b><span>Rest 31.12.</span></span></div>';
+  if(rest < 0){
+    h += '<div class="flag">'+num(-rest)+' Tage mehr verplant als vorhanden – bitte den Übertrag prüfen '
+      +  'oder einen Urlaubsantrag anpassen.</div>';
+  }
+
+  if(z.perioden.length){
+    h += '<div class="ptitel">Einzelne Zeiträume</div>';
+    z.perioden.forEach(function(pz){
+      var t = TY[pz.typ] || {label:pz.typ, farbe:'#888'};
+      h += '<div class="antrag"><span class="dot" style="background:'+t.farbe+'"></span>'
+        + '<div class="t">'+esc(t.label)+' · '+zeitraum(pz.von,pz.bis)+'<br>'
+        + '<span class="muted">'+num(pz.arbeitstage)+' AT · '+pz.kalendertage+' KT · '
+        + (pz.nachweis ? 'Nachweis liegt vor' : 'kein Nachweis hinterlegt')+'</span></div>'
+        + (pz.dateien||[]).map(function(f){
+            return '<a class="btn small ghost" style="text-decoration:none" target="_blank" rel="noopener" '
+                 + 'href="api.php?a=datei&id='+esc(f.id)+'">Nachweis öffnen</a>'; }).join('')
+        + '</div>';
+    });
+  }
+  (z.hinweise||[]).forEach(function(hw){ h += '<div class="flag">'+esc(hw)+'</div>'; });
+  return h + '</div>';
+}
+function rPost(v, l){ return '<span class="rp"><b>'+num(v||0)+'</b><span>'+l+'</span></span>'; }
+function rOp(z){ return '<span class="rop">'+z+'</span>'; }
 
 // ------------------------------------------------------------------ Ansicht: Mein Urlaub (Mitarbeiterin)
 function viewMeins(){
@@ -1245,14 +1371,20 @@ function viewMeins(){
   if(!m) return '<div class="card"><h2>Mein Urlaub</h2><p class="muted">Ihr Zugang ist noch keiner Person '
        + 'im Plan zugeordnet. Bitte die Praxisleitung darum bitten – danach sehen Sie hier Ihr Urlaubskonto.</p></div>';
   var k = S.konten[sid] || {anspruch:0,uebertrag:0,genommen:0,geplant:0,rest:0,krank:0,kind:0,fortbildung:0};
+  var gesamt = Math.max(1, k.anspruch + k.uebertrag);
   var h = '<div class="card"><h2>Mein Urlaubskonto '+JAHR+'</h2>'
-    + '<div class="kgrid">'
-      + kbox(k.anspruch,'Anspruch') + kbox(k.uebertrag,'Übertrag')
-      + kbox(k.genommen,'genommen') + kbox(k.geplant,'geplant')
-      + '<div class="kbox rest'+(k.rest<0?' neg':'')+'"><div class="v">'+num(k.rest)+'</div><div class="l">Rest</div></div>'
+    + '<div class="bar" title="dunkel = genommen, hell = geplant">'
+      + '<i style="background:var(--accent);width:'+Math.min(100,k.genommen/gesamt*100)+'%"></i>'
+      + '<i style="background:#b8d9c8;width:'+Math.min(100,Math.max(0,k.geplant)/gesamt*100)+'%"></i>'
     + '</div>'
-    + '<div class="kgrid">'+kbox(k.krank,'Krank (AT)')+kbox(k.kind,'Kind krank')+kbox(k.fortbildung,'Fortbildung')+'</div>'
-    + '<button class="btn" onclick="openEintrag({})">Urlaub beantragen</button>'
+    + '<div class="rechnung'+(k.rest<0?' neg':'')+'">'
+      + '<span class="rt">Urlaub '+JAHR+'</span>'
+      + rPost(k.anspruch,'Anspruch') + rOp('+') + rPost(k.uebertrag,'Übertrag')
+      + rOp('−') + rPost(k.genommen,'genommen') + rOp('−') + rPost(k.geplant,'geplant')
+      + rOp('=') + '<span class="rp erg"><b>'+num(k.rest)+'</b><span>Rest 31.12.</span></span></div>'
+    + '<div class="chips">'+chip('Krank', k.krank, 'AT')+chip('Kind krank', k.kind, 'AT')
+      + chip('Fortbildung', k.fortbildung, 'AT')+'</div>'
+    + '<button class="btn" style="margin-top:12px" onclick="openEintrag({})">Urlaub beantragen</button>'
     + '<div class="hilfe">Krankenschein oder Attest fürs Kind: unten beim passenden Eintrag auf '
     + '<b>Nachweis hochladen</b> tippen – Foto oder PDF genügt. Nur die Praxisleitung und Sie selbst '
     + 'können die Datei öffnen.</div></div>';
@@ -1325,7 +1457,13 @@ function viewEinst(){
    + '<div><label>Neues Passwort (mind. 10 Zeichen)</label><input id="p_neu" type="password"></div></div>'
    + '<button class="btn ghost" onclick="savePasswort()">Passwort ändern</button></div>'
    + '<div class="card"><h2>Daten</h2>'
-   + '<a class="btn ghost" href="api.php?a=export&jahr='+JAHR+'" style="text-decoration:none;text-align:center">Abwesenheiten '+JAHR+' als CSV</a>'
+   + '<div class="werkzeug">'
+   +   '<a class="btn small" href="api.php?a=export&amp;jahr='+JAHR+'">Abwesenheiten '+JAHR+' als Excel-Datei</a>'
+   +   '<a class="btn small ghost" href="api.php?a=export&amp;jahr='+JAHR+'&amp;format=csv">als CSV</a>'
+   + '</div>'
+   + '<p class="muted" style="margin:-4px 0 12px">Die Excel-Datei hat drei Blätter: <b>Übersicht</b> je Person, '
+   + 'alle <b>Abwesenheiten</b> einzeln und die <b>Feiertage</b> des Jahres – mit Spaltenbreiten, '
+   + 'Datumsformat und Filterzeile. Die CSV ist für Programme gedacht, die nur CSV lesen.</p>'
    + '<button class="btn ghost" onclick="recalc()">Arbeitstage neu berechnen</button>'
    + '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">'
    + '<b style="font-size:0.88rem">Nachweise</b>'
@@ -1343,7 +1481,10 @@ function viewEinst(){
    + '<div class="card"><h2>Feiertage '+JAHR+' · '+esc(S.bundeslaender[S.bundesland]||'')+'</h2>'
    + '<p class="muted" style="margin-bottom:10px">'+Object.keys(S.feiertage).length+' gesetzliche Feiertage. '
    + 'Sie werden bei allen Berechnungen automatisch abgezogen und im Plan hell hinterlegt. '
-   + 'Zusammenhängende Tage stehen als Zeitraum.</p>'+ft+'</div>';
+   + 'Zusammenhängende Tage stehen als Zeitraum.</p>'+ft
+   + (S.feiertage_hinweise||[]).map(function(x){
+       return '<div class="flag" style="margin-top:10px">'+esc(x)+'</div>'; }).join('')
+   + '</div>';
 }
 /** Aufeinanderfolgende Feiertage zu einem Zeitraum zusammenfassen. */
 function feiertagGruppen(){

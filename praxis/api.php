@@ -226,8 +226,8 @@ function feiertage(int $jahr, string $bl): array {
   };
   $add(['BW','BY','ST'],                     $fix('01-06'), 'Heilige Drei Könige');
   $add(['BE','MV'],                          $fix('03-08'), 'Internationaler Frauentag');
-  $add(['BB'],                               $d(0),         'Ostersonntag');
-  $add(['BB'],                               $d(49),        'Pfingstsonntag');
+  $add(['BB','HE'],                          $d(0),         'Ostersonntag');
+  $add(['BB','HE'],                          $d(49),        'Pfingstsonntag');
   $add(['BW','BY','HE','NW','RP','SL'],      $d(60),        'Fronleichnam');
   $add(['SL'],                               $fix('08-15'), 'Mariä Himmelfahrt');
   $add(['TH'],                               $fix('09-20'), 'Weltkindertag');
@@ -237,6 +237,26 @@ function feiertage(int $jahr, string $bl): array {
 
   ksort($h);
   return $GLOBALS['FEIERTAGE_CACHE'][$ck] = $h;
+}
+/**
+ * Feiertage, die nicht im ganzen Bundesland gelten, sondern nur in einzelnen Gemeinden.
+ * Sie stehen bewusst nicht in der Liste oben - sonst wuerde fuer die halbe Belegschaft
+ * ein Arbeitstag verschwinden, den es gibt. Stattdessen wird darauf hingewiesen.
+ */
+function feiertageHinweise(string $bl): array {
+  $h = [];
+  if ($bl === 'BY') {
+    $h[] = 'Mariä Himmelfahrt (15.08.) ist in Bayern nur in überwiegend katholischen Gemeinden '
+         . 'gesetzlicher Feiertag, das Augsburger Friedensfest (08.08.) nur in der Stadt Augsburg. '
+         . 'Beide sind hier nicht eingerechnet – falls sie für Ihre Gemeinde gelten, bitte als '
+         . '„Praxis geschlossen" eintragen.';
+  }
+  if ($bl === 'SN' || $bl === 'TH') {
+    $h[] = 'Fronleichnam ist in diesem Bundesland nur in einzelnen Gemeinden gesetzlicher Feiertag '
+         . 'und daher nicht eingerechnet – falls er für Ihre Gemeinde gilt, bitte als '
+         . '„Praxis geschlossen" eintragen.';
+  }
+  return $h;
 }
 /** Ostersonntag ohne Abhaengigkeit von der calendar-Extension (Gauss/Anonyme Gregorianische Formel). */
 function easter_date_safe(int $y): int {
@@ -918,6 +938,262 @@ function warteschlangeNachher(int $max = 2, bool $nurFaellig = true): void {
   });
 }
 
+// ---------------------------------------------------------------- Beschriftungen
+/** Klartext statt Kuerzel - in Listen, die jemand lesen soll. */
+function typLabel(string $key): string {
+  foreach (TYPEN as $t) if ($t['key'] === $key) return $t['label'];
+  return $key;
+}
+const ROLLEN_LABEL = ['arzt' => 'Ärztin / Arzt', 'mfa' => 'MFA', 'azubi' => 'Auszubildende',
+                      'verwaltung' => 'Verwaltung', 'sonstige' => 'Sonstige'];
+function rolleLabel(string $k): string { return ROLLEN_LABEL[$k] ?? ($k !== '' ? $k : '–'); }
+const STATUS_LABEL = ['beantragt' => 'beantragt', 'gemeldet' => 'gemeldet', 'genehmigt' => 'genehmigt',
+                      'abgelehnt' => 'abgelehnt', 'storniert' => 'storniert'];
+function statusLabel(string $k): string { return STATUS_LABEL[$k] ?? $k; }
+
+/** Spalten und Zeilen der Fehlzeiten-Auswertung - fuer Excel und CSV gleich. */
+const REPORT_SPALTEN = ['Mitarbeiterin', 'Rolle', 'Eintritt', 'Austritt',
+  'Abwesend gesamt AT', 'Abwesend gesamt KT', 'Urlaub AT', 'Sonderurlaub AT', 'Unbezahlt AT',
+  'Krank AT', 'Krank KT', 'Kind krank AT', 'Mutterschutz / Elternzeit KT', 'Fortbildung AT',
+  'Berufsschule AT', 'Überstunden AT', 'Sonstiges AT',
+  'Urlaub Anspruch', 'Übertrag', 'genommen', 'geplant', 'Rest 31.12.'];
+function reportZeile(array $z): array {
+  return [$z['name'], rolleLabel((string)$z['rolle']), $z['eintritt'], $z['austritt'],
+          (float)$z['abwesend_at'], (float)$z['abwesend_kt'], (float)$z['urlaub'],
+          (float)$z['sonderurlaub'], (float)$z['unbezahlt'], (float)$z['krank_at'],
+          (float)$z['krank_kt'], (float)$z['kind_at'], (float)$z['mutterschutz_kt'],
+          (float)$z['fortbildung'], (float)$z['berufsschule'], (float)$z['ueberstunden'],
+          (float)$z['sonstiges'], (float)$z['konto']['anspruch'], (float)$z['konto']['uebertrag'],
+          (float)$z['konto']['genommen'], (float)$z['konto']['geplant'], (float)$z['konto']['rest']];
+}
+
+// ---------------------------------------------------------------- Excel-Datei (.xlsx)
+/**
+ * Kleiner Excel-Schreiber ohne Fremdbibliothek: erzeugt eine echte .xlsx-Datei mit
+ * festen Spaltenbreiten, fixierter Kopfzeile, Filter sowie Datums- und Zahlenformaten.
+ * Eine CSV-Datei kann das alles nicht - darum sahen die Listen bisher unaufgeraeumt aus.
+ *
+ * Aufbau: $blaetter = [ ['name'=>'Abwesenheiten', 'spalten'=>[28,10,...],
+ *                        'fixieren'=>5, 'filter'=>[5, 11],
+ *                        'zeilen'=>[ [zelle, zelle, ...], ... ]], ... ]
+ * Eine Zelle ist ein Text, eine Zahl oder ['w'=>Wert,'t'=>'s|n|d','s'=>Stilnummer,'b'=>Breite].
+ */
+const XL_STD = 0, XL_KOPF = 1, XL_TITEL = 2, XL_GRAU = 3, XL_DATUM = 4, XL_ZAHL = 5,
+      XL_GANZ = 6, XL_FETT = 7, XL_ZAHLFETT = 8, XL_ABSCHNITT = 9, XL_ROT = 10,
+      XL_MITTE = 11, XL_KOPFLINKS = 12, XL_LABEL = 13, XL_TEXT = 14;
+
+function xlsxSpalte(int $i): string {
+  $s = '';
+  for ($n = $i + 1; $n > 0; $n = intdiv($n - 1, 26)) $s = chr(65 + ($n - 1) % 26) . $s;
+  return $s;
+}
+function xlsxText(?string $v): string {
+  $v = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/u', '', (string)$v);
+  return htmlspecialchars($v, ENT_QUOTES | ENT_XML1, 'UTF-8');
+}
+/** Datum als Excel-Seriennummer (Tage seit 30.12.1899). */
+function xlsxDatum(string $ymd): ?int {
+  if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $ymd)) return null;
+  $t = strtotime($ymd . ' 12:00 UTC');
+  if ($t === false) return null;
+  return (int)floor($t / 86400) + 25569;
+}
+
+function xlsxStyles(): string {
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+  . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+  . '<numFmts count="3">'
+  .   '<numFmt numFmtId="164" formatCode="DD\.MM\.YYYY"/>'
+  .   '<numFmt numFmtId="165" formatCode="#,##0.0"/>'
+  .   '<numFmt numFmtId="166" formatCode="#,##0"/>'
+  . '</numFmts>'
+  . '<fonts count="7">'
+  .   '<font><sz val="11"/><name val="Calibri"/><color rgb="FF1F2933"/></font>'
+  .   '<font><sz val="11"/><name val="Calibri"/><b/><color rgb="FFFFFFFF"/></font>'
+  .   '<font><sz val="16"/><name val="Calibri"/><b/><color rgb="FF16653F"/></font>'
+  .   '<font><sz val="10"/><name val="Calibri"/><color rgb="FF6B7280"/></font>'
+  .   '<font><sz val="11"/><name val="Calibri"/><b/><color rgb="FF1F2933"/></font>'
+  .   '<font><sz val="11"/><name val="Calibri"/><b/><color rgb="FFB91C1C"/></font>'
+  .   '<font><sz val="11"/><name val="Calibri"/><b/><color rgb="FF16653F"/></font>'
+  . '</fonts>'
+  . '<fills count="5">'
+  .   '<fill><patternFill patternType="none"/></fill>'
+  .   '<fill><patternFill patternType="gray125"/></fill>'
+  .   '<fill><patternFill patternType="solid"><fgColor rgb="FF16653F"/><bgColor indexed="64"/></patternFill></fill>'
+  .   '<fill><patternFill patternType="solid"><fgColor rgb="FFEAF1EC"/><bgColor indexed="64"/></patternFill></fill>'
+  .   '<fill><patternFill patternType="solid"><fgColor rgb="FFF5F7F8"/><bgColor indexed="64"/></patternFill></fill>'
+  . '</fills>'
+  . '<borders count="3">'
+  .   '<border><left/><right/><top/><bottom/><diagonal/></border>'
+  .   '<border><left/><right/><top/><bottom style="thin"><color rgb="FFD5DBE0"/></bottom><diagonal/></border>'
+  .   '<border><left style="thin"><color rgb="FFE3E8EC"/></left><right style="thin"><color rgb="FFE3E8EC"/></right>'
+  .     '<top style="thin"><color rgb="FFE3E8EC"/></top><bottom style="thin"><color rgb="FFE3E8EC"/></bottom><diagonal/></border>'
+  . '</borders>'
+  . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+  . '<cellXfs count="15">'
+  .   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>'
+  .   '<xf numFmtId="0"   fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
+  .   '<xf numFmtId="0"   fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+  .   '<xf numFmtId="0"   fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+  .   '<xf numFmtId="164" fontId="0" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+  .   '<xf numFmtId="165" fontId="0" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
+  .   '<xf numFmtId="166" fontId="0" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
+  .   '<xf numFmtId="0"   fontId="4" fillId="0" borderId="2" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+  .   '<xf numFmtId="165" fontId="4" fillId="3" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
+  .   '<xf numFmtId="0"   fontId="6" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+  .   '<xf numFmtId="165" fontId="5" fillId="0" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
+  .   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="2" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+  .   '<xf numFmtId="0"   fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'
+  .   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="2" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
+  .   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
+  . '</cellXfs>'
+  . '<cellStyles count="1"><cellStyle name="Standard" xfId="0" builtinId="0"/></cellStyles>'
+  . '</styleSheet>';
+}
+
+/** Ein Arbeitsblatt als XML. */
+function xlsxBlatt(array $b): string {
+  $zeilen = $b['zeilen'] ?? [];
+  $spalten = $b['spalten'] ?? [];
+  $maxSp = count($spalten);
+  foreach ($zeilen as $z) $maxSp = max($maxSp, count($z));
+
+  $cols = '';
+  if ($spalten) {
+    $cols = '<cols>';
+    foreach ($spalten as $i => $w) {
+      $cols .= '<col min="' . ($i + 1) . '" max="' . ($i + 1) . '" width="' . $w . '" customWidth="1"/>';
+    }
+    $cols .= '</cols>';
+  }
+  $fix = '';
+  if (!empty($b['fixieren'])) {
+    $n = (int)$b['fixieren'];
+    $fix = '<pane ySplit="' . $n . '" topLeftCell="A' . ($n + 1) . '" activePane="bottomLeft" state="frozen"/>'
+         . '<selection pane="bottomLeft" activeCell="A' . ($n + 1) . '" sqref="A' . ($n + 1) . '"/>';
+  }
+
+  $xml = '';
+  foreach ($zeilen as $r => $z) {
+    $nr = $r + 1;
+    $hoehe = isset($b['hoehen'][$r]) ? ' ht="' . $b['hoehen'][$r] . '" customHeight="1"' : '';
+    $xml .= '<row r="' . $nr . '"' . $hoehe . '>';
+    foreach ($z as $c => $zelle) {
+      if ($zelle === null || $zelle === '') continue;
+      $stil = XL_STD; $typ = null; $wert = $zelle;
+      if (is_array($zelle)) {
+        $wert = $zelle['w'] ?? '';
+        $stil = $zelle['s'] ?? XL_STD;
+        $typ  = $zelle['t'] ?? null;
+        if ($wert === null || $wert === '') { if ($stil === XL_STD) continue; $wert = ''; }
+      }
+      $ref = xlsxSpalte($c) . $nr;
+      $sa  = $stil ? ' s="' . $stil . '"' : '';
+      if ($typ === 'd') {
+        $ser = xlsxDatum((string)$wert);
+        $xml .= $ser === null
+          ? '<c r="' . $ref . '"' . $sa . ' t="inlineStr"><is><t>' . xlsxText((string)$wert) . '</t></is></c>'
+          : '<c r="' . $ref . '"' . $sa . '><v>' . $ser . '</v></c>';
+      } elseif ($typ === 'n' || (is_numeric($wert) && !is_string($wert))) {
+        $xml .= '<c r="' . $ref . '"' . $sa . '><v>' . (0 + $wert) . '</v></c>';
+      } else {
+        $xml .= '<c r="' . $ref . '"' . $sa . ' t="inlineStr"><is><t xml:space="preserve">'
+              . xlsxText((string)$wert) . '</t></is></c>';
+      }
+    }
+    $xml .= '</row>';
+  }
+  $letzte = max(1, count($zeilen));
+  $filter = '';
+  if (!empty($b['filter'])) {
+    [$von, $bis] = $b['filter'];
+    if ($bis >= $von) $filter = '<autoFilter ref="A' . $von . ':' . xlsxSpalte(max(0, $maxSp - 1)) . $bis . '"/>';
+  }
+  $merge = '';
+  if (!empty($b['verbinden'])) {
+    $merge = '<mergeCells count="' . count($b['verbinden']) . '">';
+    foreach ($b['verbinden'] as $m) $merge .= '<mergeCell ref="' . $m . '"/>';
+    $merge .= '</mergeCells>';
+  }
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    . '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'
+    . '<dimension ref="A1:' . xlsxSpalte(max(0, $maxSp - 1)) . $letzte . '"/>'
+    . '<sheetViews><sheetView showGridLines="0" workbookViewId="0">' . $fix . '</sheetView></sheetViews>'
+    . '<sheetFormatPr defaultRowHeight="15"/>'
+    . $cols . '<sheetData>' . $xml . '</sheetData>' . $filter . $merge
+    . '<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>'
+    . '<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0" paperSize="9"/>'
+    . '</worksheet>';
+}
+
+/** ZIP-Paket ohne Fremdbibliothek - eine .xlsx ist nichts anderes. */
+function zipPaket(array $dateien): string {
+  $lokal = ''; $zentral = ''; $offset = 0; $anzahl = 0;
+  $zeit = (int)date('H') << 11 | (int)date('i') << 5 | intdiv((int)date('s'), 2);
+  $datum = ((int)date('Y') - 1980) << 9 | (int)date('n') << 5 | (int)date('j');
+  foreach ($dateien as $name => $inhalt) {
+    $crc = crc32($inhalt);
+    $roh = strlen($inhalt);
+    $kom = function_exists('gzdeflate') ? gzdeflate($inhalt, 6) : false;
+    $methode = ($kom !== false && strlen($kom) < $roh) ? 8 : 0;
+    if ($methode === 0) $kom = $inhalt;
+    $kopf = pack('vvvvvVVVvv', 20, 0x0800, $methode, $zeit, $datum, $crc, strlen($kom), $roh, strlen($name), 0);
+    $lokal .= "PK\x03\x04" . $kopf . $name . $kom;
+    $zentral .= "PK\x01\x02" . pack('v', 20) . $kopf . pack('vvvVV', 0, 0, 0, 0, $offset) . $name;
+    $offset = strlen($lokal);
+    $anzahl++;
+  }
+  return $lokal . $zentral . "PK\x05\x06"
+       . pack('vvvvVVv', 0, 0, $anzahl, $anzahl, strlen($zentral), strlen($lokal), 0);
+}
+
+/** Fertige .xlsx-Datei aus mehreren Blaettern. */
+function xlsxDatei(array $blaetter): string {
+  $typen = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+    . '<Default Extension="xml" ContentType="application/xml"/>'
+    . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+    . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
+  $sheets = ''; $rels = ''; $dateien = [];
+  foreach (array_values($blaetter) as $i => $b) {
+    $n = $i + 1;
+    $typen   .= '<Override PartName="/xl/worksheets/sheet' . $n . '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+    $sheets  .= '<sheet name="' . xlsxText(mb_substr($b['name'], 0, 31)) . '" sheetId="' . $n . '" r:id="rId' . $n . '"/>';
+    $rels    .= '<Relationship Id="rId' . $n . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' . $n . '.xml"/>';
+    $dateien['xl/worksheets/sheet' . $n . '.xml'] = xlsxBlatt($b);
+  }
+  $typen .= '</Types>';
+  $anzahl = count($blaetter) + 1;
+  return zipPaket(array_merge([
+    '[Content_Types].xml' => $typen,
+    '_rels/.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+      . '</Relationships>',
+    'xl/workbook.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+      . 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      . '<sheets>' . $sheets . '</sheets></workbook>',
+    'xl/_rels/workbook.xml.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      . $rels . '<Relationship Id="rId' . $anzahl . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+      . '</Relationships>',
+    'xl/styles.xml' => xlsxStyles(),
+  ], $dateien));
+}
+/** Datei an den Browser ausliefern. */
+function xlsxAusliefern(string $inhalt, string $name): void {
+  header_remove('Content-Type');
+  header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  header('Content-Disposition: attachment; filename="' . $name . '.xlsx"');
+  header('Content-Length: ' . strlen($inhalt));
+  header('Cache-Control: no-store');
+  echo $inhalt;
+  exit;
+}
+
 // ---------------------------------------------------------------- Auswertung fuer die Lohnabrechnung
 /**
  * Fehlzeiten je Mitarbeiterin fuer einen Monat oder ein ganzes Jahr.
@@ -1207,6 +1483,7 @@ case 'state': {
     'staff' => $staff,
     'absences' => $abs,
     'feiertage' => feiertage($jahr, $bl),
+    'feiertage_hinweise' => feiertageHinweise($bl),
     'konten' => $kt,
     'dateien' => array_values(array_filter(dateienFuer(), function ($f) use ($istL, $eigene) {
       return $istL || $f['staff_id'] === $eigene;
@@ -1544,28 +1821,245 @@ case 'save_settings': {
 
 case 'export': {
   requireLogin();
+  if (!istLeitung()) fail('keine_berechtigung', 403);
   $jahr = (int)($_GET['jahr'] ?? date('Y'));
   $pdo = db();
   $staff = [];
-  foreach ($pdo->query("SELECT * FROM " . t('staff'))->fetchAll() as $m) $staff[$m['id']] = $m;
+  foreach ($pdo->query("SELECT * FROM " . t('staff') . " ORDER BY sortierung, name")->fetchAll() as $m) {
+    $staff[$m['id']] = $m;
+  }
   $st = $pdo->prepare("SELECT * FROM " . t('absences') . " WHERE bis >= ? AND von <= ? ORDER BY von");
   $st->execute(["$jahr-01-01", "$jahr-12-31"]);
-  header('Content-Type: text/csv; charset=utf-8');
-  header('Content-Disposition: attachment; filename="abwesenheiten-' . $jahr . '.csv"');
-  $o = fopen('php://output', 'w');
-  fwrite($o, "\xEF\xBB\xBF");                       // BOM, damit Excel Umlaute erkennt
-  fputcsv($o, ['Mitarbeiter','Rolle','Art','Von','Bis','Arbeitstage','Kalendertage','Halbtag','Status','Nachweis','Notiz'], ';', '"', '');
-  foreach ($st->fetchAll() as $r) {
-    $m = $staff[$r['staff_id']] ?? ['name' => '?', 'rolle' => ''];
-    $label = $r['typ'];
-    foreach (TYPEN as $ty) if ($ty['key'] === $r['typ']) $label = $ty['label'];
-    fputcsv($o, [$m['name'], $m['rolle'], $label, $r['von'], $r['bis'], $r['tage'],
-                 $r['kalendertage'], $r['halbtag'] ? 'ja' : 'nein', $r['status'],
-                 $r['nachweis'] ? 'ja' : 'nein', $r['notiz']], ';', '"', '');
+  $abs = $st->fetchAll();
+  $nachweise = [];
+  foreach ($pdo->query("SELECT absence_id FROM " . t('files'))->fetchAll() as $f) {
+    $nachweise[$f['absence_id']] = true;
   }
-  fclose($o);
-  exit;
+
+  // Reine CSV-Liste - fuer DATEV und andere Programme, die nur CSV lesen
+  if (($_GET['format'] ?? '') === 'csv') {
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="abwesenheiten-' . $jahr . '.csv"');
+    $o = fopen('php://output', 'w');
+    fwrite($o, "\xEF\xBB\xBF");                     // BOM, damit Excel Umlaute erkennt
+    fputcsv($o, ['Mitarbeiterin','Rolle','Art','Von','Bis','Arbeitstage','Kalendertage',
+                 'Halbtag','Status','Nachweis','Notiz'], ';', '"', '');
+    foreach ($abs as $r) {
+      $m = $staff[$r['staff_id']] ?? ['name' => '?', 'rolle' => ''];
+      fputcsv($o, [$m['name'], rolleLabel((string)$m['rolle']), typLabel((string)$r['typ']),
+                   date('d.m.Y', (int)strtotime($r['von'])), date('d.m.Y', (int)strtotime($r['bis'])),
+                   str_replace('.', ',', (string)round((float)$r['tage'], 1)), (int)$r['kalendertage'],
+                   $r['halbtag'] ? 'ja' : 'nein', statusLabel((string)$r['status']),
+                   (isset($nachweise[$r['id']]) || (int)$r['nachweis'] === 1) ? 'ja' : 'nein',
+                   $r['notiz']], ';', '"', '');
+    }
+    fclose($o);
+    exit;
+  }
+
+  $bl    = setting('bundesland', 'HH') ?? 'HH';
+  $feier = feiertage($jahr, $bl);
+  $rep   = reportDaten($jahr, 0);
+  $praxis = setting('praxisname', 'Praxis');
+  $stand = 'Stand ' . date('d.m.Y, H:i') . ' Uhr';
+
+  // ---- Blatt 1: Uebersicht je Person
+  $u = ['name' => 'Übersicht', 'fixieren' => 4, 'filter' => [4, 4 + count($rep['zeilen'])],
+        'spalten' => [26, 15, 11, 11, 9, 9, 9, 9, 9, 9, 11, 10, 10, 10, 10, 10],
+        'hoehen' => [0 => 24, 3 => 34], 'zeilen' => []];
+  $u['zeilen'][] = [['w' => $praxis, 's' => XL_TITEL]];
+  $u['zeilen'][] = [['w' => 'Abwesenheiten und Urlaubskonten ' . $jahr . ' · ' . $stand, 's' => XL_GRAU]];
+  $u['zeilen'][] = [];
+  $u['zeilen'][] = array_map(fn($t) => ['w' => $t, 's' => XL_KOPF], [
+    'Mitarbeiterin', 'Rolle', 'Eintritt', 'Austritt', 'Urlaub AT', 'Sonder AT', 'Unbez. AT',
+    'Krank AT', 'Krank KT', 'Kind krank AT', 'Fortbildung AT', 'Abwesend AT',
+    'Anspruch', 'Übertrag', 'genommen', 'geplant', 'Rest 31.12.']);
+  foreach ($rep['zeilen'] as $z) {
+    $rest = (float)$z['konto']['rest'];
+    $u['zeilen'][] = [
+      ['w' => $z['name'], 's' => XL_FETT], ['w' => rolleLabel((string)$z['rolle']), 's' => XL_LABEL],
+      ['w' => $z['eintritt'], 't' => 'd', 's' => XL_DATUM], ['w' => $z['austritt'], 't' => 'd', 's' => XL_DATUM],
+      ['w' => $z['urlaub'], 't' => 'n', 's' => XL_ZAHL], ['w' => $z['sonderurlaub'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['unbezahlt'], 't' => 'n', 's' => XL_ZAHL], ['w' => $z['krank_at'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['krank_kt'], 't' => 'n', 's' => XL_GANZ], ['w' => $z['kind_at'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['fortbildung'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['abwesend_at'], 't' => 'n', 's' => XL_ZAHLFETT],
+      ['w' => $z['konto']['anspruch'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['konto']['uebertrag'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['konto']['genommen'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['konto']['geplant'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $rest, 't' => 'n', 's' => $rest < 0 ? XL_ROT : XL_ZAHLFETT],
+    ];
+  }
+  $u['zeilen'][] = [];
+  $u['zeilen'][] = [['w' => 'AT = Arbeitstage nach dem persönlichen Wochenmuster · KT = Kalendertage · '
+    . 'Rest 31.12. = Anspruch + Übertrag − genommen − geplant. Ein roter Wert bedeutet: es ist mehr '
+    . 'Urlaub verplant als vorhanden.', 's' => XL_GRAU]];
+
+  // ---- Blatt 2: alle Eintraege, nach Person und Datum
+  usort($abs, function ($a, $b) use ($staff) {
+    $na = $staff[$a['staff_id']]['name'] ?? ''; $nb = $staff[$b['staff_id']]['name'] ?? '';
+    return $na === $nb ? strcmp($a['von'], $b['von']) : strcmp($na, $nb);
+  });
+  $e = ['name' => 'Abwesenheiten', 'fixieren' => 4, 'filter' => [4, 4 + count($abs)],
+        'spalten' => [26, 15, 21, 12, 12, 13, 14, 9, 14, 11, 40],
+        'hoehen' => [0 => 24, 3 => 30], 'zeilen' => []];
+  $e['zeilen'][] = [['w' => $praxis, 's' => XL_TITEL]];
+  $e['zeilen'][] = [['w' => 'Alle Einträge ' . $jahr . ' · ' . count($abs) . ' Zeiträume · ' . $stand, 's' => XL_GRAU]];
+  $e['zeilen'][] = [];
+  $e['zeilen'][] = array_map(fn($t) => ['w' => $t, 's' => XL_KOPF], [
+    'Mitarbeiterin', 'Rolle', 'Art', 'Von', 'Bis', 'Arbeitstage', 'Kalendertage',
+    'Halbtag', 'Status', 'Nachweis', 'Notiz']);
+  foreach ($abs as $r) {
+    $m = $staff[$r['staff_id']] ?? ['name' => '?', 'rolle' => ''];
+    $e['zeilen'][] = [
+      ['w' => $m['name'], 's' => XL_LABEL], ['w' => rolleLabel((string)$m['rolle']), 's' => XL_LABEL],
+      ['w' => typLabel((string)$r['typ']), 's' => XL_LABEL],
+      ['w' => $r['von'], 't' => 'd', 's' => XL_DATUM], ['w' => $r['bis'], 't' => 'd', 's' => XL_DATUM],
+      ['w' => round((float)$r['tage'], 1), 't' => 'n', 's' => XL_ZAHL],
+      ['w' => (int)$r['kalendertage'], 't' => 'n', 's' => XL_GANZ],
+      ['w' => $r['halbtag'] ? 'ja' : '–', 's' => XL_MITTE],
+      ['w' => statusLabel((string)$r['status']), 's' => XL_LABEL],
+      ['w' => (isset($nachweise[$r['id']]) || (int)$r['nachweis'] === 1) ? 'ja' : '–', 's' => XL_MITTE],
+      ['w' => $r['notiz'], 's' => XL_LABEL],
+    ];
+  }
+  if (!$abs) $e['zeilen'][] = [['w' => 'Für ' . $jahr . ' ist nichts erfasst.', 's' => XL_GRAU]];
+
+  // ---- Blatt 3: Feiertage des Jahres
+  $f = ['name' => 'Feiertage', 'fixieren' => 4, 'spalten' => [14, 14, 32],
+        'hoehen' => [0 => 24], 'zeilen' => []];
+  $f['zeilen'][] = [['w' => 'Feiertage ' . $jahr, 's' => XL_TITEL]];
+  $f['zeilen'][] = [['w' => BUNDESLAENDER[$bl] . ' · ' . count($feier) . ' gesetzliche Feiertage · '
+                     . 'bei allen Berechnungen automatisch abgezogen', 's' => XL_GRAU]];
+  $f['zeilen'][] = [];
+  $f['zeilen'][] = array_map(fn($t) => ['w' => $t, 's' => XL_KOPF], ['Datum', 'Wochentag', 'Feiertag']);
+  $wt = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  foreach ($feier as $datum => $name) {
+    $f['zeilen'][] = [['w' => $datum, 't' => 'd', 's' => XL_DATUM],
+                      ['w' => $wt[(int)date('N', (int)strtotime($datum)) - 1], 's' => XL_MITTE],
+                      ['w' => $name, 's' => XL_LABEL]];
+  }
+  foreach (feiertageHinweise($bl) as $hw) {
+    $f['zeilen'][] = [];
+    $f['zeilen'][] = [['w' => $hw, 's' => XL_GRAU]];
+  }
+
+  logAction('export_xlsx', (string)$jahr);
+  xlsxAusliefern(xlsxDatei([$u, $e, $f]), 'Abwesenheiten-' . $jahr);
 }
+
+case 'report_csv': {
+  requireLogin();
+  if (!istLeitung() && !istSteuerberater()) fail('keine_berechtigung', 403);
+  $jahr  = (int)($_GET['jahr'] ?? date('Y'));
+  $monat = (int)($_GET['monat'] ?? 0);
+  if ($monat < 0 || $monat > 12) $monat = 0;
+  $d = reportDaten($jahr, $monat, s($_GET, 'von'), s($_GET, 'bis'));
+  $name = 'Fehlzeiten-' . substr($d['von'], 0, 10) . '-bis-' . substr($d['bis'], 0, 10);
+  $csv = ($_GET['format'] ?? '') === 'csv';
+
+  if ($csv) {
+    header_remove('Content-Type');
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $name . '.csv"');
+    $o = fopen('php://output', 'w');
+    fwrite($o, "\xEF\xBB\xBF");
+    fputcsv($o, ['Zeitraum', date('d.m.Y', (int)strtotime($d['von'])) . ' bis '
+                 . date('d.m.Y', (int)strtotime($d['bis']))], ';', '"', '');
+    fputcsv($o, [], ';', '"', '');
+    fputcsv($o, REPORT_SPALTEN, ';', '"', '');
+    foreach ($d['zeilen'] as $z) {
+      fputcsv($o, array_map(fn($v) => is_float($v) ? str_replace('.', ',', (string)$v) : $v,
+                            reportZeile($z)), ';', '"', '');
+    }
+    fputcsv($o, [], ';', '"', '');
+    fputcsv($o, ['Einzelne Zeitraeume (Krankheit, Kind krank, unbezahlt, Mutterschutz)'], ';', '"', '');
+    fputcsv($o, ['Mitarbeiterin','Art','Von','Bis','Arbeitstage','Kalendertage','Nachweis'], ';', '"', '');
+    foreach ($d['zeilen'] as $z) {
+      foreach ($z['perioden'] as $pz) {
+        fputcsv($o, [$z['name'], typLabel((string)$pz['typ']),
+                     date('d.m.Y', (int)strtotime($pz['von'])), date('d.m.Y', (int)strtotime($pz['bis'])),
+                     str_replace('.', ',', (string)$pz['arbeitstage']), $pz['kalendertage'],
+                     $pz['nachweis'] ? 'ja' : 'nein'], ';', '"', '');
+      }
+    }
+    fclose($o);
+    exit;
+  }
+
+  $zeitraum = date('d.m.Y', (int)strtotime($d['von'])) . ' bis ' . date('d.m.Y', (int)strtotime($d['bis']));
+  $stand = 'Stand ' . date('d.m.Y, H:i') . ' Uhr';
+
+  // ---- Blatt 1: Fehlzeiten je Person
+  $a = ['name' => 'Fehlzeiten', 'fixieren' => 4, 'filter' => [4, 4 + count($d['zeilen'])],
+        'spalten' => [24, 16, 11, 11, 12, 12, 11, 13, 11, 10, 10, 12, 16, 12, 12, 12, 11, 12, 11, 12, 10, 12],
+        'hoehen' => [0 => 24, 3 => 34], 'zeilen' => []];
+  $a['zeilen'][] = [['w' => $d['praxis'], 's' => XL_TITEL]];
+  $a['zeilen'][] = [['w' => 'Fehlzeiten für die Lohnabrechnung · ' . $zeitraum . ' · ' . $stand, 's' => XL_GRAU]];
+  $a['zeilen'][] = [];
+  $a['zeilen'][] = array_map(fn($t) => ['w' => $t, 's' => XL_KOPF], REPORT_SPALTEN);
+  foreach ($d['zeilen'] as $z) {
+    $r = reportZeile($z);
+    $zeile = [['w' => $r[0], 's' => XL_FETT], ['w' => $r[1], 's' => XL_LABEL],
+              ['w' => $r[2], 't' => 'd', 's' => XL_DATUM], ['w' => $r[3], 't' => 'd', 's' => XL_DATUM]];
+    for ($i = 4; $i < count($r); $i++) {
+      $stil = ($i === 4 || $i === 5) ? XL_ZAHLFETT : XL_ZAHL;
+      if ($i === count($r) - 1) $stil = $r[$i] < 0 ? XL_ROT : XL_ZAHLFETT;
+      $zeile[] = ['w' => $r[$i], 't' => 'n', 's' => $stil];
+    }
+    $a['zeilen'][] = $zeile;
+  }
+
+  // ---- Blatt 2: einzelne Zeitraeume
+  $p = ['name' => 'Einzelne Zeiträume', 'fixieren' => 4, 'spalten' => [26, 19, 12, 12, 11, 11, 10],
+        'hoehen' => [0 => 24, 3 => 30], 'zeilen' => []];
+  $p['zeilen'][] = [['w' => 'Einzelne Zeiträume', 's' => XL_TITEL]];
+  $p['zeilen'][] = [['w' => 'Krankheit, Kind krank, unbezahlter Urlaub, Mutterschutz · ' . $zeitraum
+                     . ' · wichtig für U1-Erstattung und die Sechs-Wochen-Frist', 's' => XL_GRAU]];
+  $p['zeilen'][] = [];
+  $p['zeilen'][] = array_map(fn($t) => ['w' => $t, 's' => XL_KOPF],
+    ['Mitarbeiterin', 'Art', 'Von', 'Bis', 'Arbeitstage', 'Kalendertage', 'Nachweis']);
+  $anzahl = 0;
+  foreach ($d['zeilen'] as $z) {
+    foreach ($z['perioden'] as $pz) {
+      $anzahl++;
+      $p['zeilen'][] = [
+        ['w' => $z['name'], 's' => XL_LABEL], ['w' => typLabel((string)$pz['typ']), 's' => XL_LABEL],
+        ['w' => $pz['von'], 't' => 'd', 's' => XL_DATUM], ['w' => $pz['bis'], 't' => 'd', 's' => XL_DATUM],
+        ['w' => $pz['arbeitstage'], 't' => 'n', 's' => XL_ZAHL],
+        ['w' => $pz['kalendertage'], 't' => 'n', 's' => XL_GANZ],
+        ['w' => $pz['nachweis'] ? 'ja' : '–', 's' => XL_MITTE]];
+    }
+  }
+  if (!$anzahl) $p['zeilen'][] = [['w' => 'In diesem Zeitraum keine.', 's' => XL_GRAU]];
+  $p['filter'] = [4, 4 + $anzahl];
+
+  // ---- Blatt 3: Erlaeuterung
+  $hinweise = [
+    ['AT', 'Arbeitstage nach dem persönlichen Wochenmuster. Wochenenden, Feiertage und freie '
+         . 'Teilzeittage sind abgezogen.'],
+    ['KT', 'Kalendertage, also jeder Tag im Zeitraum – unabhängig vom Wochenmuster.'],
+    ['Abwesend gesamt', 'Jeder Kalendertag zählt genau einmal, auch wenn zwei Einträge auf '
+         . 'denselben Tag fallen.'],
+    ['Krank (KT)', 'Für die Sechs-Wochen-Frist der Entgeltfortzahlung und die U1-Erstattung.'],
+    ['Resturlaub', 'Anspruch + Übertrag − genommen − geplant. Ein roter Wert heißt: es ist mehr '
+         . 'Urlaub verplant als vorhanden.'],
+    ['Nicht enthalten', 'Notizen, Diagnosen, hochgeladene Krankenscheine, Zugangsdaten. Diese Datei '
+         . 'enthält keine Gesundheitsdaten über die Tatsache der Arbeitsunfähigkeit hinaus.'],
+  ];
+  $e = ['name' => 'Erläuterung', 'spalten' => [22, 92], 'hoehen' => [0 => 24], 'zeilen' => []];
+  $e['zeilen'][] = [['w' => 'Was in dieser Datei steht', 's' => XL_TITEL]];
+  $e['zeilen'][] = [['w' => $d['praxis'] . ' · ' . $zeitraum, 's' => XL_GRAU]];
+  $e['zeilen'][] = [];
+  foreach ($hinweise as $hw) {
+    $e['zeilen'][] = [['w' => $hw[0], 's' => XL_ABSCHNITT], ['w' => $hw[1], 's' => XL_TEXT]];
+  }
+
+  logAction('report_xlsx', $d['von'] . '..' . $d['bis']);
+  xlsxAusliefern(xlsxDatei([$a, $p, $e]), $name);
+}
+
 
 case 'recalc': {
   requirePost(); requireLeitung(); requireCsrf();
@@ -1810,49 +2304,6 @@ case 'report': {
   if ($jahr < 2000 || $jahr > 2100) $jahr = (int)date('Y');
   if ($monat < 0 || $monat > 12) $monat = 0;
   out(reportDaten($jahr, $monat, s($_GET, 'von'), s($_GET, 'bis')));
-}
-
-case 'report_csv': {
-  requireLogin();
-  if (!istLeitung() && !istSteuerberater()) fail('keine_berechtigung', 403);
-  $jahr  = (int)($_GET['jahr'] ?? date('Y'));
-  $monat = (int)($_GET['monat'] ?? 0);
-  if ($monat < 0 || $monat > 12) $monat = 0;
-  $d = reportDaten($jahr, $monat, s($_GET, 'von'), s($_GET, 'bis'));
-  header_remove('Content-Type');
-  header('Content-Type: text/csv; charset=utf-8');
-  header('Content-Disposition: attachment; filename="fehlzeiten-' . $jahr
-         . ($monat ? '-' . sprintf('%02d', $monat) : '') . '.csv"');
-  $o = fopen('php://output', 'w');
-  fwrite($o, "\xEF\xBB\xBF");
-  fputcsv($o, ['Zeitraum', $d['von'] . ' bis ' . $d['bis']], ';', '"', '');
-  fputcsv($o, [], ';', '"', '');
-  fputcsv($o, ['Mitarbeiter','Rolle','Eintritt','Austritt','Abwesend gesamt (AT)','Abwesend gesamt (KT)',
-               'Urlaub (AT)','Sonderurlaub (AT)',
-               'Unbezahlt (AT)','Krank (AT)','Krank (KT)','Kind krank (AT)','Mutterschutz/Elternzeit (KT)',
-               'Fortbildung (AT)','Berufsschule (AT)','Ueberstundenabbau (AT)','Sonstiges (AT)',
-               'Urlaubsanspruch','Uebertrag','genommen','geplant','Resturlaub'], ';', '"', '');
-  foreach ($d['zeilen'] as $z) {
-    fputcsv($o, [$z['name'], $z['rolle'], $z['eintritt'], $z['austritt'],
-                 $z['abwesend_at'], $z['abwesend_kt'], $z['urlaub'], $z['sonderurlaub'],
-                 $z['unbezahlt'], $z['krank_at'], $z['krank_kt'], $z['kind_at'], $z['mutterschutz_kt'],
-                 $z['fortbildung'], $z['berufsschule'], $z['ueberstunden'], $z['sonstiges'],
-                 $z['konto']['anspruch'], $z['konto']['uebertrag'], $z['konto']['genommen'],
-                 $z['konto']['geplant'], $z['konto']['rest']], ';', '"', '');
-  }
-  fputcsv($o, [], ';', '"', '');
-  fputcsv($o, ['Einzelne Zeitraeume (Krankheit, Kind krank, unbezahlt, Mutterschutz)'], ';', '"', '');
-  fputcsv($o, ['Mitarbeiter','Art','Von','Bis','Arbeitstage','Kalendertage','Nachweis'], ';', '"', '');
-  foreach ($d['zeilen'] as $z) {
-    foreach ($z['perioden'] as $pz) {
-      $label = $pz['typ'];
-      foreach (TYPEN as $ty) if ($ty['key'] === $pz['typ']) $label = $ty['label'];
-      fputcsv($o, [$z['name'], $label, $pz['von'], $pz['bis'], $pz['arbeitstage'],
-                   $pz['kalendertage'], $pz['nachweis'] ? 'ja' : 'nein'], ';', '"', '');
-    }
-  }
-  fclose($o);
-  exit;
 }
 
 case 'mail_diagnose': {

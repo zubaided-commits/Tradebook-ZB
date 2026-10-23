@@ -58,14 +58,17 @@ alle Daten bleiben auf dem eigenen Server.
 | **Urlaub** | Urlaubskonten aller: Anspruch, Übertrag, genommen, geplant, Rest – dazu Krank-, Kind-krank- und Fortbildungstage. |
 | **Auswertung** | Abwesenheiten und Fehlzeiten: **bis heute**, ganzes Jahr, ein Monat oder ein **eigener Zeitraum**. Ganz oben steht je Person „abwesend gesamt", darunter die Aufschlüsselung. Mit CSV-Export. |
 | **Team** | Personen anlegen und ändern; darunter die **Zugänge** zum Anmelden. |
-| **Einstellungen** | Praxisname, Bundesland, eigenes Passwort, CSV-Export. |
+| **Einstellungen** | Praxisname, Bundesland, eigenes Passwort, Excel-Export. |
 
 Der grüne Knopf **+ Eintrag** unten rechts ist immer erreichbar.
 
 ### Reiter „Lohn" – Auswertung für die Steuerberatung
 
-Fehlzeiten je Person für einen Monat oder ein ganzes Jahr, mit CSV-Export für
-DATEV oder Excel und einer Druckansicht. Enthalten ist genau das, was die
+Fehlzeiten je Person für einen Monat, ein ganzes Jahr oder einen frei gewählten
+Zeitraum – als **Excel-Datei**, als CSV für DATEV und als Druckansicht. Jede Person
+steht auf einer eigenen Karte: oben die beiden Hauptzahlen, darunter eine Tabelle
+nur mit den Arten, die tatsächlich vorkommen, und zuletzt die Urlaubsrechnung
+*Anspruch + Übertrag − genommen − geplant = Rest*. Enthalten ist genau das, was die
 Lohnabrechnung braucht:
 
 * Urlaub, bezahlter Sonderurlaub, **unbezahlter Urlaub**
@@ -78,6 +81,26 @@ Lohnabrechnung braucht:
 Automatische Hinweise: bei unbezahltem Urlaub ab fünf zusammenhängenden
 Arbeitstagen (Unterbrechung im Lohnkonto, Meldung zur Sozialversicherung) und
 beim Überschreiten von 42 Krankheits-Kalendertagen in zwölf Monaten.
+
+### Die Excel-Dateien
+
+Alles, was man herunterladen kann, gibt es als fertig formatierte **.xlsx-Datei**:
+feste Spaltenbreiten, fixierte Kopfzeile, Filterzeile, Datumsformat `TT.MM.JJJJ`,
+Zahlen als Zahlen (nicht als Text) und ein roter Resturlaub, wenn mehr verplant ist
+als vorhanden. Sie lässt sich ohne Nachbearbeitung öffnen, drucken und weitergeben.
+
+| Datei | Blätter |
+|---|---|
+| *Einstellungen* → **Abwesenheiten als Excel-Datei** | **Übersicht** je Person · **Abwesenheiten** (jeder Eintrag einzeln, nach Person und Datum sortiert) · **Feiertage** des Jahres |
+| *Auswertung* → **Excel-Datei** | **Fehlzeiten** je Person · **Einzelne Zeiträume** · **Erläuterung** der Spalten |
+
+Daneben steht jeweils ein **CSV**-Knopf für Programme, die nur CSV lesen – etwa
+beim Import in DATEV. Die Excel-Datei wird ohne Fremdbibliothek erzeugt; auf dem
+Webspace muss nichts nachinstalliert werden.
+
+Den Jahresexport mit allen Notizen bekommt nur die **Praxisleitung**. Die
+Steuerberatung kann ausschließlich die Fehlzeiten-Datei ihres Zeitraums
+herunterladen, Mitarbeiterinnen gar keine.
 
 ### Für Mitarbeiterinnen mit Zugang – zwei Reiter
 
@@ -389,17 +412,40 @@ geladen – beim Aufruf verlässt keine Anfrage den Praxis-Server.
 ## 7. Hinweise zu den Feiertagen
 
 Die Feiertage werden aus dem Bundesland berechnet (Ostern nach Gauß, daraus Karfreitag,
-Ostermontag, Christi Himmelfahrt, Pfingstmontag, Fronleichnam). Nicht abgebildet sind
-Feiertage, die nur in einzelnen Gemeinden gelten – **Mariä Himmelfahrt** in Teilen Bayerns
-und **Fronleichnam** in einzelnen Gemeinden Sachsens und Thüringens. Solche Tage bitte
-als Eintrag „Praxis geschlossen“ erfassen.
+Ostermontag, Christi Himmelfahrt, Pfingstmontag, Fronleichnam). Geprüft sind alle
+16 Bundesländer über mehrere Jahre: Zahl und Datum der gesetzlichen Feiertage, das
+Osterdatum und der Buß- und Bettag (Mittwoch vor dem 23. November, nur Sachsen).
+
+Nicht abgebildet sind Feiertage, die **nur in einzelnen Gemeinden** gelten – Mariä
+Himmelfahrt in Teilen Bayerns, das Augsburger Friedensfest und Fronleichnam in
+einzelnen Gemeinden Sachsens und Thüringens. Sie stehen bewusst nicht in der Liste,
+weil sonst für einen Teil der Belegschaft ein Arbeitstag verschwände, den es gibt;
+unter *Einstellungen* erscheint stattdessen ein Hinweis, sobald ein solches
+Bundesland eingestellt ist. Solche Tage bitte als Eintrag „Praxis geschlossen“
+erfassen.
 
 ### Hamburg
 Voreingestellt ist **Hamburg**: neun bundesweite Feiertage plus Reformationstag (31.10.).
 
 Unter *Einstellungen* stehen alle Feiertage des Jahres mit Wochentag. Fallen
 mehrere direkt aufeinander – etwa der 1. und 2. Weihnachtstag – erscheinen sie
-als ein Zeitraum mit der Zahl der Tage.
+als ein Zeitraum mit der Zahl der Tage. Im Monatsplan sind Feiertagsspalten
+bernsteinfarben hinterlegt und im Kopf mit einem Punkt markiert; direkt unter dem
+Plan stehen die Feiertage des Monats im Klartext.
+
+### Die Farben im Plan
+
+| | bedeutet |
+|---|---|
+| graublaue Spalte | Wochenende |
+| bernsteinfarbene Spalte mit Punkt | gesetzlicher Feiertag |
+| diagonaler Strich in einer Zelle | kein Arbeitstag **dieser Person** (Teilzeit) |
+| kleines Dreieck unten rechts | halber Arbeitstag |
+| schraffierte Zeile | vor dem Eintritt bzw. nach dem Austritt |
+| blasse Farbfläche | Eintrag liegt auf einem Tag, der nicht mitzählt |
+
+Spalten gelten für alle, Muster in einzelnen Zellen gelten nur für diese Person –
+daran sind die beiden Fälle auseinanderzuhalten.
 
 ## 8. Nächste Ausbaustufen
 
