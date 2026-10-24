@@ -883,15 +883,28 @@ function meldungMailSenden(string $absenceId, bool $erneut = false): array {
 // Seitenaufruf, sobald die Antwort beim Browser ist. Niemand muss darauf warten,
 // und keine Meldung bleibt unbemerkt liegen.
 
-/** Meldepflichtige Eintraege, die noch nicht verschickt sind - neueste zuerst. */
-function offeneMeldungen(int $limit = 0, bool $nurFaellig = false): array {
+/**
+ * Meldungen, deren Versand versucht wurde und gescheitert ist - neueste zuerst.
+ *
+ * Bewusst NUR gescheiterte Versuche: Eintraege, die angelegt wurden, als der Versand
+ * noch nicht eingerichtet oder ausgeschaltet war, sind keine liegengebliebenen
+ * Meldungen. Sie duerfen nie von allein verschickt werden - sonst bekommt die
+ * Steuerberatung beim naechsten Speichern alte Krankmeldungen ein zweites Mal
+ * oder ueberhaupt erst Monate spaeter.
+ *
+ * $automatisch: Aufruf ohne Zutun der Leitung (Seitenaufruf, Einstellungen speichern,
+ * Testnachricht). Dann nur Fehlschlaege der letzten 7 Tage - was aelter ist, schickt
+ * die Leitung bewusst ueber "Jetzt senden".
+ */
+function offeneMeldungen(int $limit = 0, bool $nurFaellig = false, bool $automatisch = false): array {
   $c = mailKonfig();
   if (!$c['aktiv'] || !$c['arten']) return [];
   $platz = implode(',', array_fill(0, count($c['arten']), '?'));
-  // Nur die letzten 90 Tage - aelteres holt die Leitung bei Bedarf von Hand nach
-  $werte = array_merge($c['arten'], [date('Y-m-d', strtotime('-90 days'))]);
+  $seit = date('Y-m-d', strtotime($automatisch ? '-7 days' : '-90 days'));
+  $werte = array_merge($c['arten'], [$seit]);
   $st = db()->prepare("SELECT * FROM " . t('absences') . "
                        WHERE typ IN ($platz) AND (mail_am IS NULL OR mail_am = '')
+                       AND COALESCE(mail_versuche, 0) > 0
                        AND status NOT IN ('beantragt','abgelehnt','storniert')
                        AND created_at >= ?
                        ORDER BY created_at DESC");
@@ -914,9 +927,9 @@ function offeneMeldungen(int $limit = 0, bool $nurFaellig = false): array {
 }
 
 /** Liegengebliebene Meldungen nachschicken. Gibt zurueck, was dabei herauskam. */
-function warteschlangeAbarbeiten(int $max = 3, bool $nurFaellig = true): array {
+function warteschlangeAbarbeiten(int $max = 3, bool $nurFaellig = true, bool $automatisch = true): array {
   $erledigt = 0; $fehler = 0; $letzter = null;
-  foreach (offeneMeldungen($max, $nurFaellig) as $a) {
+  foreach (offeneMeldungen($max, $nurFaellig, $automatisch) as $a) {
     $r = meldungMailSenden((string)$a['id']);
     if (!empty($r['ok'])) $erledigt++;
     elseif (empty($r['still'])) { $fehler++; $letzter = $r; }
@@ -1693,6 +1706,14 @@ case 'save_absence': {
     }
   }
 
+  // Stand vor dem Speichern: entscheidet, ob eine Meldung faellig wird
+  $vorher = null;
+  if ($id !== '') {
+    $st = db()->prepare("SELECT status, mail_am FROM " . t('absences') . " WHERE id = ?");
+    $st->execute([$id]);
+    $vorher = $st->fetch() ?: null;
+  }
+
   $staffIds = [];
   if ($typ === 'geschlossen') {                    // gilt fuer die ganze Praxis
     foreach (db()->query("SELECT id FROM " . t('staff') . " WHERE aktiv = 1")->fetchAll() as $r) {
@@ -1733,9 +1754,16 @@ case 'save_absence': {
   }
   logAction('eintrag_gespeichert', "$typ $von..$bis");
 
-  // Meldung noch am selben Tag an die Steuerberatung schicken
+  // Meldung noch am selben Tag an die Steuerberatung schicken - aber nur, wenn
+  // tatsaechlich etwas Neues zu melden ist:
+  //  - ein neu angelegter Eintrag, oder
+  //  - ein Antrag, der mit diesem Speichern genehmigt wurde.
+  // Wer einen alten Eintrag nur aendert, verschickt nichts. Sonst ginge jede
+  // Korrektur an einer laengst erledigten Krankmeldung erneut an die Steuerberatung.
+  $neu = ($vorher === null);
+  $geradeGenehmigt = $vorher !== null && $vorher['status'] === 'beantragt' && $status !== 'beantragt';
   $mail = null;
-  if (in_array($typ, mailArten(), true)) {
+  if (in_array($typ, mailArten(), true) && ($neu || $geradeGenehmigt)) {
     foreach ($gespeichert as $gid) {
       $r = meldungMailSenden($gid);
       if (empty($r['still']) && empty($r['schon'])) $mail = $r;
@@ -1825,7 +1853,7 @@ case 'save_settings': {
   }
   logAction('einstellungen_gespeichert');
   // Zugangsdaten koennen gerade korrigiert worden sein: ohne Wartezeit sofort nachholen
-  warteschlangeNachher(25, false);
+  warteschlangeNachher(5, false);
   out(['ok' => true]);
 }
 
@@ -2167,12 +2195,17 @@ case 'entscheiden': {
   $id = s($d, 'id');
   $status = s($d, 'status');
   if (!in_array($status, ['genehmigt', 'abgelehnt'], true)) fail('status_ungueltig');
+  $st = db()->prepare("SELECT status FROM " . t('absences') . " WHERE id = ?");
+  $st->execute([$id]);
+  $vorher = (string)($st->fetchColumn() ?: '');
   db()->prepare("UPDATE " . t('absences') . " SET status = ?, updated_at = ? WHERE id = ?")
       ->execute([$status, date('c'), $id]);
   logAction('antrag_' . $status, $id);
-  // Genehmigte Meldearten gehen jetzt an die Steuerberatung
+  // Nur ein bis eben offener Antrag wird mit der Genehmigung gemeldet.
+  // "Zur Kenntnis" bei einer Krankmeldung ist keine neue Meldung - die ging
+  // schon beim Eintragen raus und darf nicht ein zweites Mal verschickt werden.
   $mail = null;
-  if ($status === 'genehmigt') {
+  if ($status === 'genehmigt' && $vorher === 'beantragt') {
     $r = meldungMailSenden($id);
     if (empty($r['still']) && empty($r['schon'])) $mail = $r;
   }
@@ -2447,7 +2480,7 @@ case 'mail_erneut': {
 case 'mail_warteschlange': {
   requirePost(); requireLeitung(); requireCsrf();
   if (!mailKonfig()['aktiv']) out(['ok' => false, 'fehler' => 'Der Versand ist ausgeschaltet'], 200);
-  $ws = warteschlangeAbarbeiten(25, false);
+  $ws = warteschlangeAbarbeiten(25, false, false);
   $r = $ws['letzter'];
   out(['ok' => $ws['fehler'] === 0, 'versandt' => $ws['versandt'], 'fehler_anzahl' => $ws['fehler'],
        'fehler' => $r['fehler'] ?? '', 'hinweis' => $r['hinweis'] ?? '']);

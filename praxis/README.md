@@ -219,13 +219,28 @@ Empfängeradresse mit Tippfehler. Damit so etwas nicht unbemerkt liegen bleibt:
 * Im Reiter *Kalender* steht ganz oben die Karte **„Noch nicht an die
   Steuerberatung gemeldet"**, solange etwas offen ist. Die Zahl am Reiter
   *Kalender* zählt diese Meldungen mit.
-* **Der Kalender versucht es von allein erneut** – bei jedem Aufruf der Seite,
-  mit wachsendem Abstand (nach wenigen Minuten, dann seltener), damit der
-  Mailserver nicht bedrängt wird. Sobald die Zugangsdaten stimmen, geht alles
-  Liegengebliebene automatisch raus; eine erfolgreiche **Testnachricht** nimmt es
-  sofort mit.
-* Von Hand: **Jetzt senden** am einzelnen Eintrag oder **Alle jetzt senden** in
-  der Karte.
+* **Der Kalender versucht es von allein erneut** – aber nur bei Meldungen, deren
+  Versand tatsächlich **gescheitert** ist, und nur in den ersten sieben Tagen danach.
+  Sobald die Zugangsdaten stimmen, gehen diese Fehlschläge mit dem Speichern der
+  Einstellungen raus. Ältere Fehlschläge schickt die Praxisleitung bewusst über
+  **Jetzt senden** bzw. **Alle jetzt senden**.
+
+#### Wann eine Meldung verschickt wird – und wann nie
+
+Verschickt wird **genau einmal**, und zwar wenn
+
+* ein neuer Eintrag einer gemeldeten Art angelegt wird (Krank, Kind krank, …), oder
+* die Praxisleitung einen offenen Antrag genehmigt (z. B. Elternzeit).
+
+**Nie** von allein verschickt werden:
+
+* Einträge, die angelegt wurden, als der Versand noch nicht eingerichtet oder
+  ausgeschaltet war – auch nicht, wenn er später eingeschaltet wird;
+* Änderungen an einem bestehenden Eintrag (Zeitraum verlängert, Notiz ergänzt …);
+* „Zur Kenntnis" bei einer Krankmeldung – die ging schon beim Eintragen raus.
+
+Wird eine Krankmeldung verlängert und soll die Steuerberatung den neuen Zeitraum
+bekommen, im Eintrag auf **erneut senden** tippen.
 
 **Der häufigste Fall: das Passwort des Postfachs wurde geändert.** Wird das
 Mailpostfach bei IONOS mit einem neuen Passwort versehen, kennt der Kalender nur
