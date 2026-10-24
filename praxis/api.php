@@ -11,7 +11,7 @@ declare(strict_types=1);
  * ueberein, wurde nur eine der zwei Dateien hochgeladen (oder der Browser zeigt
  * noch die alte Oberflaeche) - die Anwendung sagt das dann oben auf der Seite.
  */
-const VERSION = '2026-10-24.3';
+const VERSION = '2026-10-24.4';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -376,6 +376,19 @@ function belegteTage(array $staff, array $abs, string $von, string $bis): array 
 const FEHLZEIT_ARTEN = ['krank', 'kind_krank', 'abwesend', 'sonderurlaub', 'unbezahlt'];
 /** Abwesend, aber dienstlich oder als Ausgleich - keine Fehlzeit. */
 const DIENST_ARTEN = ['fortbildung', 'berufsschule', 'ueberstunden'];
+/** Gruppen in der Reihenfolge der Auswertung: [Schluessel, Titel, [Art => Feld im Bericht]]. */
+const BERICHT_GRUPPEN = [
+  ['fehl',   'Fehlzeiten ohne Urlaub', ['krank' => 'krank_at', 'kind_krank' => 'kind_at',
+      'abwesend' => 'sonstiges', 'sonderurlaub' => 'sonderurlaub', 'unbezahlt' => 'unbezahlt']],
+  ['mutter', 'Mutterschutz / Elternzeit', ['mutterschutz' => 'mutterschutz_at']],
+  ['dienst', 'Dienstlich / Ausgleich', ['fortbildung' => 'fortbildung', 'berufsschule' => 'berufsschule',
+      'ueberstunden' => 'ueberstunden']],
+  ['urlaub', 'Urlaub', ['urlaub' => 'urlaub']],
+];
+function artGruppe(string $typ): string {
+  foreach (BERICHT_GRUPPEN as $g) if (isset($g[2][$typ])) return $g[1];
+  return 'Sonstiges';
+}
 function summenAusTagen(array $tage, string $stichtag = ''): array {
   $s = ['urlaub_genommen' => 0.0, 'urlaub_geplant' => 0.0, 'krank' => 0.0, 'krank_kal' => 0,
         'kind' => 0.0, 'kind_kal' => 0, 'fortbildung' => 0.0, 'sonder' => 0.0, 'stunden' => 0.0,
@@ -1029,6 +1042,134 @@ function reportZeile(array $z): array {
           (float)$z['konto']['genommen'], (float)$z['konto']['geplant'], (float)$z['konto']['rest']];
 }
 
+// ---------------------------------------------------------------- Bericht fuer eine Person
+/** Dateiname ohne Umlaute und Sonderzeichen - funktioniert auf jedem Geraet. */
+function dateiName(string $t): string {
+  $t = strtr($t, ['ä' => 'ae', 'ö' => 'oe', 'ü' => 'ue', 'Ä' => 'Ae', 'Ö' => 'Oe', 'Ü' => 'Ue', 'ß' => 'ss']);
+  $t = preg_replace('/[^A-Za-z0-9]+/', '-', $t);
+  return trim((string)$t, '-') ?: 'Person';
+}
+
+/**
+ * Bericht einer Person als Excel- oder CSV-Datei: Zusammenfassung nach Gruppen und
+ * jeder einzelne Eintrag im Zeitraum. Ohne Notizen und ohne Diagnosen.
+ */
+function personBericht(array $d, array $z, bool $csv): void {
+  $zeitraum = date('d.m.Y', (int)strtotime($d['von'])) . ' bis ' . date('d.m.Y', (int)strtotime($d['bis']));
+  $datei = 'Abwesenheiten-' . dateiName($z['name']) . '-' . $d['von'] . '-bis-' . $d['bis'];
+  $kt = $z['kt'] ?? [];
+
+  // Zeilen der Zusammenfassung: [Text, AT, KT, Art der Zeile]
+  $zus = [];
+  foreach (BERICHT_GRUPPEN as $g) {
+    $teile = [];
+    foreach ($g[2] as $typ => $feld) {
+      $at = (float)($z[$feld] ?? 0); $k = (int)($kt[$typ] ?? 0);
+      if ($at > 0 || $k > 0) $teile[] = [typLabel($typ), $at, $k];
+    }
+    if (!$teile && $g[0] !== 'fehl') continue;
+    $zus[] = [$g[1], null, null, 'gruppe'];
+    if (!$teile) { $zus[] = ['keine', null, null, 'leer']; continue; }
+    $sa = 0.0; $sk = 0;
+    foreach ($teile as $t) { $zus[] = [$t[0], $t[1], $t[2], 'art']; $sa += $t[1]; $sk += $t[2]; }
+    if (count($teile) > 1) $zus[] = ['zusammen', $sa, $sk, 'summe'];
+  }
+  $zus[] = ['Insgesamt nicht in der Praxis', (float)$z['abwesend_at'], (int)$z['abwesend_kt'], 'gesamt'];
+  $k = $z['konto'];
+
+  if ($csv) {
+    header_remove('Content-Type');
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $datei . '.csv"');
+    $o = fopen('php://output', 'w');
+    fwrite($o, "\xEF\xBB\xBF");
+    $z2 = fn(array $r) => fputcsv($o, $r, ';', '"', '');
+    $n = fn($v) => str_replace('.', ',', (string)$v);
+    $z2(['Mitarbeiterin', $z['name']]); $z2(['Zeitraum', $zeitraum]); $z2([]);
+    $z2(['Art', 'Arbeitstage', 'Kalendertage']);
+    foreach ($zus as $r) $z2([$r[3] === 'art' ? '  ' . $r[0] : $r[0],
+                              $r[1] === null ? '' : $n($r[1]), $r[2] === null ? '' : $r[2]]);
+    $z2([]);
+    $z2(['Resturlaub 31.12.' . $d['konto_jahr'], $n($k['rest'])]);
+    $z2([]);
+    $z2(['Art', 'Gruppe', 'Von', 'Bis', 'Arbeitstage im Zeitraum', 'Kalendertage im Zeitraum', 'Status', 'Nachweis']);
+    foreach ($z['eintraege'] ?? [] as $e) {
+      $z2([typLabel($e['typ']), $e['gruppe'], date('d.m.Y', (int)strtotime($e['von'])),
+           date('d.m.Y', (int)strtotime($e['bis'])), $n($e['at']), $e['kt'], statusLabel($e['status']),
+           $e['nachweis'] ? 'ja' : 'nein']);
+    }
+    fclose($o);
+    exit;
+  }
+
+  // ---- Blatt 1: Zusammenfassung
+  $a = ['name' => 'Zusammenfassung', 'spalten' => [34, 14, 14], 'hoehen' => [0 => 24], 'zeilen' => []];
+  $a['zeilen'][] = [['w' => $z['name'], 's' => XL_TITEL]];
+  $a['zeilen'][] = [['w' => rolleLabel((string)$z['rolle'])
+                     . ($z['eintritt'] ? ' · Eintritt ' . date('d.m.Y', (int)strtotime($z['eintritt'])) : '')
+                     . ($z['austritt'] ? ' · Austritt ' . date('d.m.Y', (int)strtotime($z['austritt'])) : ''),
+                     's' => XL_GRAU]];
+  $a['zeilen'][] = [['w' => 'Abwesenheiten ' . $zeitraum . ' · ' . $d['praxis'], 's' => XL_GRAU]];
+  $a['zeilen'][] = [];
+  $a['zeilen'][] = [['w' => 'Art', 's' => XL_KOPFLINKS], ['w' => 'Arbeitstage', 's' => XL_KOPF],
+                    ['w' => 'Kalendertage', 's' => XL_KOPF]];
+  foreach ($zus as $r) {
+    switch ($r[3]) {
+      case 'gruppe':
+        $a['zeilen'][] = [['w' => $r[0], 's' => XL_ABSCHNITT], ['w' => '', 's' => XL_ABSCHNITT],
+                          ['w' => '', 's' => XL_ABSCHNITT]];
+        break;
+      case 'leer':
+        $a['zeilen'][] = [['w' => 'keine', 's' => XL_LABEL], ['w' => '–', 's' => XL_MITTE], ['w' => '–', 's' => XL_MITTE]];
+        break;
+      case 'art':
+        $a['zeilen'][] = [['w' => '   ' . $r[0], 's' => XL_LABEL], ['w' => $r[1], 't' => 'n', 's' => XL_ZAHL],
+                          ['w' => $r[2], 't' => 'n', 's' => XL_GANZ]];
+        break;
+      default:   // zusammen / gesamt
+        $a['zeilen'][] = [['w' => $r[0], 's' => XL_FETT], ['w' => $r[1], 't' => 'n', 's' => XL_ZAHLFETT],
+                          ['w' => $r[2], 't' => 'n', 's' => XL_GANZFETT]];
+    }
+  }
+  $a['zeilen'][] = [];
+  $a['zeilen'][] = [['w' => 'Urlaub ' . $d['konto_jahr'], 's' => XL_ABSCHNITT], ['w' => '', 's' => XL_ABSCHNITT],
+                    ['w' => '', 's' => XL_ABSCHNITT]];
+  foreach ([['Anspruch', $k['anspruch']], ['Übertrag', $k['uebertrag']], ['genommen', $k['genommen']],
+            ['geplant', $k['geplant']]] as $p) {
+    $a['zeilen'][] = [['w' => '   ' . $p[0], 's' => XL_LABEL], ['w' => (float)$p[1], 't' => 'n', 's' => XL_ZAHL]];
+  }
+  $a['zeilen'][] = [['w' => 'Resturlaub 31.12.' . $d['konto_jahr'], 's' => XL_FETT],
+                    ['w' => (float)$k['rest'], 't' => 'n', 's' => $k['rest'] < 0 ? XL_ROT : XL_ZAHLFETT]];
+  foreach ($z['hinweise'] ?? [] as $hw) { $a['zeilen'][] = []; $a['zeilen'][] = [['w' => $hw, 's' => XL_GRAU]]; }
+  $a['zeilen'][] = [];
+  $a['zeilen'][] = [['w' => 'Fehlzeiten ohne Urlaub = Krank, Kind krank, Abwesend/Sonstiges, Sonderurlaub, '
+                     . 'unbezahlter Urlaub. Jeder Kalendertag zählt einmal. Ohne Notizen und Diagnosen.', 's' => XL_GRAU]];
+
+  // ---- Blatt 2: jeder Eintrag
+  $e = $z['eintraege'] ?? [];
+  $b = ['name' => 'Alle Einträge', 'fixieren' => 4, 'filter' => [4, 4 + count($e)],
+        'spalten' => [24, 24, 12, 12, 13, 14, 13, 11], 'hoehen' => [0 => 24, 3 => 34], 'zeilen' => []];
+  $b['zeilen'][] = [['w' => $z['name'] . ' – alle Einträge', 's' => XL_TITEL]];
+  $b['zeilen'][] = [['w' => $zeitraum . ' · ' . count($e) . ' Einträge · Tage, die außerhalb des Zeitraums '
+                     . 'liegen, zählen nicht mit', 's' => XL_GRAU]];
+  $b['zeilen'][] = [];
+  $b['zeilen'][] = array_map(fn($t) => ['w' => $t, 's' => XL_KOPF],
+    ['Art', 'Gruppe', 'Von', 'Bis', 'Arbeitstage im Zeitraum', 'Kalendertage im Zeitraum', 'Status', 'Nachweis']);
+  foreach ($e as $x) {
+    $b['zeilen'][] = [
+      ['w' => typLabel($x['typ']) . ($x['halbtag'] ? ' (halber Tag)' : ''), 's' => XL_LABEL],
+      ['w' => $x['gruppe'], 's' => XL_LABEL],
+      ['w' => $x['von'], 't' => 'd', 's' => XL_DATUM], ['w' => $x['bis'], 't' => 'd', 's' => XL_DATUM],
+      ['w' => $x['at'], 't' => 'n', 's' => XL_ZAHL], ['w' => $x['kt'], 't' => 'n', 's' => XL_GANZ],
+      ['w' => statusLabel($x['status']), 's' => XL_LABEL],
+      ['w' => $x['nachweis'] ? 'ja' : '–', 's' => XL_MITTE]];
+  }
+  if (!$e) $b['zeilen'][] = [['w' => 'In diesem Zeitraum keine Einträge.', 's' => XL_GRAU]];
+
+  logAction('personbericht', $z['name'] . ' ' . $d['von'] . '..' . $d['bis']);
+  xlsxAusliefern(xlsxDatei([$a, $b]), $datei);
+}
+
 // ---------------------------------------------------------------- Excel-Datei (.xlsx)
 /**
  * Kleiner Excel-Schreiber ohne Fremdbibliothek: erzeugt eine echte .xlsx-Datei mit
@@ -1042,7 +1183,7 @@ function reportZeile(array $z): array {
  */
 const XL_STD = 0, XL_KOPF = 1, XL_TITEL = 2, XL_GRAU = 3, XL_DATUM = 4, XL_ZAHL = 5,
       XL_GANZ = 6, XL_FETT = 7, XL_ZAHLFETT = 8, XL_ABSCHNITT = 9, XL_ROT = 10,
-      XL_MITTE = 11, XL_KOPFLINKS = 12, XL_LABEL = 13, XL_TEXT = 14;
+      XL_MITTE = 11, XL_KOPFLINKS = 12, XL_LABEL = 13, XL_TEXT = 14, XL_GANZFETT = 15;
 
 function xlsxSpalte(int $i): string {
   $s = '';
@@ -1095,7 +1236,7 @@ function xlsxStyles(): string {
   .     '<top style="thin"><color rgb="FFE3E8EC"/></top><bottom style="thin"><color rgb="FFE3E8EC"/></bottom><diagonal/></border>'
   . '</borders>'
   . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-  . '<cellXfs count="15">'
+  . '<cellXfs count="16">'
   .   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>'
   .   '<xf numFmtId="0"   fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'
   .   '<xf numFmtId="0"   fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf>'
@@ -1111,6 +1252,7 @@ function xlsxStyles(): string {
   .   '<xf numFmtId="0"   fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'
   .   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="2" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>'
   .   '<xf numFmtId="0"   fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
+  .   '<xf numFmtId="166" fontId="4" fillId="3" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>'
   . '</cellXfs>'
   . '<cellStyles count="1"><cellStyle name="Standard" xfId="0" builtinId="0"/></cellStyles>'
   . '</styleSheet>';
@@ -1265,7 +1407,7 @@ function xlsxAusliefern(string $inhalt, string $name): void {
  * Enthaelt ausschliesslich das, was die Lohnabrechnung braucht - keine Notizen,
  * keine Diagnosen, keine Angaben zu anderen Bereichen.
  */
-function reportDaten(int $jahr, int $monat, string $vonFrei = '', string $bisFrei = ''): array {
+function reportDaten(int $jahr, int $monat, string $vonFrei = '', string $bisFrei = '', string $nurStaff = ''): array {
   if ($vonFrei !== '' && $bisFrei !== '' && isDate($vonFrei) && isDate($bisFrei) && $bisFrei >= $vonFrei) {
     $von = $vonFrei; $bis = $bisFrei;
   } else {
@@ -1275,6 +1417,9 @@ function reportDaten(int $jahr, int $monat, string $vonFrei = '', string $bisFre
 
   $pdo = db();
   $staff = $pdo->query("SELECT * FROM " . t('staff') . " ORDER BY sortierung, name")->fetchAll();
+  if ($nurStaff !== '') {
+    $staff = array_values(array_filter($staff, fn($m) => (string)$m['id'] === $nurStaff));
+  }
   $st = $pdo->prepare("SELECT * FROM " . t('absences') . " WHERE bis >= ? AND von <= ? ORDER BY von");
   $st->execute([$von, $bis]);
   $abs = $st->fetchAll();
@@ -1283,7 +1428,8 @@ function reportDaten(int $jahr, int $monat, string $vonFrei = '', string $bisFre
   foreach (db()->query("SELECT id, absence_id, dateiname FROM " . t('files'))->fetchAll() as $f) {
     $dateien[$f['absence_id']][] = ['id' => $f['id'], 'name' => $f['dateiname']];
   }
-  $konten = konten($jahr);
+  $kontoJahr = (int)substr($bis, 0, 4);
+  $konten = konten($kontoJahr);
 
   $zeilen = [];
   foreach ($staff as $m) {
@@ -1348,11 +1494,29 @@ function reportDaten(int $jahr, int $monat, string $vonFrei = '', string $bisFre
       $z['hinweise'][] = 'Kinderkrankentage ' . $jahr . ': ' . str_replace('.', ',', (string)$k['kind'])
         . ' – gesetzlicher Rahmen (15 Tage je Kind und Elternteil) ausgeschöpft.';
     }
+    if ($nurStaff !== '') {
+      $z['eintraege'] = [];
+      foreach ($abs as $a) {
+        if ((string)$a['staff_id'] !== (string)$m['id']) continue;
+        if (in_array($a['status'], ['abgelehnt', 'storniert'], true)) continue;
+        if ($a['typ'] === 'geschlossen') continue;           // Praxis zu - keine persoenliche Abwesenheit
+        $z['eintraege'][] = [
+          'id' => $a['id'], 'typ' => $a['typ'], 'gruppe' => artGruppe((string)$a['typ']),
+          'von' => $a['von'], 'bis' => $a['bis'], 'status' => $a['status'],
+          'halbtag' => (int)$a['halbtag'],
+          'at' => round(anteilImZeitraum($a, $m, $von, $bis), 1),
+          'kt' => kalenderImZeitraum($a, $von, $bis),
+          'ganz' => ($a['von'] >= $von && $a['bis'] <= $bis) ? 1 : 0,
+          'nachweis' => (isset($dateien[$a['id']]) || (int)$a['nachweis'] === 1) ? 1 : 0,
+        ];
+      }
+    }
+    $z['id'] = $m['id'];
     $z['leer'] = ($z['abwesend_at'] > 0 || $z['abwesend_kt'] > 0) ? 0 : 1;
     $zeilen[] = $z;
   }
-  return ['von' => $von, 'bis' => $bis, 'jahr' => $jahr, 'monat' => $monat,
-          'praxis' => setting('praxisname', 'Praxis'), 'zeilen' => $zeilen];
+  return ['von' => $von, 'bis' => $bis, 'jahr' => $jahr, 'monat' => $monat, 'konto_jahr' => $kontoJahr,
+          'staff' => $nurStaff, 'praxis' => setting('praxisname', 'Praxis'), 'zeilen' => $zeilen];
 }
 
 // ---------------------------------------------------------------- Sitzung / Auth
@@ -2065,9 +2229,14 @@ case 'report_csv': {
   $jahr  = (int)($_GET['jahr'] ?? date('Y'));
   $monat = (int)($_GET['monat'] ?? 0);
   if ($monat < 0 || $monat > 12) $monat = 0;
-  $d = reportDaten($jahr, $monat, s($_GET, 'von'), s($_GET, 'bis'));
+  $nur = s($_GET, 'staff');
+  if ($nur !== '' && !ladeStaff($nur)) fail('mitarbeiter_unbekannt', 404);
+  $d = reportDaten($jahr, $monat, s($_GET, 'von'), s($_GET, 'bis'), $nur);
   $name = 'Fehlzeiten-' . substr($d['von'], 0, 10) . '-bis-' . substr($d['bis'], 0, 10);
   $csv = ($_GET['format'] ?? '') === 'csv';
+
+  // Bericht fuer eine einzelne Person - eigene Datei mit allen Eintraegen
+  if ($nur !== '' && $d['zeilen']) personBericht($d, $d['zeilen'][0], $csv);
 
   if ($csv) {
     header_remove('Content-Type');
@@ -2421,7 +2590,9 @@ case 'report': {
   $monat = (int)($_GET['monat'] ?? 0);
   if ($jahr < 2000 || $jahr > 2100) $jahr = (int)date('Y');
   if ($monat < 0 || $monat > 12) $monat = 0;
-  out(reportDaten($jahr, $monat, s($_GET, 'von'), s($_GET, 'bis')));
+  $nur = s($_GET, 'staff');
+  if ($nur !== '' && !ladeStaff($nur)) fail('mitarbeiter_unbekannt', 404);
+  out(reportDaten($jahr, $monat, s($_GET, 'von'), s($_GET, 'bis'), $nur));
 }
 
 case 'mail_diagnose': {

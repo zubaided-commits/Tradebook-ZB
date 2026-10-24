@@ -115,6 +115,25 @@ Eintrag nichts.
 Das ist nicht nur in der Oberfläche so: der Server weist jede Änderung und jede
 Löschung ab, auch wenn sie an der Oberfläche vorbei geschickt wird.
 
+### Bericht für eine einzelne Person
+
+In der *Auswertung* neben dem Zeitraum die **Person** wählen – oder auf einer Karte
+**Einzeln ansehen** tippen. Dann steht nur diese Person auf der Seite, oben ihre
+Fehlzeiten und ihr Urlaub, darunter **jeder einzelne Eintrag** im Zeitraum mit
+Arbeits- und Kalendertagen, Gruppe und Status. Reicht ein Eintrag über den Rand des
+Zeitraums hinaus, zählt nur der Teil darin; das steht dann dabei.
+
+Der Zeitraum ist frei: ein Monat, das ganze Jahr, „bis heute" oder unter
+**Eigener Zeitraum** ein beliebiges Von–Bis – auch über den Jahreswechsel, etwa vom
+01.09. bis zum 31.08. des Folgejahres.
+
+Herunterladen lässt sich der Bericht als **Excel-Datei** (Blatt *Zusammenfassung*
+und Blatt *Alle Einträge*) oder als CSV, Dateiname mit Name und Zeitraum, z. B.
+`Abwesenheiten-Samira-Ahmadi-2026-10-01-bis-2026-10-31.xlsx`. **Drucken / als PDF**
+druckt nur diese Person, mit Praxisname und Erstellungsdatum; auf dem iPad über
+*Teilen → In Dateien sichern* als PDF ablegen. Notizen und Diagnosen stehen in
+keinem Bericht. Berichte sehen nur die Praxisleitung und die Steuerberatung.
+
 ### Die Excel-Dateien
 
 Alles, was man herunterladen kann, gibt es als fertig formatierte **.xlsx-Datei**:

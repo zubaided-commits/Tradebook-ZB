@@ -253,6 +253,9 @@ table.fz tr.gesamt td{font-weight:700;border-top:2px solid var(--line)}
 .rechnung.neg .rp.erg b{color:var(--bad)}
 .person .ptitel{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;
   font-weight:700;margin:14px 0 2px}
+.nurdruck{display:none}
+@media print{ .nurdruck{display:block;font-size:0.8rem;color:var(--ink);margin-bottom:8px;
+  padding-bottom:6px;border-bottom:1px solid var(--line)} }
 .legende-text p{font-size:0.8rem;line-height:1.6;color:var(--mut);margin-bottom:9px}
 .legende-text p:last-child{margin-bottom:0}
 .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
@@ -332,7 +335,7 @@ var TY = {};                        // typ-key -> definition
 var MSG = null;
 
 /** Stand dieser Datei - muss zu dem in api.php passen (siehe versionsHinweis). */
-var VERSION = '2026-10-24.3';
+var VERSION = '2026-10-24.4';
 var WTAG = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 var MNAME = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 var MKURZ = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -1278,15 +1281,25 @@ function delStaff(id){
 // ------------------------------------------------------------------ Ansicht: Lohnabrechnung
 var MONATWAHL = new Date().getMonth() + 1;   // 0 = ganzes Jahr, -1 = bis heute, -2 = eigener Zeitraum
 var ZVON = '', ZBIS = '';
+var PERSONWAHL = '';        // '' = alle, sonst die id einer Person
 var REPORT = null;
 
 function reportAdresse(basis){
-  if(MONATWAHL === -1) return basis+'&jahr='+JAHR+'&von='+JAHR+'-01-01&bis='+S.heute;
-  if(MONATWAHL === -2 && ZVON && ZBIS) return basis+'&jahr='+JAHR+'&von='+ZVON+'&bis='+ZBIS;
-  return basis+'&jahr='+JAHR+'&monat='+Math.max(0, MONATWAHL);
+  var p = PERSONWAHL ? '&staff='+encodeURIComponent(PERSONWAHL) : '';
+  if(MONATWAHL === -1) return basis+'&jahr='+JAHR+'&von='+JAHR+'-01-01&bis='+S.heute+p;
+  if(MONATWAHL === -2 && ZVON && ZBIS) return basis+'&jahr='+JAHR+'&von='+ZVON+'&bis='+ZBIS+p;
+  return basis+'&jahr='+JAHR+'&monat='+Math.max(0, MONATWAHL)+p;
 }
 var REPORT_KEY = null, REPORT_LAEDT = false;
-function reportSchluessel(){ return JAHR+'|'+MONATWAHL+'|'+ZVON+'|'+ZBIS; }
+function reportSchluessel(){ return JAHR+'|'+MONATWAHL+'|'+ZVON+'|'+ZBIS+'|'+PERSONWAHL; }
+/** Auswertung fuer eine Person (oder mit '' wieder fuer alle). */
+function personWahl(id){
+  PERSONWAHL = id || '';
+  REPORT_KEY = null;
+  if(VIEW !== 'lohn'){ VIEW = 'lohn'; }
+  ladeReport();
+  window.scrollTo(0, 0);
+}
 function ladeReport(){
   var k = reportSchluessel();
   return api(reportAdresse('report')).then(function(r){
@@ -1318,31 +1331,52 @@ function viewLohn(){
         return '<option value="'+(i+1)+'"'+(MONATWAHL===i+1?' selected':'')+'>'+n+' '+JAHR+'</option>'; }).join('')
     + '<option value="-2"'+(MONATWAHL===-2?' selected':'')+'>Eigener Zeitraum …</option>';
 
+  var person = PERSONWAHL ? (S.staff.filter(function(m){ return m.id === PERSONWAHL; })[0] || null) : null;
+  var personOpts = '<option value="">Alle Mitarbeiterinnen</option>'
+    + S.staff.map(function(m){
+        return '<option value="'+esc(m.id)+'"'+(m.id === PERSONWAHL ? ' selected' : '')+'>'+esc(m.name)
+             + (m.aktiv === 0 ? ' (nicht mehr im Plan)' : '')+'</option>'; }).join('');
+
   var h = '<div class="card">'
-    + '<h2>'+(S.steuerberater ? 'Fehlzeiten für die Lohnabrechnung' : 'Abwesenheiten und Fehlzeiten')+'</h2>'
-    + '<div class="row noprint'+(MONATWAHL === -2 ? ' three' : ' one')+'">'
+    + '<p class="nurdruck"><b>'+esc(S.praxis)+'</b> · erstellt am '+dmy(S.heute)+'</p>'
+    + '<h2>'+(person ? 'Bericht · '+esc(person.name)
+             : (S.steuerberater ? 'Fehlzeiten für die Lohnabrechnung' : 'Abwesenheiten und Fehlzeiten'))+'</h2>'
+    + '<div class="row noprint">'
     +   '<div><label>Zeitraum</label><select onchange="monatWahl(this.value)">'+opts+'</select></div>'
-    +   (MONATWAHL === -2
-        ? '<div><label>Von</label><input id="r_von" type="date" value="'+esc(ZVON)+'" onchange="zeitraumWahl()"></div>'
+    +   '<div><label>Person</label><select onchange="personWahl(this.value)">'+personOpts+'</select></div>'
+    + '</div>'
+    + (MONATWAHL === -2
+        ? '<div class="row noprint">'
+          + '<div><label>Von</label><input id="r_von" type="date" value="'+esc(ZVON)+'" onchange="zeitraumWahl()"></div>'
           + '<div><label>Bis</label><input id="r_bis" type="date" value="'+esc(ZBIS)+'" onchange="zeitraumWahl()"></div>'
+          + '</div>'
+          + '<p class="muted noprint" style="margin:-4px 0 11px">Jeder beliebige Zeitraum ist möglich – '
+          + 'auch über den Jahreswechsel, etwa vom 01.09. bis zum 31.08. des Folgejahres.</p>'
         : '')
-    + '</div>'
     + '<div class="werkzeug noprint">'
-    +   '<a class="btn small" href="'+reportAdresse('api.php?a=report_csv')+'">Excel-Datei (.xlsx)</a>'
-    +   '<a class="btn small ghost" href="'+reportAdresse('api.php?a=report_csv')+'&amp;format=csv">CSV (DATEV)</a>'
-    +   '<button class="btn small ghost" onclick="window.print()">Drucken</button>'
+    +   '<a class="btn small" href="'+reportAdresse('api.php?a=report_csv')+'">'
+    +     (person ? 'Excel für '+esc(person.name) : 'Excel-Datei (.xlsx)')+'</a>'
+    +   '<a class="btn small ghost" href="'+reportAdresse('api.php?a=report_csv')+'&amp;format=csv">'
+    +     (person ? 'CSV' : 'CSV (DATEV)')+'</a>'
+    +   '<button class="btn small ghost" onclick="window.print()">Drucken'+(person ? ' / als PDF' : '')+'</button>'
+    +   (person ? '<button class="btn small ghost" onclick="personWahl(\'\')">‹ Alle Mitarbeiterinnen</button>' : '')
     + '</div>'
-    + '<p class="muted">'+dmy(REPORT.von)+' bis '+dmy(REPORT.bis)+' · <b>Fehlzeiten ohne Urlaub</b> = Krank, '
+    + '<p class="muted">'+(person ? '<b>'+esc(person.name)+'</b> · ' : '')
+    + dmy(REPORT.von)+' bis '+dmy(REPORT.bis)+' · <b>Fehlzeiten ohne Urlaub</b> = Krank, '
     + 'Kind krank, Abwesend/Sonstiges, Sonderurlaub und unbezahlter Urlaub – die Tage, an denen jemand nicht '
     + 'zur Arbeit kam. <b>AT</b> = Arbeitstage nach persönlichem Wochenmuster, <b>KT</b> = Kalendertage. '
     + 'Ohne Notizen und ohne Diagnosen.</p></div>';
 
   var leer = true;
-  REPORT.zeilen.forEach(function(z){
-    if(z.leer && !z.konto.genommen && !z.konto.geplant) return;
-    leer = false;
-    h += personKarte(z);
-  });
+  if(PERSONWAHL){
+    REPORT.zeilen.forEach(function(z){ leer = false; h += personKarte(z, true) + eintraegeKarte(z); });
+  } else {
+    REPORT.zeilen.forEach(function(z){
+      if(z.leer && !z.konto.genommen && !z.konto.geplant) return;
+      leer = false;
+      h += personKarte(z, false);
+    });
+  }
   if(leer) h += '<div class="card"><p class="muted">In diesem Zeitraum sind keine Fehlzeiten erfasst.</p></div>';
 
   h += '<div class="card noprint"><h2>Was in dieser Auswertung steht</h2>'
@@ -1375,7 +1409,7 @@ var GRUPPEN = [
 ];
 
 /** Eine Person in der Auswertung: zuerst die Fehlzeiten, dann der Rest, zuletzt die Summe. */
-function personKarte(z){
+function personKarte(z, einzeln){
   var kt = z.kt || {};
   var h = '<div class="person">'
     + '<div class="ph"><div class="pn"><b>'+esc(z.name)+'</b><span>'+esc(ROLLEN[z.rolle]||z.rolle)
@@ -1420,11 +1454,13 @@ function personKarte(z){
 
   // Urlaubsstand nur als eine Zeile - die ausfuehrliche Rechnung steht im Reiter "Urlaub"
   var k = z.konto;
-  h += '<div class="urlaubzeile'+(k.rest < 0 ? ' neg' : '')+'"><span>Resturlaub zum 31.12.'+JAHR+'</span>'
+  h += '<div class="urlaubzeile'+(k.rest < 0 ? ' neg' : '')+'"><span>Resturlaub zum 31.12.'
+    +  (REPORT.konto_jahr || JAHR)+'</span>'
     +  '<b>'+tage(k.rest)+'</b><i>Anspruch '+num(k.anspruch)+' + Übertrag '+num(k.uebertrag)
     +  ' − genommen '+num(k.genommen)+' − geplant '+num(k.geplant)+'</i></div>';
 
-  if(z.perioden.length){
+  // In der Einzelansicht stehen alle Eintraege ohnehin darunter - dort nicht doppelt
+  if(z.perioden.length && !einzeln){
     h += '<div class="ptitel">Einzelne Zeiträume (für Lohnabrechnung und U1)</div>';
     z.perioden.forEach(function(pz){
       var t = TY[pz.typ] || {label:pz.typ, farbe:'#888'};
@@ -1439,6 +1475,34 @@ function personKarte(z){
     });
   }
   (z.hinweise||[]).forEach(function(hw){ h += '<div class="flag">'+esc(hw)+'</div>'; });
+  if(!einzeln && z.id){
+    h += '<div class="werkzeug noprint" style="margin:12px 0 0">'
+      +  '<button class="btn small ghost" onclick="personWahl(\''+z.id+'\')">Einzeln ansehen</button>'
+      +  '<a class="btn small ghost" href="'+reportAdresse('api.php?a=report_csv').replace(/&staff=[^&]*/, '')
+      +    '&amp;staff='+encodeURIComponent(z.id)+'">Excel für '+esc(z.name)+'</a></div>';
+  }
+  return h + '</div>';
+}
+
+/** Jeder einzelne Eintrag der Person im Zeitraum - zum Nachpruefen jeder Zahl. */
+function eintraegeKarte(z){
+  var liste = (z.eintraege || []).slice().sort(function(a,b){ return a.von < b.von ? -1 : 1; });
+  var h = '<div class="person"><div class="ptitel" style="margin-top:0">Alle Einträge im Zeitraum · '
+        + liste.length+'</div>';
+  if(!liste.length) return h + '<p class="muted">In diesem Zeitraum gibt es keine Einträge.</p></div>';
+  var st = {beantragt:'beantragt – noch nicht entschieden', gemeldet:'gemeldet', genehmigt:'genehmigt'};
+  liste.forEach(function(e){
+    var t = TY[e.typ] || {label:e.typ, farbe:'#888'};
+    var offen = S.leitung && S.absences.some(function(a){ return a.id === e.id; });
+    h += '<div class="antrag"><span class="dot" style="background:'+t.farbe+'"></span>'
+      + '<div class="t"><b>'+esc(t.label)+'</b>'+(e.halbtag ? ' (halber Tag)' : '')+' · '+zeitraum(e.von, e.bis)
+      + '<br><span class="muted">'+esc(e.gruppe)+' · '+num(e.at)+' AT · '+e.kt+' KT'
+      + (e.ganz ? '' : ' <i>(nur der Teil im Zeitraum)</i>')
+      + ' · '+esc(st[e.status] || e.status)
+      + (e.nachweis ? ' · Nachweis liegt vor' : '')+'</span></div>'
+      + (offen ? '<button class="btn small ghost noprint" onclick="openEintragById(\''+e.id+'\')">öffnen</button>' : '')
+      + '</div>';
+  });
   return h + '</div>';
 }
 function rPost(v, l){ return '<span class="rp"><b>'+num(v||0)+'</b><span>'+l+'</span></span>'; }
