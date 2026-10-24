@@ -172,6 +172,9 @@ td.d .klammer{position:absolute;right:1px;top:1px;width:0;height:0;
   border-bottom:1px solid var(--line)}
 .festKopf b{display:block;font-size:1rem}
 .festKopf span{display:block;font-size:0.78rem;color:var(--mut);margin-top:2px}
+.zweiknopf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.zweiknopf .btn{margin:0}
+.btn.krank{background:#dc2626}
 .fest{background:#f3f4f6;border-left:3px solid #9aa5ad;border-radius:8px;padding:11px 13px;
   font-size:0.8rem;line-height:1.6;color:var(--ink);margin-bottom:12px}
 /* ---- Auswertung: eine Karte je Person ---- */
@@ -298,7 +301,7 @@ var TY = {};                        // typ-key -> definition
 var MSG = null;
 
 /** Stand dieser Datei - muss zu dem in api.php passen (siehe versionsHinweis). */
-var VERSION = '2026-10-24';
+var VERSION = '2026-10-24.2';
 var WTAG = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 var MNAME = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 var MKURZ = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -389,6 +392,8 @@ var FEHLER = {
   keine_berechtigung:'Dafür fehlt Ihnen die Berechtigung.',
   keine_empfaenger:'Bitte zuerst die Adresse der Steuerberatung eintragen.',
   elternzeit_gesperrt:'Mutterschutz und Elternzeit trägt die Praxisleitung ein.',
+  schon_krank_gemeldet:'Für diesen Tag sind Sie bereits krankgemeldet. Den Krankenschein bitte beim '
+    + 'vorhandenen Eintrag hochladen – eine zweite Meldung ist nicht nötig.',
   adresse_ungueltig:'Bitte eine gültige E-Mail-Adresse eintragen.'
 };
 function fehlerText(e){
@@ -1426,10 +1431,13 @@ function viewMeins(){
       + rOp('=') + '<span class="rp erg"><b>'+num(k.rest)+'</b><span>Rest 31.12.</span></span></div>'
     + '<div class="chips">'+chip('Krank', k.krank, 'AT')+chip('Kind krank', k.kind, 'AT')
       + chip('Fortbildung', k.fortbildung, 'AT')+'</div>'
-    + '<button class="btn" style="margin-top:12px" onclick="openEintrag({})">Urlaub beantragen</button>'
-    + '<div class="hilfe">Krankenschein oder Attest fürs Kind: unten beim passenden Eintrag auf '
-    + '<b>Nachweis hochladen</b> tippen – Foto oder PDF genügt. Nur die Praxisleitung und Sie selbst '
-    + 'können die Datei öffnen.</div></div>';
+    + '<div class="zweiknopf">'
+    +   '<button class="btn" onclick="openEintrag({typ:\'urlaub\'})">Urlaub beantragen</button>'
+    +   '<button class="btn krank" onclick="openEintrag({typ:\'krank\'})">Krank melden</button>'
+    + '</div>'
+    + '<div class="hilfe"><b>Krankenschein nachreichen?</b> Nicht noch einmal krank melden – unten '
+    + 'beim vorhandenen Eintrag auf <b>Nachweis</b> tippen und dort hochladen. Foto oder PDF genügt. '
+    + 'Nur die Praxisleitung und Sie selbst können die Datei öffnen.</div></div>';
 
   var meine = S.absences.filter(function(a){ return a.staff_id === sid; })
                         .sort(function(a,b){ return a.von < b.von ? 1 : -1; });
@@ -1850,13 +1858,14 @@ function openEintrag(a){
          + 'style="--c:'+t.farbe+'" onclick="typWahl(this)"><i></i>'+esc(t.label)+'</button>';
   }).join('');
 
-  dialog(a.id ? 'Eintrag ändern' : (istL ? 'Neuer Eintrag' : 'Urlaub beantragen'),
+  dialog(a.id ? 'Eintrag ändern' : 'Neuer Eintrag',
      wer
    + '<div class="row one"><div><label>'+(istL?'2. ':'1. ')+'Was?</label>'
    + '<div class="typegrid" id="a_typen">'+chips+'</div>'
    + '<input type="hidden" id="a_typ" value="'+esc(typ)+'"></div></div>'
    + '<label style="margin-bottom:7px">'+(istL?'3. ':'2. ')+'Wann?</label>'
    + '<div id="a_zeit">' + zeitraumZeile(0, a.von||heute, a.bis||a.von||heute) + '</div>'
+   + '<div id="a_schon" style="display:none"></div>'
    + '<div style="display:flex;gap:7px;margin-bottom:11px;flex-wrap:wrap">'
    +   '<button type="button" class="btn small ghost" onclick="spanne(0)">1 Tag</button>'
    +   '<button type="button" class="btn small ghost" onclick="spanne(6)">1 Woche</button>'
@@ -2145,7 +2154,33 @@ function vorschau(){
     var schon = [];
     res.forEach(function(r){ (r.vorhanden||[]).forEach(function(v){
       if(!schon.filter(function(x){ return x.id === v.id; }).length) schon.push(v); }); });
-    if(schon.length){
+    // Dieselbe Krankmeldung gibt es schon: das ist fast immer der Versuch, den Schein
+    // nachzureichen. Dafuer zum vorhandenen Eintrag leiten - eine zweite Meldung ginge
+    // sonst ein zweites Mal an die Steuerberatung.
+    var gleich = istKrankArt(typ) ? schon.filter(function(v){ return v.typ === typ; })[0] : null;
+    var speichern = el('dlg_save');
+    var hinweisBox = el('a_schon');
+    if(gleich && !S.leitung){
+      if(hinweisBox){
+        hinweisBox.innerHTML = '<div class="fest" style="margin:0 0 12px">'
+          + '<b>Für diesen Tag sind Sie bereits krankgemeldet</b> ('+esc(gleich.label)+' '
+          + zeitraum(gleich.von, gleich.bis)+').<br>Den Krankenschein laden Sie beim vorhandenen '
+          + 'Eintrag hoch – eine zweite Krankmeldung ist nicht nötig. Sind Sie länger krank, '
+          + 'tragen Sie bitte nur die <b>neuen</b> Tage ein.<br>'
+          + '<button type="button" class="btn small" style="margin-top:9px" '
+          + 'onclick="openEintragById(\''+gleich.id+'\')">Zum vorhandenen Eintrag – Krankenschein hochladen</button></div>';
+        hinweisBox.style.display = '';
+      }
+      if(speichern){ speichern.disabled = true; speichern.dataset.gesperrt = '1'; }
+      if(el('a_nachweisbox')) el('a_nachweisbox').style.display = 'none';
+    } else {
+      if(hinweisBox){ hinweisBox.innerHTML = ''; hinweisBox.style.display = 'none'; }
+      if(speichern && speichern.dataset.gesperrt){
+        speichern.disabled = false; delete speichern.dataset.gesperrt;
+        nachweisSichtbarkeit();
+      }
+    }
+    if(schon.length && !(gleich && !S.leitung)){
       txt += '<br>&#9888; Für diese Person gibt es hier schon: '
            + schon.map(function(v){ return esc(v.label)+' '+zeitraum(v.von,v.bis); }).join(', ')
            + '. Bitte prüfen, ob der Eintrag doppelt wäre.';

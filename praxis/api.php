@@ -11,7 +11,7 @@ declare(strict_types=1);
  * ueberein, wurde nur eine der zwei Dateien hochgeladen (oder der Browser zeigt
  * noch die alte Oberflaeche) - die Anwendung sagt das dann oben auf der Seite.
  */
-const VERSION = '2026-10-24';
+const VERSION = '2026-10-24.2';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -840,6 +840,24 @@ function meldungFehlerMerken(string $absenceId, array $r): void {
      ->execute([($r['stufe'] ?? '') . '|' . $text, date('c'), $absenceId]);
 }
 
+/** Liegen alle Tage dieses Eintrags schon in frueher gemeldeten Eintraegen derselben Art? */
+function tageSchonGemeldet(array $a): bool {
+  $st = db()->prepare("SELECT von, bis FROM " . t('absences') . "
+                       WHERE staff_id = ? AND typ = ? AND id <> ? AND bis >= ? AND von <= ?
+                       AND mail_am IS NOT NULL AND mail_am <> ''
+                       AND status NOT IN ('abgelehnt','storniert')");
+  $st->execute([$a['staff_id'], $a['typ'], $a['id'], $a['von'], $a['bis']]);
+  $gemeldet = $st->fetchAll();
+  if (!$gemeldet) return false;
+  for ($t = strtotime($a['von'] . ' 12:00'); $t <= strtotime($a['bis'] . ' 12:00'); $t += 86400) {
+    $tag = date('Y-m-d', $t);
+    $drin = false;
+    foreach ($gemeldet as $g) if ($g['von'] <= $tag && $tag <= $g['bis']) { $drin = true; break; }
+    if (!$drin) return false;                     // mindestens ein Tag ist neu -> melden
+  }
+  return true;
+}
+
 /** Meldung verschicken und das Datum am Eintrag vermerken. */
 function meldungMailSenden(string $absenceId, bool $erneut = false): array {
   $c = mailKonfig();
@@ -861,6 +879,16 @@ function meldungMailSenden(string $absenceId, bool $erneut = false): array {
   if (!$erneut && !empty($a['mail_am'])) return ['ok' => true, 'schon' => true];
   $m = ladeStaff((string)$a['staff_id']);
   if (!$m) return ['ok' => false, 'fehler' => 'Person nicht gefunden'];
+
+  // Sind alle Tage dieses Eintrags schon mit einer frueheren Meldung derselben Art
+  // bei der Steuerberatung? Dann waere das ein Duplikat - nicht verschicken, aber als
+  // gemeldet vermerken. "erneut senden" durch die Leitung geht weiterhin.
+  if (!$erneut && tageSchonGemeldet($a)) {
+    db()->prepare("UPDATE " . t('absences') . " SET mail_am = ?, mail_fehler = '' WHERE id = ?")
+       ->execute([date('c'), $absenceId]);
+    logAction('meldung_doppelt_verhindert', $a['typ'] . ' ' . $m['name'] . ' ' . $a['von']);
+    return ['ok' => true, 'schon' => true, 'doppelt' => true];
+  }
 
   $inhalt = meldungMailText($m, $a);
   $r = mailVersenden($c, mailAdressen($c['an']), mailAdressen($c['cc']), $inhalt['betreff'], $inhalt['text']);
@@ -1664,7 +1692,7 @@ case 'preview': {
     if ($ausser !== '' && $a['id'] === $ausser) continue;
     $label = $a['typ'];
     foreach (TYPEN as $ty) if ($ty['key'] === $a['typ']) $label = $ty['label'];
-    $schon[] = ['id' => $a['id'], 'label' => $label, 'von' => $a['von'], 'bis' => $a['bis']];
+    $schon[] = ['id' => $a['id'], 'typ' => $a['typ'], 'label' => $label, 'von' => $a['von'], 'bis' => $a['bis']];
   }
   $r['vorhanden'] = $schon;
   out($r);
@@ -1696,6 +1724,19 @@ case 'save_absence': {
     $d['staff_id'] = $eigene;
     // Urlaub & Co. sind Antraege, eine Krankmeldung ist eine Meldung - sofort verbindlich
     $d['status'] = in_array($typ, ['krank', 'kind_krank'], true) ? 'gemeldet' : 'beantragt';
+    // Ist fuer diese Tage schon eine Krankmeldung da, ist eine zweite fast immer der Versuch,
+    // den Krankenschein nachzureichen. Der gehoert an den vorhandenen Eintrag - eine zweite
+    // Meldung wuerde die Steuerberatung doppelt benachrichtigen.
+    if (in_array($typ, ['krank', 'kind_krank'], true)) {
+      $st = db()->prepare("SELECT id, von, bis FROM " . t('absences') . "
+                           WHERE staff_id = ? AND typ = ? AND bis >= ? AND von <= ?
+                           AND status NOT IN ('abgelehnt','storniert') AND id <> ?
+                           ORDER BY von LIMIT 1");
+      $st->execute([$eigene, $typ, $von, $bis, $id]);
+      if ($schon = $st->fetch()) {
+        out(['error' => 'schon_krank_gemeldet', 'vorhanden' => $schon], 409);
+      }
+    }
     if ($id !== '') {
       $st = db()->prepare("SELECT * FROM " . t('absences') . " WHERE id = ?");
       $st->execute([$id]);

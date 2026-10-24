@@ -237,7 +237,17 @@ Verschickt wird **genau einmal**, und zwar wenn
 * Einträge, die angelegt wurden, als der Versand noch nicht eingerichtet oder
   ausgeschaltet war – auch nicht, wenn er später eingeschaltet wird;
 * Änderungen an einem bestehenden Eintrag (Zeitraum verlängert, Notiz ergänzt …);
-* „Zur Kenntnis" bei einer Krankmeldung – die ging schon beim Eintragen raus.
+* „Zur Kenntnis" bei einer Krankmeldung – die ging schon beim Eintragen raus;
+* das Hochladen eines Krankenscheins oder Attests – der Nachweis ist nur für die
+  Praxis und geht nie an die Steuerberatung;
+* ein Eintrag, dessen Tage alle schon mit einer früheren Meldung derselben Art
+  gemeldet wurden – auch wenn die Praxisleitung sie versehentlich doppelt einträgt.
+
+Meldet sich eine Mitarbeiterin für einen Tag krank, für den sie schon krankgemeldet
+ist – meist, weil sie den Krankenschein nachreichen will –, nimmt der Kalender das
+nicht an. Stattdessen zeigt er direkt unter dem Datum einen Knopf zum vorhandenen
+Eintrag, wo sie den Schein hochlädt. Ist sie länger krank, trägt sie nur die
+**neuen** Tage ein; die gehen dann als eigene Meldung raus.
 
 Wird eine Krankmeldung verlängert und soll die Steuerberatung den neuen Zeitraum
 bekommen, im Eintrag auf **erneut senden** tippen.
