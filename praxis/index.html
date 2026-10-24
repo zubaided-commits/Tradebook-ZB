@@ -212,14 +212,14 @@ table.fz td:first-child{white-space:nowrap}
 table.fz td .dot{display:inline-block;margin-right:8px;vertical-align:-1px}
 table.fz tr.gesamt td{font-weight:700;border-top:2px solid var(--line)}
 /* Urlaubsrechnung: Anspruch + Uebertrag - genommen - geplant = Rest */
-.rechnung{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;background:#f5f8f6;
+.rechnung{display:flex;align-items:flex-end;flex-wrap:wrap;gap:4px 8px;background:#f5f8f6;
   border:1px solid var(--line);border-radius:12px;padding:10px 13px}
 .rechnung .rt{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;
   font-weight:700;width:100%;margin-bottom:2px}
 .rechnung .rp{display:flex;flex-direction:column;align-items:center;min-width:56px}
 .rechnung .rp b{font-family:var(--serif);font-size:1.12rem;font-weight:600;font-variant-numeric:tabular-nums}
 .rechnung .rp span{font-size:0.56rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.04em;margin-top:1px}
-.rechnung .rop{color:var(--mut);font-size:0.95rem;font-weight:600;padding-bottom:12px}
+.rechnung .rop{color:var(--mut);font-size:0.95rem;font-weight:600;padding-bottom:15px;line-height:1}
 .rechnung .rp.erg b{color:var(--accent);font-size:1.32rem}
 .rechnung.neg{background:#fef2f2;border-color:#fecaca}
 .rechnung.neg .rp.erg b{color:var(--bad)}
@@ -983,7 +983,7 @@ function viewKonten(){
       h += '<div class="flag">Kinderkrankentage: '+num(k.kind)+' Tage in '+JAHR+' – gesetzlicher Rahmen (15 je Kind/Elternteil) ausgeschöpft.</div>';
     }
     if(k.rest < 0){
-      h += '<div class="flag">'+num(-k.rest)+' Tage mehr verplant als vorhanden – bitte den Übertrag prüfen '
+      h += '<div class="flag">'+tage(-k.rest)+' mehr verplant als vorhanden – bitte den Übertrag prüfen '
          + 'oder einen Urlaubsantrag anpassen.</div>';
     }
     if(k.rest > 0 && !k.hinweis_am){
@@ -1387,7 +1387,7 @@ function personKarte(z){
     + rOp('−') + rPost(k.genommen,'genommen') + rOp('−') + rPost(k.geplant,'geplant')
     + rOp('=') + '<span class="rp erg"><b>'+num(rest)+'</b><span>Rest 31.12.</span></span></div>';
   if(rest < 0){
-    h += '<div class="flag">'+num(-rest)+' Tage mehr verplant als vorhanden – bitte den Übertrag prüfen '
+    h += '<div class="flag">'+tage(-rest)+' mehr verplant als vorhanden – bitte den Übertrag prüfen '
       +  'oder einen Urlaubsantrag anpassen.</div>';
   }
 
