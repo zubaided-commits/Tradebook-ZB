@@ -208,6 +208,34 @@ table.fz td{padding:9px 12px 9px 0;border-top:1px solid var(--line);font-size:0.
 table.fz td:first-child{padding-left:0}
 table.fz td.n{text-align:right;width:104px;font-variant-numeric:tabular-nums}
 .fznote{font-size:0.68rem;color:var(--mut);margin:-6px 0 12px;line-height:1.5}
+/* Auswertung: zwei Kopfzahlen - Fehlzeiten zuerst, Urlaub daneben */
+.kopfzahlen{display:flex;gap:9px;flex-wrap:wrap}
+.kz{display:flex;flex-direction:column;align-items:flex-start;min-width:148px;padding:9px 14px 10px;
+  border-radius:12px;background:#f6f7f8;border:1px solid var(--line)}
+.kz .kzt{font-size:0.55rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;font-weight:700}
+.kz b{font-family:var(--serif);font-size:1.6rem;font-weight:600;line-height:1.15;margin-top:3px;
+  font-variant-numeric:tabular-nums;color:var(--ink)}
+.kz span:last-child{font-size:0.68rem;color:var(--mut)}
+.kz.fehl{background:#f1f7f3;border-color:#cfe3d6}
+.kz.fehl b{color:var(--accent)}
+.kz.fehl.da{background:#fdf3f2;border-color:#f3d0cc}
+.kz.fehl.da b{color:#b42318}
+/* Gruppenueberschriften in der Tabelle */
+table.fz tr.gk td{padding:13px 0 5px;border-top:none;font-size:0.58rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.06em;color:var(--mut)}
+table.fz tr.gk-fehl td{color:#b42318}
+table.fz tr.gk:first-child td{padding-top:4px}
+table.fz tr.zs td{font-weight:600;color:var(--mut);font-size:0.8rem;border-top:1px dashed var(--line)}
+table.fz tr.keine td{color:var(--mut);font-size:0.8rem;font-style:italic;white-space:normal}
+table.fz tr.gk td,table.fz tr.gesamt td:first-child{white-space:normal}
+/* Urlaubsstand als eine Zeile */
+.urlaubzeile{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;padding:10px 13px;
+  border-radius:10px;background:#f5f8f6;font-size:0.8rem}
+.urlaubzeile span{font-size:0.58rem;color:var(--mut);text-transform:uppercase;letter-spacing:0.05em;font-weight:700}
+.urlaubzeile b{color:var(--accent)}
+.urlaubzeile i{font-style:normal;color:var(--mut);font-size:0.72rem}
+.urlaubzeile.neg{background:#fef2f2}
+.urlaubzeile.neg b{color:var(--bad)}
 table.fz td:first-child{white-space:nowrap}
 table.fz td .dot{display:inline-block;margin-right:8px;vertical-align:-1px}
 table.fz tr.gesamt td{font-weight:700;border-top:2px solid var(--line)}
@@ -236,7 +264,10 @@ table.fz tr.gesamt td{font-weight:700;border-top:2px solid var(--line)}
 @media (max-width:520px){
   .person{padding:14px}
   .person .pz b{font-size:1.28rem}
-  table.fz td.n{width:70px}
+  table.fz td.n{width:64px;padding-right:6px}
+  table.fz th{padding-right:6px}
+  table.fz td:first-child{white-space:normal}
+  .kz{min-width:0;flex:1}
 }
 /* ---- Liste ---- */
 .item{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--line)}
@@ -301,7 +332,7 @@ var TY = {};                        // typ-key -> definition
 var MSG = null;
 
 /** Stand dieser Datei - muss zu dem in api.php passen (siehe versionsHinweis). */
-var VERSION = '2026-10-24.2';
+var VERSION = '2026-10-24.3';
 var WTAG = ['Mo','Di','Mi','Do','Fr','Sa','So'];
 var MNAME = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
 var MKURZ = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
@@ -947,7 +978,9 @@ function viewKonten(){
         +   '<a class="btn small ghost" href="api.php?a=export&amp;jahr='+JAHR+'&amp;format=csv">CSV</a>'
         +   '<button class="btn small ghost" onclick="window.print()">Drucken</button></div>'
         + '<p class="muted">Rest = Anspruch + Übertrag − genommen − geplant. <b>AT</b> = Arbeitstage nach '
-        + 'persönlichem Wochenmuster; Wochenenden und Feiertage sind bereits abgezogen.</p></div>';
+        + 'persönlichem Wochenmuster; Wochenenden und Feiertage sind bereits abgezogen. '
+        + 'Krankheit, Abwesend, Sonderurlaub und andere Fehlzeiten stehen im Reiter '
+        + '<a href="#" onclick="setView(\'lohn\');return false;"><b>Auswertung</b></a>.</p></div>';
   var staff = S.staff.filter(function(m){ return m.aktiv; });
   if(!staff.length) return h+'<div class="card"><p class="muted">Noch keine Mitarbeiterinnen angelegt.</p></div>';
 
@@ -968,20 +1001,8 @@ function viewKonten(){
         + '<span class="rt">Urlaub '+JAHR+'</span>'
         + rPost(k.anspruch,'Anspruch') + rOp('+') + rPost(k.uebertrag,'Übertrag')
         + rOp('−') + rPost(k.genommen,'genommen') + rOp('−') + rPost(k.geplant,'geplant')
-        + rOp('=') + '<span class="rp erg"><b>'+num(k.rest)+'</b><span>Rest 31.12.</span></span></div>'
-      + '<div class="chips">'
-        + chip('Krank', k.krank, 'AT') + chip('Kind krank', k.kind, 'AT')
-        + chip('Fortbildung', k.fortbildung, 'AT') + chip('Sonderurlaub', k.sonder||0, 'AT')
-      + '</div>';
-    if(k.krank_12m_kalendertage >= 42){
-      h += '<div class="flag"><b>6-Wochen-Grenze erreicht:</b> '+k.krank_12m_kalendertage
-         + ' Krankheits-Kalendertage in den letzten 12 Monaten. Entgeltfortzahlung prüfen (EFZG) und BEM anbieten.</div>';
-    } else if(k.krank_12m_kalendertage >= 30){
-      h += '<div class="flag">'+k.krank_12m_kalendertage+' Krankheitstage in 12 Monaten – 6-Wochen-Grenze (42 Tage) im Blick behalten.</div>';
-    }
-    if(k.kind >= 15){
-      h += '<div class="flag">Kinderkrankentage: '+num(k.kind)+' Tage in '+JAHR+' – gesetzlicher Rahmen (15 je Kind/Elternteil) ausgeschöpft.</div>';
-    }
+        + rOp('=') + '<span class="rp erg"><b>'+num(k.rest)+'</b><span>Rest 31.12.</span></span></div>';
+    // Krankheit und andere Fehlzeiten stehen in der Auswertung - hier nur der Urlaub
     if(k.rest < 0){
       h += '<div class="flag">'+tage(-k.rest)+' mehr verplant als vorhanden – bitte den Übertrag prüfen '
          + 'oder einen Urlaubsantrag anpassen.</div>';
@@ -1311,8 +1332,9 @@ function viewLohn(){
     +   '<a class="btn small ghost" href="'+reportAdresse('api.php?a=report_csv')+'&amp;format=csv">CSV (DATEV)</a>'
     +   '<button class="btn small ghost" onclick="window.print()">Drucken</button>'
     + '</div>'
-    + '<p class="muted">'+dmy(REPORT.von)+' bis '+dmy(REPORT.bis)+' · <b>AT</b> = Arbeitstage nach '
-    + 'persönlichem Wochenmuster, <b>KT</b> = Kalendertage. Jeder Tag zählt genau einmal. '
+    + '<p class="muted">'+dmy(REPORT.von)+' bis '+dmy(REPORT.bis)+' · <b>Fehlzeiten ohne Urlaub</b> = Krank, '
+    + 'Kind krank, Abwesend/Sonstiges, Sonderurlaub und unbezahlter Urlaub – die Tage, an denen jemand nicht '
+    + 'zur Arbeit kam. <b>AT</b> = Arbeitstage nach persönlichem Wochenmuster, <b>KT</b> = Kalendertage. '
     + 'Ohne Notizen und ohne Diagnosen.</p></div>';
 
   var leer = true;
@@ -1334,65 +1356,76 @@ function viewLohn(){
   return h;
 }
 
-/** Zeilen der Fehlzeiten-Tabelle: nur, was tatsaechlich vorkommt. */
-function fehlzeitZeilen(z){
-  var r = [
-    ['urlaub',       'Urlaub',                     z.urlaub,          null],
-    ['sonderurlaub', 'Sonderurlaub',               z.sonderurlaub,    null],
-    ['unbezahlt',    'Unbezahlter Urlaub',         z.unbezahlt,       null],
-    ['krank',        'Krank (AU)',                 z.krank_at,        z.krank_kt],
-    ['kind_krank',   'Kind krank',                 z.kind_at,         z.kind_kt],
-    ['mutterschutz', 'Mutterschutz / Elternzeit',  z.mutterschutz_at, z.mutterschutz_kt],
-    ['fortbildung',  'Fortbildung',                z.fortbildung,     null],
-    ['berufsschule', 'Berufsschule',               z.berufsschule,    null],
-    ['ueberstunden', 'Überstundenabbau',           z.ueberstunden,    null],
-    ['abwesend',     'Abwesend / Sonstiges',       z.sonstiges,       null]
-  ];
-  return r.filter(function(x){ return (x[2] || 0) > 0 || (x[3] || 0) > 0; });
-}
+/**
+ * Arten in Gruppen - so laesst sich ablesen, wie oft jemand NICHT zur Arbeit kam,
+ * getrennt vom Urlaub und von Dienstlichem. Muss zu FEHLZEIT_ARTEN / DIENST_ARTEN
+ * in api.php passen.
+ */
+var GRUPPEN = [
+  {key:'fehl',   titel:'Fehlzeiten ohne Urlaub', zeigeLeer:true,
+   arten:[['krank','Krank (AU)','krank_at'], ['kind_krank','Kind krank','kind_at'],
+          ['abwesend','Abwesend / Sonstiges','sonstiges'], ['sonderurlaub','Sonderurlaub','sonderurlaub'],
+          ['unbezahlt','Unbezahlter Urlaub','unbezahlt']]},
+  {key:'mutter', titel:'Mutterschutz / Elternzeit',
+   arten:[['mutterschutz','Mutterschutz / Elternzeit','mutterschutz_at']]},
+  {key:'dienst', titel:'Dienstlich / Ausgleich',
+   arten:[['fortbildung','Fortbildung','fortbildung'], ['berufsschule','Berufsschule','berufsschule'],
+          ['ueberstunden','Überstundenabbau','ueberstunden']]},
+  {key:'urlaub', titel:'Urlaub', arten:[['urlaub','Urlaub','urlaub']]}
+];
 
-/** Eine Person: Kopf mit den beiden Hauptzahlen, Tabelle der Arten, Urlaubsrechnung. */
+/** Eine Person in der Auswertung: zuerst die Fehlzeiten, dann der Rest, zuletzt die Summe. */
 function personKarte(z){
-  var zeilen = fehlzeitZeilen(z);
+  var kt = z.kt || {};
   var h = '<div class="person">'
     + '<div class="ph"><div class="pn"><b>'+esc(z.name)+'</b><span>'+esc(ROLLEN[z.rolle]||z.rolle)
     +   (z.eintritt ? ' · Eintritt '+dmy(z.eintritt) : '')
     +   (z.austritt ? ' · Austritt '+dmy(z.austritt) : '')+'</span></div>'
-    + '<div class="pzwrap"><span class="pzlabel">abwesend im Zeitraum</span><div class="pzbox">'
-    +   '<div class="pz"><b>'+num(z.abwesend_at)+'</b><span>Arbeitstage</span></div>'
-    +   '<div class="pz"><b>'+z.abwesend_kt+'</b><span>Kalendertage</span></div>'
-    + '</div></div></div>';
+    + '<div class="kopfzahlen">'
+    +   '<div class="kz fehl'+(z.fehl_at > 0 ? ' da' : '')+'"><span class="kzt">Fehlzeiten ohne Urlaub</span>'
+    +     '<b>'+num(z.fehl_at)+'</b><span>'+(z.fehl_at === 1 ? 'Arbeitstag' : 'Arbeitstage')
+    +     ' · '+z.fehl_kt+' KT</span></div>'
+    +   '<div class="kz"><span class="kzt">Urlaub</span><b>'+num(z.urlaub)+'</b>'
+    +     '<span>'+(z.urlaub === 1 ? 'Arbeitstag' : 'Arbeitstage')+'</span></div>'
+    + '</div></div>';
 
-  if(zeilen.length){
-    h += '<table class="fz"><thead><tr><th>Art der Abwesenheit</th>'
-      +  '<th>Arbeitstage<i>AT</i></th><th>Kalendertage<i>KT</i></th></tr></thead><tbody>';
-    zeilen.forEach(function(x){
-      var t = TY[x[0]] || {farbe:'#9aa5ad'};
-      h += '<tr><td><span class="dot" style="background:'+t.farbe+'"></span>'+esc(x[1])+'</td>'
-        +  '<td class="n">'+((x[2]||0) > 0 ? num(x[2]) : '–')+'</td>'
-        +  '<td class="n">'+(x[3] ? x[3] : '–')+'</td></tr>';
+  var zeilen = '';
+  GRUPPEN.forEach(function(g){
+    var teile = g.arten.filter(function(a){ return (z[a[2]]||0) > 0 || (kt[a[0]]||0) > 0; });
+    if(!teile.length && !g.zeigeLeer) return;
+    var sumAt = 0, sumKt = 0;
+    zeilen += '<tr class="gk gk-'+g.key+'"><td colspan="3">'+esc(g.titel)+'</td></tr>';
+    if(!teile.length){
+      zeilen += '<tr class="keine"><td colspan="3">keine – an allen Arbeitstagen da gewesen'
+             +  (z.urlaub > 0 || z.dienst_at > 0 ? ', abgesehen von Urlaub und Dienstlichem' : '')+'</td></tr>';
+      return;
+    }
+    teile.forEach(function(a){
+      var t = TY[a[0]] || {farbe:'#9aa5ad'};
+      var at = z[a[2]] || 0, k = kt[a[0]] || 0;
+      sumAt += at; sumKt += k;
+      zeilen += '<tr><td><span class="dot" style="background:'+t.farbe+'"></span>'+esc(a[1])+'</td>'
+             +  '<td class="n">'+(at > 0 ? num(at) : '–')+'</td><td class="n">'+(k || '–')+'</td></tr>';
     });
-    h += '<tr class="gesamt"><td>Abwesend gesamt</td><td class="n">'+num(z.abwesend_at)+'</td>'
-      +  '<td class="n">'+z.abwesend_kt+'</td></tr></tbody></table>'
-      +  '<p class="fznote">Jeder Kalendertag zählt genau einmal – auch wenn zwei Einträge '
-      +  'auf denselben Tag fallen.</p>';
-  } else {
-    h += '<p class="muted" style="margin:2px 0 10px">Keine Fehlzeiten in diesem Zeitraum.</p>';
-  }
+    if(teile.length > 1){
+      zeilen += '<tr class="zs"><td>zusammen</td><td class="n">'+num(sumAt)+'</td>'
+             +  '<td class="n">'+sumKt+'</td></tr>';
+    }
+  });
+  h += '<table class="fz"><thead><tr><th>Art der Abwesenheit</th>'
+    +  '<th>Arbeitstage<i>AT</i></th><th>Kalendertage<i>KT</i></th></tr></thead><tbody>' + zeilen
+    +  '<tr class="gesamt"><td>Insgesamt nicht in der Praxis</td><td class="n">'+num(z.abwesend_at)+'</td>'
+    +  '<td class="n">'+z.abwesend_kt+'</td></tr></tbody></table>'
+    +  '<p class="fznote">Jeder Kalendertag zählt genau einmal – auch wenn zwei Einträge auf denselben Tag fallen.</p>';
 
-  var k = z.konto, rest = k.rest;
-  h += '<div class="rechnung'+(rest < 0 ? ' neg' : '')+'">'
-    + '<span class="rt">Urlaub '+JAHR+'</span>'
-    + rPost(k.anspruch,'Anspruch') + rOp('+') + rPost(k.uebertrag,'Übertrag')
-    + rOp('−') + rPost(k.genommen,'genommen') + rOp('−') + rPost(k.geplant,'geplant')
-    + rOp('=') + '<span class="rp erg"><b>'+num(rest)+'</b><span>Rest 31.12.</span></span></div>';
-  if(rest < 0){
-    h += '<div class="flag">'+tage(-rest)+' mehr verplant als vorhanden – bitte den Übertrag prüfen '
-      +  'oder einen Urlaubsantrag anpassen.</div>';
-  }
+  // Urlaubsstand nur als eine Zeile - die ausfuehrliche Rechnung steht im Reiter "Urlaub"
+  var k = z.konto;
+  h += '<div class="urlaubzeile'+(k.rest < 0 ? ' neg' : '')+'"><span>Resturlaub zum 31.12.'+JAHR+'</span>'
+    +  '<b>'+tage(k.rest)+'</b><i>Anspruch '+num(k.anspruch)+' + Übertrag '+num(k.uebertrag)
+    +  ' − genommen '+num(k.genommen)+' − geplant '+num(k.geplant)+'</i></div>';
 
   if(z.perioden.length){
-    h += '<div class="ptitel">Einzelne Zeiträume</div>';
+    h += '<div class="ptitel">Einzelne Zeiträume (für Lohnabrechnung und U1)</div>';
     z.perioden.forEach(function(pz){
       var t = TY[pz.typ] || {label:pz.typ, farbe:'#888'};
       h += '<div class="antrag"><span class="dot" style="background:'+t.farbe+'"></span>'

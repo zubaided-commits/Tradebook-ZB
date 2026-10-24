@@ -11,7 +11,7 @@ declare(strict_types=1);
  * ueberein, wurde nur eine der zwei Dateien hochgeladen (oder der Browser zeigt
  * noch die alte Oberflaeche) - die Anwendung sagt das dann oben auf der Seite.
  */
-const VERSION = '2026-10-24.2';
+const VERSION = '2026-10-24.3';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -372,14 +372,26 @@ function belegteTage(array $staff, array $abs, string $von, string $bis): array 
 }
 
 /** Summen je Konto-Gruppe aus den belegten Tagen. */
+/** Nicht zur Arbeit gekommen, ohne Urlaub und ohne Dienstliches. */
+const FEHLZEIT_ARTEN = ['krank', 'kind_krank', 'abwesend', 'sonderurlaub', 'unbezahlt'];
+/** Abwesend, aber dienstlich oder als Ausgleich - keine Fehlzeit. */
+const DIENST_ARTEN = ['fortbildung', 'berufsschule', 'ueberstunden'];
 function summenAusTagen(array $tage, string $stichtag = ''): array {
   $s = ['urlaub_genommen' => 0.0, 'urlaub_geplant' => 0.0, 'krank' => 0.0, 'krank_kal' => 0,
         'kind' => 0.0, 'kind_kal' => 0, 'fortbildung' => 0.0, 'sonder' => 0.0, 'stunden' => 0.0,
         'unbezahlt' => 0.0, 'berufsschule' => 0.0, 'sonstiges' => 0.0,
-        'mutterschutz' => 0.0, 'mutterschutz_kal' => 0, 'abwesend' => 0.0, 'abwesend_kal' => 0];
+        'mutterschutz' => 0.0, 'mutterschutz_kal' => 0, 'abwesend' => 0.0, 'abwesend_kal' => 0,
+        // Gruppen - "Fehlzeiten" sind Tage, an denen jemand nicht zur Arbeit kam,
+        // ohne dass es Urlaub oder etwas Dienstliches war
+        'fehl' => 0.0, 'fehl_kal' => 0, 'dienst' => 0.0, 'dienst_kal' => 0, 'urlaub_kal' => 0,
+        'kt' => []];
   foreach ($tage as $d => $t) {
     $f = (float)$t['faktor'];
     if ($t['typ'] !== 'geschlossen') { $s['abwesend'] += $f; $s['abwesend_kal']++; }
+    $s['kt'][$t['typ']] = ($s['kt'][$t['typ']] ?? 0) + 1;
+    if (in_array($t['typ'], FEHLZEIT_ARTEN, true)) { $s['fehl'] += $f; $s['fehl_kal']++; }
+    elseif (in_array($t['typ'], DIENST_ARTEN, true)) { $s['dienst'] += $f; $s['dienst_kal']++; }
+    elseif ($t['typ'] === 'urlaub') $s['urlaub_kal']++;
     switch ($t['typ']) {
       case 'urlaub':
         if ($stichtag !== '' && $d > $stichtag) $s['urlaub_geplant'] += $f;
@@ -1001,12 +1013,14 @@ function statusLabel(string $k): string { return STATUS_LABEL[$k] ?? $k; }
 
 /** Spalten und Zeilen der Fehlzeiten-Auswertung - fuer Excel und CSV gleich. */
 const REPORT_SPALTEN = ['Mitarbeiterin', 'Rolle', 'Eintritt', 'Austritt',
+  'Fehlzeiten ohne Urlaub AT', 'Fehlzeiten ohne Urlaub KT',
   'Abwesend gesamt AT', 'Abwesend gesamt KT', 'Urlaub AT', 'Sonderurlaub AT', 'Unbezahlt AT',
   'Krank AT', 'Krank KT', 'Kind krank AT', 'Mutterschutz / Elternzeit KT', 'Fortbildung AT',
   'Berufsschule AT', 'Überstunden AT', 'Sonstiges AT',
   'Urlaub Anspruch', 'Übertrag', 'genommen', 'geplant', 'Rest 31.12.'];
 function reportZeile(array $z): array {
   return [$z['name'], rolleLabel((string)$z['rolle']), $z['eintritt'], $z['austritt'],
+          (float)$z['fehl_at'], (float)$z['fehl_kt'],
           (float)$z['abwesend_at'], (float)$z['abwesend_kt'], (float)$z['urlaub'],
           (float)$z['sonderurlaub'], (float)$z['unbezahlt'], (float)$z['krank_at'],
           (float)$z['krank_kt'], (float)$z['kind_at'], (float)$z['mutterschutz_kt'],
@@ -1287,6 +1301,9 @@ function reportDaten(int $jahr, int $monat, string $vonFrei = '', string $bisFre
       'fortbildung' => round($sum['fortbildung'], 1), 'berufsschule' => round($sum['berufsschule'], 1),
       'ueberstunden' => round($sum['stunden'], 1),
       'abwesend_at' => round($sum['abwesend'], 1), 'abwesend_kt' => $sum['abwesend_kal'],
+      'fehl_at' => round($sum['fehl'], 1), 'fehl_kt' => $sum['fehl_kal'],
+      'dienst_at' => round($sum['dienst'], 1), 'dienst_kt' => $sum['dienst_kal'],
+      'urlaub_kt' => $sum['urlaub_kal'], 'kt' => $sum['kt'],
       'perioden' => [], 'hinweise' => [],
     ];
     // Einzelne Zeitraeume weiterhin aus den Eintraegen - sie sind fuer die Lohnabrechnung nötig
@@ -1321,7 +1338,15 @@ function reportDaten(int $jahr, int $monat, string $vonFrei = '', string $bisFre
     ];
     if (($k['krank_12m_kalendertage'] ?? 0) >= 42) {
       $z['hinweise'][] = ($k['krank_12m_kalendertage']) . ' Krankheits-Kalendertage in den letzten '
-        . '12 Monaten – Ende der Entgeltfortzahlung nach sechs Wochen prüfen.';
+        . '12 Monaten – Ende der Entgeltfortzahlung nach sechs Wochen prüfen.'
+        . (istLeitung() ? ' Ein Gespräch zum betrieblichen Eingliederungsmanagement (BEM) anbieten.' : '');
+    } elseif (istLeitung() && ($k['krank_12m_kalendertage'] ?? 0) >= 30) {
+      $z['hinweise'][] = $k['krank_12m_kalendertage'] . ' Krankheits-Kalendertage in den letzten '
+        . '12 Monaten – die Sechs-Wochen-Grenze (42 Tage) im Blick behalten.';
+    }
+    if (($k['kind'] ?? 0) >= 15) {
+      $z['hinweise'][] = 'Kinderkrankentage ' . $jahr . ': ' . str_replace('.', ',', (string)$k['kind'])
+        . ' – gesetzlicher Rahmen (15 Tage je Kind und Elternteil) ausgeschöpft.';
     }
     $z['leer'] = ($z['abwesend_at'] > 0 || $z['abwesend_kt'] > 0) ? 0 : 1;
     $zeilen[] = $z;
@@ -1944,25 +1969,28 @@ case 'export': {
 
   // ---- Blatt 1: Uebersicht je Person
   $u = ['name' => 'Übersicht', 'fixieren' => 4, 'filter' => [4, 4 + count($rep['zeilen'])],
-        'spalten' => [26, 15, 11, 11, 9, 9, 9, 9, 9, 9, 11, 10, 10, 10, 10, 10],
-        'hoehen' => [0 => 24, 3 => 34], 'zeilen' => []];
+        'spalten' => [26, 15, 11, 11, 14, 9, 9, 10, 11, 9, 9, 9, 12, 9, 10, 10, 10, 10, 10],
+        'hoehen' => [0 => 24, 3 => 48], 'zeilen' => []];
   $u['zeilen'][] = [['w' => $praxis, 's' => XL_TITEL]];
   $u['zeilen'][] = [['w' => 'Abwesenheiten und Urlaubskonten ' . $jahr . ' · ' . $stand, 's' => XL_GRAU]];
   $u['zeilen'][] = [];
   $u['zeilen'][] = array_map(fn($t) => ['w' => $t, 's' => XL_KOPF], [
-    'Mitarbeiterin', 'Rolle', 'Eintritt', 'Austritt', 'Urlaub AT', 'Sonder AT', 'Unbez. AT',
-    'Krank AT', 'Krank KT', 'Kind krank AT', 'Fortbildung AT', 'Abwesend AT',
+    'Mitarbeiterin', 'Rolle', 'Eintritt', 'Austritt', 'Fehlzeiten ohne Urlaub AT',
+    'Krank AT', 'Krank KT', 'Kind krank AT', 'Abwesend / Sonst. AT', 'Sonder AT', 'Unbez. AT',
+    'Urlaub AT', 'Fortbildung / Schule AT', 'Gesamt AT',
     'Anspruch', 'Übertrag', 'genommen', 'geplant', 'Rest 31.12.']);
   foreach ($rep['zeilen'] as $z) {
     $rest = (float)$z['konto']['rest'];
     $u['zeilen'][] = [
       ['w' => $z['name'], 's' => XL_FETT], ['w' => rolleLabel((string)$z['rolle']), 's' => XL_LABEL],
       ['w' => $z['eintritt'], 't' => 'd', 's' => XL_DATUM], ['w' => $z['austritt'], 't' => 'd', 's' => XL_DATUM],
-      ['w' => $z['urlaub'], 't' => 'n', 's' => XL_ZAHL], ['w' => $z['sonderurlaub'], 't' => 'n', 's' => XL_ZAHL],
-      ['w' => $z['unbezahlt'], 't' => 'n', 's' => XL_ZAHL], ['w' => $z['krank_at'], 't' => 'n', 's' => XL_ZAHL],
-      ['w' => $z['krank_kt'], 't' => 'n', 's' => XL_GANZ], ['w' => $z['kind_at'], 't' => 'n', 's' => XL_ZAHL],
-      ['w' => $z['fortbildung'], 't' => 'n', 's' => XL_ZAHL],
-      ['w' => $z['abwesend_at'], 't' => 'n', 's' => XL_ZAHLFETT],
+      ['w' => $z['fehl_at'], 't' => 'n', 's' => XL_ZAHLFETT],
+      ['w' => $z['krank_at'], 't' => 'n', 's' => XL_ZAHL], ['w' => $z['krank_kt'], 't' => 'n', 's' => XL_GANZ],
+      ['w' => $z['kind_at'], 't' => 'n', 's' => XL_ZAHL], ['w' => $z['sonstiges'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['sonderurlaub'], 't' => 'n', 's' => XL_ZAHL], ['w' => $z['unbezahlt'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['urlaub'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['dienst_at'], 't' => 'n', 's' => XL_ZAHL],
+      ['w' => $z['abwesend_at'], 't' => 'n', 's' => XL_ZAHL],
       ['w' => $z['konto']['anspruch'], 't' => 'n', 's' => XL_ZAHL],
       ['w' => $z['konto']['uebertrag'], 't' => 'n', 's' => XL_ZAHL],
       ['w' => $z['konto']['genommen'], 't' => 'n', 's' => XL_ZAHL],
@@ -1971,6 +1999,9 @@ case 'export': {
     ];
   }
   $u['zeilen'][] = [];
+  $u['zeilen'][] = [['w' => 'Fehlzeiten ohne Urlaub = Krank, Kind krank, Abwesend/Sonstiges, Sonderurlaub und '
+    . 'unbezahlter Urlaub – die Tage, an denen jemand nicht zur Arbeit kam, ohne dass es Urlaub oder etwas '
+    . 'Dienstliches war.', 's' => XL_GRAU]];
   $u['zeilen'][] = [['w' => 'AT = Arbeitstage nach dem persönlichen Wochenmuster · KT = Kalendertage · '
     . 'Rest 31.12. = Anspruch + Übertrag − genommen − geplant. Ein roter Wert bedeutet: es ist mehr '
     . 'Urlaub verplant als vorhanden.', 's' => XL_GRAU]];
@@ -2072,8 +2103,8 @@ case 'report_csv': {
 
   // ---- Blatt 1: Fehlzeiten je Person
   $a = ['name' => 'Fehlzeiten', 'fixieren' => 4, 'filter' => [4, 4 + count($d['zeilen'])],
-        'spalten' => [24, 16, 11, 11, 12, 12, 11, 13, 11, 10, 10, 12, 16, 12, 12, 12, 11, 12, 11, 12, 10, 12],
-        'hoehen' => [0 => 24, 3 => 34], 'zeilen' => []];
+        'spalten' => [24, 16, 11, 11, 14, 14, 12, 12, 11, 13, 11, 10, 10, 12, 16, 12, 12, 13, 11, 12, 11, 12, 10, 12],
+        'hoehen' => [0 => 24, 3 => 48], 'zeilen' => []];
   $a['zeilen'][] = [['w' => $d['praxis'], 's' => XL_TITEL]];
   $a['zeilen'][] = [['w' => 'Fehlzeiten für die Lohnabrechnung · ' . $zeitraum . ' · ' . $stand, 's' => XL_GRAU]];
   $a['zeilen'][] = [];
@@ -2116,6 +2147,9 @@ case 'report_csv': {
 
   // ---- Blatt 3: Erlaeuterung
   $hinweise = [
+    ['Fehlzeiten ohne Urlaub', 'Krank, Kind krank, Abwesend/Sonstiges, Sonderurlaub und unbezahlter Urlaub – '
+         . 'die Tage, an denen jemand nicht zur Arbeit kam, ohne dass es Urlaub oder etwas Dienstliches '
+         . '(Fortbildung, Berufsschule, Überstundenabbau) war.'],
     ['AT', 'Arbeitstage nach dem persönlichen Wochenmuster. Wochenenden, Feiertage und freie '
          . 'Teilzeittage sind abgezogen.'],
     ['KT', 'Kalendertage, also jeder Tag im Zeitraum – unabhängig vom Wochenmuster.'],

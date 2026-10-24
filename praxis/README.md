@@ -65,11 +65,26 @@ Der grüne Knopf **+ Eintrag** unten rechts ist immer erreichbar.
 ### Reiter „Lohn" – Auswertung für die Steuerberatung
 
 Fehlzeiten je Person für einen Monat, ein ganzes Jahr oder einen frei gewählten
-Zeitraum – als **Excel-Datei**, als CSV für DATEV und als Druckansicht. Jede Person
-steht auf einer eigenen Karte: oben die beiden Hauptzahlen, darunter eine Tabelle
-nur mit den Arten, die tatsächlich vorkommen, und zuletzt die Urlaubsrechnung
-*Anspruch + Übertrag − genommen − geplant = Rest*. Enthalten ist genau das, was die
-Lohnabrechnung braucht:
+Zeitraum – als **Excel-Datei**, als CSV für DATEV und als Druckansicht.
+
+Die wichtigste Zahl steht oben rechts auf jeder Karte: **Fehlzeiten ohne Urlaub** –
+die Tage, an denen jemand nicht zur Arbeit kam, ohne dass es Urlaub oder etwas
+Dienstliches war. Daneben steht der Urlaub im Zeitraum. Darunter sind die Arten in
+Gruppen getrennt:
+
+| Gruppe | Arten |
+|---|---|
+| **Fehlzeiten ohne Urlaub** | Krank, Kind krank, Abwesend/Sonstiges, Sonderurlaub, unbezahlter Urlaub |
+| Mutterschutz / Elternzeit | eigene Gruppe, damit lange Zeiten die Fehlzeiten nicht überdecken |
+| Dienstlich / Ausgleich | Fortbildung, Berufsschule, Überstundenabbau |
+| Urlaub | Urlaub |
+
+Gruppen ohne Einträge werden weggelassen – außer den Fehlzeiten: Hat jemand keine,
+steht dort ausdrücklich „keine". Die ausführliche Urlaubsrechnung steht im Reiter
+**Urlaub**; die Auswertung zeigt den Resturlaub nur als eine Zeile. Krankheitsbezogene
+Hinweise (Sechs-Wochen-Grenze, Kinderkrankentage) stehen in der Auswertung.
+
+Enthalten ist genau das, was die Lohnabrechnung braucht:
 
 * Urlaub, bezahlter Sonderurlaub, **unbezahlter Urlaub**
 * Krankheitstage als Arbeits- **und** Kalendertage, dazu jeder Zeitraum einzeln –
